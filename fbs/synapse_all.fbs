@@ -1,0 +1,7 @@
+include "synapse_topics.fbs";
+include "synapse_optical_flow.fbs";
+include "synapse_mocap.fbs";
+include "synapse_log.fbs";
+include "synapse_sil.fbs";
+
+namespace synapse;

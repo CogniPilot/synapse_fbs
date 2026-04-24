@@ -1,0 +1,15 @@
+cmake_minimum_required(VERSION 3.20)
+project(synapse_fbs_fetch_smoke C)
+
+include(FetchContent)
+
+FetchContent_Declare(
+  synapse_fbs
+  URL file://{{ archive_path }}
+  URL_HASH SHA256={{ archive_sha256 }}
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(synapse_fbs)
+
+add_executable(smoke main.c)
+target_link_libraries(smoke PRIVATE synapse_fbs::c)
