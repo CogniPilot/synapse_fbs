@@ -1,0 +1,45 @@
+namespace synapse.log;
+
+table LogFileHeader {
+  format_version:uint;
+  created_unix_us:ulong;
+  source:string;
+  description:string;
+}
+
+table SchemaRecord {
+  schema_id:ulong;
+  name:string;
+  root_type:string;
+  file_identifier:string;
+  fbs_text:string;
+  fbs_sha256:string;
+  bfbs:[ubyte];
+}
+
+table TopicRecord {
+  topic_id:uint;
+  name:string;
+  schema_id:ulong;
+  encoding:string;
+}
+
+table LogFrame {
+  monotonic_us:ulong;
+  topic_id:uint;
+  payload:[ubyte];
+}
+
+union RecordPayload {
+  LogFileHeader,
+  SchemaRecord,
+  TopicRecord,
+  LogFrame
+}
+
+table LogRecord {
+  record:RecordPayload;
+}
+
+root_type LogRecord;
+file_identifier "SYLG";

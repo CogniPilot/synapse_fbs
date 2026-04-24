@@ -1,0 +1,23 @@
+# synapse_fbs C headers
+
+Generated with flatcc {{ flatcc_version }}.
+
+This archive is a generic CMake dependency, not a Zephyr module. Add it with
+CMake `FetchContent` and link `synapse_fbs::c` for reader-only accessors.
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+  synapse_fbs
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/{{ release_name }}/synapse_fbs-c.tar.gz
+  URL_HASH SHA256=<release sha256>
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(synapse_fbs)
+
+target_link_libraries(app PRIVATE synapse_fbs::c)
+```
+
+Link `synapse_fbs::flatcc_runtime` when using generated builders, verifiers, or
+JSON helpers.

@@ -1,0 +1,39 @@
+include "synapse_topics.fbs";
+
+namespace synapse.topic;
+
+struct Vec2f {
+  x:float;
+  y:float;
+}
+
+// Fixed-size structs - used as native zROS topic types
+struct VehicleOpticalFlowData {
+  timestamp_us:long;
+  pixel_flow:Vec2f;
+  delta_angle:Vec3f;
+  distance_m:float;
+  integration_timespan_us:uint;
+  quality:ubyte;
+  max_flow_rate:float;
+  min_ground_distance:float;
+  max_ground_distance:float;
+}
+
+struct VehicleOpticalFlowVelData {
+  timestamp_us:long;
+  vel_body:Vec2f;
+  vel_ne:Vec2f;
+  flow_rate_uncompensated:Vec2f;
+  flow_rate_compensated:Vec2f;
+  gyro_rate:Vec3f;
+}
+
+// Tables - used for zenoh wire format (wraps the struct)
+table VehicleOpticalFlow {
+  data:VehicleOpticalFlowData;
+}
+
+table VehicleOpticalFlowVel {
+  data:VehicleOpticalFlowVelData;
+}

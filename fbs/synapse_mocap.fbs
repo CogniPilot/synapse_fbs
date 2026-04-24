@@ -1,0 +1,69 @@
+include "synapse_topics.fbs";
+
+namespace synapse.topic;
+
+struct Quaternionf {
+  x:float;
+  y:float;
+  z:float;
+  w:float;
+}
+
+// Fixed-size per-sample payloads for streamed mocap data.
+struct MocapMarkerSample {
+  id:int;
+  position:Vec3f;
+  residual:float;
+}
+
+struct MocapRigidBodySample {
+  id:int;
+  position:Vec3f;
+  attitude:Quaternionf;
+  residual:float;
+  tracking_valid:bool;
+}
+
+struct MocapSegmentSample {
+  skeleton_id:int;
+  segment_id:int;
+  position:Vec3f;
+  attitude:Quaternionf;
+  tracking_valid:bool;
+}
+
+// Static metadata that consumers can cache and join with streamed samples.
+table MocapMarkerDefinition {
+  id:int;
+  name:string;
+  color:uint;
+}
+
+table MocapRigidBodyDefinition {
+  id:int;
+  name:string;
+}
+
+table MocapSegmentDefinition {
+  skeleton_id:int;
+  skeleton_name:string;
+  segment_id:int;
+  segment_name:string;
+}
+
+table MocapDefinition {
+  source:string;
+  frame_id:string;
+  labeled_markers:[MocapMarkerDefinition];
+  rigid_bodies:[MocapRigidBodyDefinition];
+  skeleton_segments:[MocapSegmentDefinition];
+}
+
+table MocapFrame {
+  timestamp_us:ulong;
+  frame_number:uint;
+  labeled_markers:[MocapMarkerSample];
+  unlabeled_markers:[MocapMarkerSample];
+  rigid_bodies:[MocapRigidBodySample];
+  skeleton_segments:[MocapSegmentSample];
+}
