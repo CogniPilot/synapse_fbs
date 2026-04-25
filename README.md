@@ -9,6 +9,8 @@ artifacts from the pinned toolchain in `tools.lock`.
 ## Contents
 
 - `fbs/*.fbs`: canonical FlatBuffers schemas.
+- `bfbs/*.bfbs`: generated FlatBuffers reflection schemas included in C/C++
+  release archives.
 - `rust/`: Rust package skeleton, published as the `synapse_fbs` crate.
 - `python/`: Python package skeleton, published as the `synapse-fbs` package.
 - `c/`: C release archive skeleton, published as `synapse_fbs-c.tar.gz`.
@@ -39,7 +41,7 @@ downstream CMake consumers.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.1.1"
+synapse_fbs = "0.1.2"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -73,7 +75,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.1/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.2/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -97,15 +99,16 @@ cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 
 The task builds pinned `flatc` and FlatCC, stages Rust/Python packages under
 `target/xtask/packages/`, creates the C/C++ tarballs under
-`target/xtask/artifacts/`, and smoke-tests the C archive through CMake
-`FetchContent`.
+`target/xtask/artifacts/`, includes pinned `bfbs/*.bfbs` reflection schemas and
+`bfbs.sha256` manifests in those archives, and smoke-tests the C archive through
+CMake `FetchContent`.
 
 ## Releases
 
 CI generates bindings and builds both packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.1.1` publishes:
+Pushing a tag like `v0.1.2` publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
@@ -113,7 +116,9 @@ Pushing a tag like `v0.1.1` publishes:
   - Python wheel and sdist
   - Rust `.crate` source package
   - C++ generated header tarball with matching FlatBuffers C++ runtime headers
-  - C generated header tarball with matching FlatCC headers and runtime sources
+    plus `bfbs/*.bfbs` reflection schemas
+  - C generated header tarball with matching FlatCC headers, runtime sources,
+    and `bfbs/*.bfbs` reflection schemas
 
 The generated C archive is intentionally generic. Downstream firmware projects
 that need it should fetch the release tarball directly from their own CMake

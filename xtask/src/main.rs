@@ -189,6 +189,7 @@ fn archive_context(
     release_name: &str,
     tools: &Tools,
     schema_sha256: &str,
+    bfbs_sha256: &str,
     runtime_source_paths: &str,
 ) -> Value {
     context! {
@@ -201,6 +202,7 @@ fn archive_context(
         flatcc_version => tools.flatcc_version.as_str(),
         flatcc_commit => tools.flatcc_commit.as_str(),
         schema_sha256 => schema_sha256,
+        bfbs_sha256 => bfbs_sha256,
         runtime_source_paths => runtime_source_paths,
     }
 }
@@ -534,6 +536,7 @@ fn build_archives(
     fs::create_dir_all(cpp_root.join("include"))?;
     fs::create_dir_all(cpp_root.join("third_party/flatbuffers"))?;
     fs::create_dir_all(cpp_root.join("fbs"))?;
+    fs::create_dir_all(cpp_root.join("bfbs"))?;
 
     let mut cpp_gen = Command::new(flatc);
     cpp_gen
@@ -545,6 +548,7 @@ fn build_archives(
         .arg(cpp_root.join("include/synapse"))
         .args(SCHEMAS);
     run(&mut cpp_gen)?;
+    generate_reflection_schemas(root, flatc, &cpp_root.join("bfbs"))?;
 
     copy_dir_all(
         &flatbuffers_source.join("include/flatbuffers"),
@@ -556,6 +560,7 @@ fn build_archives(
     )?;
     copy_common_archive_files(root, &cpp_root)?;
     write_schema_hashes(root, &cpp_root.join("schema.sha256"))?;
+    write_bfbs_hashes(&cpp_root, &cpp_root.join("bfbs.sha256"))?;
     copy_render_template_tree(
         "cpp",
         &root.join("cpp"),
@@ -566,6 +571,7 @@ fn build_archives(
             release_name,
             tools,
             &sha256_hex(&cpp_root.join("schema.sha256"))?,
+            &sha256_hex(&cpp_root.join("bfbs.sha256"))?,
             "",
         ),
     )?;
@@ -582,6 +588,7 @@ fn build_archives(
     fs::create_dir_all(c_root.join("src/flatcc-runtime"))?;
     fs::create_dir_all(c_root.join("third_party/flatcc"))?;
     fs::create_dir_all(c_root.join("fbs"))?;
+    fs::create_dir_all(c_root.join("bfbs"))?;
 
     let mut c_gen = Command::new(&flatcc.binary);
     c_gen
@@ -593,6 +600,7 @@ fn build_archives(
         .arg(c_root.join("include/synapse"))
         .args(SCHEMAS);
     run(&mut c_gen)?;
+    generate_reflection_schemas(root, flatc, &c_root.join("bfbs"))?;
 
     copy_dir_all(
         &flatcc.source.join("include/flatcc"),
@@ -613,6 +621,7 @@ fn build_archives(
     )?;
     copy_common_archive_files(root, &c_root)?;
     write_schema_hashes(root, &c_root.join("schema.sha256"))?;
+    write_bfbs_hashes(&c_root, &c_root.join("bfbs.sha256"))?;
     let runtime_source_paths = runtime_source_names(&c_root.join("src/flatcc-runtime"))?
         .into_iter()
         .map(|source| format!("  \"${{CMAKE_CURRENT_LIST_DIR}}/src/flatcc-runtime/{source}\""))
@@ -628,6 +637,7 @@ fn build_archives(
             release_name,
             tools,
             &sha256_hex(&c_root.join("schema.sha256"))?,
+            &sha256_hex(&c_root.join("bfbs.sha256"))?,
             &runtime_source_paths,
         ),
     )?;
@@ -650,6 +660,42 @@ fn build_archives(
     Ok(())
 }
 
+fn generate_reflection_schemas(root: &Path, flatc: &Path, output_dir: &Path) -> Result<()> {
+    println!(
+        "generating FlatBuffers reflection schemas into {}",
+        output_dir.display()
+    );
+    fs::create_dir_all(output_dir)?;
+
+    let mut bfbs_gen = Command::new(flatc);
+    bfbs_gen
+        .current_dir(root)
+        .arg("--schema")
+        .arg("-b")
+        .arg("-I")
+        .arg("fbs")
+        .arg("-o")
+        .arg(output_dir)
+        .args(SCHEMAS);
+    run(&mut bfbs_gen)?;
+
+    for schema in SCHEMAS {
+        let stem = Path::new(schema)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| io::Error::other(format!("schema path has no file stem: {schema}")))?;
+        let bfbs = output_dir.join(format!("{stem}.bfbs"));
+        if !bfbs.is_file() {
+            return fail(format!(
+                "flatc did not generate expected reflection schema {}",
+                bfbs.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 fn copy_common_archive_files(root: &Path, archive_root: &Path) -> Result<()> {
     fs::copy(root.join("LICENSE"), archive_root.join("LICENSE"))?;
     copy_dir_all(&root.join("fbs"), &archive_root.join("fbs"))?;
@@ -661,6 +707,16 @@ fn write_schema_hashes(root: &Path, output_path: &Path) -> Result<()> {
     for file in schema_files(root)? {
         let hash = sha256_hex(&file)?;
         let rel = file.strip_prefix(root)?;
+        content.push_str(&format!("{}  {}\n", hash, rel.display()));
+    }
+    write_file(output_path, &content)
+}
+
+fn write_bfbs_hashes(archive_root: &Path, output_path: &Path) -> Result<()> {
+    let mut content = String::new();
+    for file in files_with_extension(&archive_root.join("bfbs"), "bfbs")? {
+        let hash = sha256_hex(&file)?;
+        let rel = file.strip_prefix(archive_root)?;
         content.push_str(&format!("{}  {}\n", hash, rel.display()));
     }
     write_file(output_path, &content)
