@@ -9,6 +9,7 @@ table SimInput {
   rc_link_quality:ubyte;
   rc_valid:bool;
   imu_valid:bool;
+  target_boot_time_ns:ulong;
 }
 
 root_type SimInput;
