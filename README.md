@@ -41,7 +41,7 @@ downstream CMake consumers.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.1.3"
+synapse_fbs = "0.1.5"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -75,7 +75,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.3/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.5/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -108,7 +108,7 @@ CMake `FetchContent`.
 CI generates bindings and builds both packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.1.3` publishes:
+Pushing a tag like `v0.1.5` publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing

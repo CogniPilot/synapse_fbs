@@ -37,6 +37,38 @@ struct RcChannels16 {
   ch15:int;
 }
 
+struct ManualControlAxes {
+  roll:float;
+  pitch:float;
+  yaw:float;
+  throttle:float;
+}
+
+struct ManualControlAux8f {
+  aux0:float;
+  aux1:float;
+  aux2:float;
+  aux3:float;
+  aux4:float;
+  aux5:float;
+  aux6:float;
+  aux7:float;
+}
+
+// Normalized manual control command from any manual-input adapter.
+// roll/pitch/yaw and aux values use [-1, 1]; throttle uses [0, 1].
+// Positive roll is right wing down, positive pitch is nose up, and positive yaw is nose right.
+struct ManualControlData {
+  timestamp_us:ulong;
+  axes:ManualControlAxes;
+  aux:ManualControlAux8f;
+  flight_mode:ubyte;
+  arm_switch:bool;
+  kill_switch:bool;
+  active:bool;
+  valid:bool;
+}
+
 struct ControlStatus {
   rc_stamp_ms:long;
   throttle_us:int;
@@ -80,4 +112,8 @@ table MotorOutput {
   raw:MotorRaw4u16;
   armed:bool;
   test_mode:bool;
+}
+
+table ManualControl {
+  data:ManualControlData;
 }
