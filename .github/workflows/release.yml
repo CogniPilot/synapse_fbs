@@ -19,10 +19,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
       - name: Install Python build tools
         run: python -m pip install --upgrade pip build twine
       - name: Build and verify
         run: cargo run --locked --manifest-path xtask/Cargo.toml -- ci --release-name "${GITHUB_REF_NAME}"
+      - name: Pack npm package
+        run: npm pack
+        working-directory: target/xtask/packages/js
       - name: Upload GitHub Release artifacts
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -31,6 +38,7 @@ jobs:
             target/xtask/packages/python/dist/*.whl
             target/xtask/packages/python/dist/*.tar.gz
             target/xtask/packages/rust/target/package/*.crate
+            target/xtask/packages/js/*.tgz
             target/xtask/artifacts/*.tar.gz
             target/xtask/artifacts/*.sha256
           )
@@ -50,3 +58,8 @@ jobs:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: python -m twine upload target/xtask/packages/python/dist/*
+      - name: Publish JavaScript package to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+        working-directory: target/xtask/packages/js

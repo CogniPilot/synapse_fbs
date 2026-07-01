@@ -5,7 +5,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use minijinja::{Environment, Value, context};
+use minijinja::{AutoEscape, Environment, Value, context};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -39,8 +39,9 @@ fn main() -> Result<()> {
 
     match command.as_str() {
         "ci" => ci(&root, &options),
+        "js" => js(&root),
         _ => fail(format!(
-            "unknown command '{command}'. expected: cargo run --manifest-path xtask/Cargo.toml -- ci"
+            "unknown command '{command}'. expected 'ci' or 'js', e.g. cargo run --manifest-path xtask/Cargo.toml -- ci"
         )),
     }
 }
@@ -56,8 +57,22 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     generate_bindings(root, &flatc, &packages)?;
     check_rust_package(&packages.rust)?;
     build_python_package(root, &packages.python, &tools)?;
+    build_js_package(root, &packages.js, &flatc)?;
     build_archives(root, &tools, &flatc, &flatcc, &options.release_name)?;
 
+    Ok(())
+}
+
+fn js(root: &Path) -> Result<()> {
+    let tools = read_tools(root)?;
+    let templates = Templates::new(root)?;
+
+    let package = root.join("target/xtask/packages/js");
+    stage_template_tree(root, "js", &package, &templates, package_context(&tools))?;
+    let flatc = build_flatc(root, &tools)?;
+    build_js_package(root, &package, &flatc)?;
+
+    println!("staged npm package at {}", package.display());
     Ok(())
 }
 
@@ -160,6 +175,7 @@ fn require_git_sha(name: &str, value: &str) -> Result<()> {
 struct PackagePaths {
     rust: PathBuf,
     python: PathBuf,
+    js: PathBuf,
 }
 
 fn stage_packages(root: &Path, templates: &Templates, tools: &Tools) -> Result<PackagePaths> {
@@ -168,11 +184,13 @@ fn stage_packages(root: &Path, templates: &Templates, tools: &Tools) -> Result<P
     let packages = PackagePaths {
         rust: root.join("target/xtask/packages/rust"),
         python: root.join("target/xtask/packages/python"),
+        js: root.join("target/xtask/packages/js"),
     };
     let context = package_context(tools);
 
     stage_template_tree(root, "rust", &packages.rust, templates, context.clone())?;
-    stage_template_tree(root, "python", &packages.python, templates, context)?;
+    stage_template_tree(root, "python", &packages.python, templates, context.clone())?;
+    stage_template_tree(root, "js", &packages.js, templates, context)?;
 
     Ok(packages)
 }
@@ -509,6 +527,68 @@ assert Vec3f is not None and LogRecord is not None
     Ok(())
 }
 
+fn build_js_package(root: &Path, package_root: &Path, flatc: &Path) -> Result<()> {
+    println!("building JavaScript schema-assets package");
+
+    remove_dir_if_exists(&package_root.join("fbs"))?;
+    remove_dir_if_exists(&package_root.join("bfbs"))?;
+    copy_common_archive_files(root, package_root)?;
+    generate_reflection_schemas(root, flatc, &package_root.join("bfbs"))?;
+    write_schema_hashes(root, &package_root.join("schema.sha256"))?;
+    write_bfbs_hashes(package_root, &package_root.join("bfbs.sha256"))?;
+
+    smoke_js_package(package_root)?;
+
+    Ok(())
+}
+
+fn smoke_js_package(package_root: &Path) -> Result<()> {
+    println!("smoke-testing JavaScript package");
+
+    let node = node_bin()?;
+    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath } from './index.js';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+for (const name of schemaFiles) {
+  if (!existsSync(schemaPath(name))) throw new Error('missing schema ' + name);
+}
+if (!existsSync(join(fbsDir, 'synapse_log.fbs'))) throw new Error('missing fbsDir');
+if (!existsSync(join(bfbsDir, 'synapse_log.bfbs'))) throw new Error('missing reflection schema');
+console.log('synapse-fbs js package ok');
+"#;
+
+    run(Command::new(&node)
+        .current_dir(package_root)
+        .arg("--input-type=module")
+        .arg("-e")
+        .arg(script))?;
+
+    // Validate the published file set when npm is available.
+    if command_succeeds(Command::new("npm").arg("--version")) {
+        run(Command::new("npm")
+            .current_dir(package_root)
+            .arg("pack")
+            .arg("--dry-run"))?;
+    }
+
+    Ok(())
+}
+
+fn node_bin() -> Result<PathBuf> {
+    if let Ok(value) = env::var("NODE") {
+        let node = PathBuf::from(value);
+        if command_succeeds(Command::new(&node).arg("--version")) {
+            return Ok(node);
+        }
+    }
+
+    if command_succeeds(Command::new("node").arg("--version")) {
+        return Ok(PathBuf::from("node"));
+    }
+
+    fail("could not find node")
+}
+
 fn build_archives(
     root: &Path,
     tools: &Tools,
@@ -748,8 +828,12 @@ struct Templates {
 impl Templates {
     fn new(root: &Path) -> Result<Self> {
         let mut env = Environment::new();
+        // Templates render config files (package.json, Cargo.toml, ...) with raw
+        // substitution; disable auto-escaping so values are not JSON/HTML encoded.
+        env.set_auto_escape_callback(|_| AutoEscape::None);
         add_templates(&mut env, &root.join("rust"), "rust")?;
         add_templates(&mut env, &root.join("python"), "python")?;
+        add_templates(&mut env, &root.join("js"), "js")?;
         add_templates(&mut env, &root.join("c"), "c")?;
         add_templates(&mut env, &root.join("cpp"), "cpp")?;
         add_templates(&mut env, &root.join("xtask/templates"), "xtask")?;
@@ -870,7 +954,7 @@ fn should_skip_staged_path(package: &str, rel: &Path) -> bool {
 
     if matches!(
         first,
-        "target" | "build" | "dist" | "__pycache__" | ".pytest_cache"
+        "target" | "build" | "dist" | "node_modules" | "__pycache__" | ".pytest_cache"
     ) || first.ends_with(".egg-info")
     {
         return true;
@@ -885,6 +969,11 @@ fn should_skip_staged_path(package: &str, rel: &Path) -> bool {
     match package {
         "rust" => rel.starts_with("src/generated"),
         "python" => rel.starts_with("synapse"),
+        "js" => {
+            rel.starts_with("fbs")
+                || rel.starts_with("bfbs")
+                || matches!(file_name, "schema.sha256" | "bfbs.sha256")
+        }
         _ => false,
     }
 }
