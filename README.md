@@ -13,6 +13,8 @@ artifacts from the pinned toolchain in `tools.lock`.
   release archives.
 - `rust/`: Rust package skeleton, published as the `synapse_fbs` crate.
 - `python/`: Python package skeleton, published as the `synapse-fbs` package.
+- `js/`: JavaScript/TypeScript schema-assets package skeleton, published as the
+  `@cognipilot/synapse-fbs` npm package.
 - `c/`: C release archive skeleton, published as `synapse_fbs-c.tar.gz`.
 - `cpp/`: C++ release archive skeleton, published as `synapse_fbs-cpp.tar.gz`.
 - `xtask/`: reproducible local and CI build driver.
@@ -64,6 +66,22 @@ After a local `xtask` build, install the staged wheel:
 pip install target/xtask/packages/python/dist/*.whl
 ```
 
+## JavaScript / TypeScript
+
+Install the published npm package:
+
+```sh
+npm install @cognipilot/synapse-fbs
+```
+
+Unlike the Rust and Python packages, the npm package ships schema assets
+(`fbs/*.fbs` plus generated `bfbs/*.bfbs` reflection schemas) rather than
+generated bindings, and has no `flatbuffers` runtime dependency. The npm
+`flatbuffers` release cadence does not track the pinned `flatc` version, so JS
+consumers generate their own bindings from the shipped schemas or decode via the
+reflection schemas. After a local `xtask` build, the staged package lives under
+`target/xtask/packages/js`.
+
 ## C and C++ Archives
 
 Release CI publishes generated C and C++ archives for downstream CMake
@@ -112,6 +130,7 @@ Pushing a tag like `v0.1.5` publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
+- staged `target/xtask/packages/js/` to npm using `NPM_TOKEN`
 - GitHub Release assets:
   - Python wheel and sdist
   - Rust `.crate` source package
