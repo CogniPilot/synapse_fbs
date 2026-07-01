@@ -284,5 +284,6 @@ using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes versioned schema documentation to the `gh-pages`
 branch. Pushes to `main` update `/main/`; release tags like `v0.1.8` update
-`/0.1.8/`. The root docs page is regenerated from the published version
-directories so older releases remain available: <https://cognipilot.github.io/synapse_fbs/>.
+`/0.1.8/`. The root docs URL redirects to `/main/`, and the mdBook version
+selector links to published release docs:
+<https://cognipilot.github.io/synapse_fbs/>.

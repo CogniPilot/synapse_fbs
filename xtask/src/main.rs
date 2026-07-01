@@ -1176,6 +1176,7 @@ fn generate_docs_site(root: &Path, tools: &Tools, version: &str, out_dir: &Path)
     write_file(&out_dir.join(".nojekyll"), "")?;
     remove_file_if_exists(&out_dir.join("style.css"))?;
     write_docs_root_index(out_dir, &version_dir_name)?;
+    refresh_docs_version_selectors(out_dir, &version_dir_name)?;
 
     Ok(())
 }
@@ -2255,7 +2256,7 @@ fn render_version_selector_js(versions: &[DocVersion], current_version_dir: &str
       return new URL('../', window.location.href);
     }
     const scriptUrl = new URL(script.getAttribute('src'), window.location.href);
-    return new URL('../', new URL('.', scriptUrl));
+    return new URL('../../', scriptUrl);
   }
 
   function targetUrl(dir) {
@@ -2311,45 +2312,60 @@ fn render_version_selector_js(versions: &[DocVersion], current_version_dir: &str
 
 fn write_docs_root_index(out_dir: &Path, current_version_dir: &str) -> Result<()> {
     let versions = docs_versions(out_dir, current_version_dir)?;
+    let redirect_dir = versions
+        .iter()
+        .find(|version| version.dir == "main")
+        .or_else(|| versions.iter().find(|version| version.current))
+        .map(|version| version.dir.as_str())
+        .unwrap_or(current_version_dir);
+    let redirect_href = format!("{redirect_dir}/");
 
     let mut html = String::new();
     html.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
     html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+    html.push_str(&format!(
+        "<meta http-equiv=\"refresh\" content=\"0; url={}\">",
+        escape_attr(&redirect_href)
+    ));
+    html.push_str(&format!(
+        "<link rel=\"canonical\" href=\"{}\">",
+        escape_attr(&redirect_href)
+    ));
     html.push_str("<title>Synapse FlatBuffers docs</title><style>");
     html.push_str(ROOT_DOCS_CSS);
     html.push_str("</style></head><body><main><section class=\"panel\"><p class=\"eyebrow\">synapse_fbs</p><h1>Synapse FlatBuffers</h1>");
-    html.push_str(
-        "<p>Versioned FlatBuffers message schema documentation generated from the source schemas.</p>",
-    );
-    html.push_str("<label class=\"version-picker\">Version <select id=\"version-select\">");
-    for version in &versions {
-        html.push_str(&format!(
-            "<option value=\"{}/\"{}>{}</option>",
-            escape_attr(&version.dir),
-            if version.current { " selected" } else { "" },
-            escape_html(&version.label)
-        ));
-    }
-    html.push_str(
-        "</select></label></section><section class=\"panel\"><h2>Available Versions</h2><ul>",
-    );
-    for version in &versions {
-        let marker = if version.current {
-            " <span class=\"current\">updated</span>"
-        } else {
-            ""
-        };
-        html.push_str(&format!(
-            "<li><a href=\"{}/\">{}</a>{}</li>",
-            escape_attr(&version.dir),
-            escape_html(&version.label),
-            marker
-        ));
-    }
-    html.push_str("</ul></section></main><script>");
-    html.push_str("document.getElementById('version-select').addEventListener('change', function () { window.location.href = this.value; });");
+    html.push_str(&format!(
+        "<p>Redirecting to <a href=\"{}\">{}</a>.</p>",
+        escape_attr(&redirect_href),
+        escape_html(&redirect_href)
+    ));
+    html.push_str("</section></main><script>");
+    html.push_str("window.location.replace(");
+    html.push_str(&js_string(&redirect_href));
+    html.push_str(");");
     html.push_str("</script></body></html>");
     write_file(&out_dir.join("index.html"), &html)
+}
+
+fn refresh_docs_version_selectors(out_dir: &Path, current_version_dir: &str) -> Result<()> {
+    let versions = docs_versions(out_dir, current_version_dir)?;
+    for version in &versions {
+        let theme_dir = out_dir.join(&version.dir).join("theme");
+        if !theme_dir.is_dir() {
+            continue;
+        }
+        let js = render_version_selector_js(&versions, &version.dir);
+        for entry in fs::read_dir(&theme_dir)? {
+            let path = entry?.path();
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if name.starts_with("version-selector") && name.ends_with(".js") {
+                write_file(&path, &js)?;
+            }
+        }
+    }
+    Ok(())
 }
 
 fn schema_file_slug(file: &SchemaFileDoc) -> String {
