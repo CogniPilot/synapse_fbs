@@ -19,6 +19,12 @@ cargo run --locked --manifest-path xtask/Cargo.toml -- ci
   in the C/C++ release archives).
 - `schema.sha256` / `bfbs.sha256` — content hashes for the shipped assets.
 
+Runtime protocol payloads prioritize fixed memory layout. Telemetry, state,
+command, and control samples are modeled as FlatBuffers structs where possible
+so chip-to-chip shared-memory transports can use the payload layout directly.
+Tables, strings, and vectors are reserved for root wrappers, metadata, logs, or
+naturally variable-size data.
+
 Unlike the Rust and Python packages, this package does **not** ship generated
 language bindings and does **not** depend on the `flatbuffers` runtime. The npm
 `flatbuffers` release cadence does not track the pinned `flatc` version, so

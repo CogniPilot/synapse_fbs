@@ -12,6 +12,24 @@ and FLU for body-frame vectors. Compact integer fields use explicit unit
 suffixes when a scaled representation is chosen for precision or wire
 efficiency.
 
+## Schema Design Priorities
+
+Fixed memory layout is the default for protocol payloads. Runtime telemetry,
+state, command, and control samples should use FlatBuffers `struct` definitions
+so adapters can share predictable native layouts and avoid allocation where the
+target language/runtime allows it.
+
+This is especially important for chip-to-chip communication over shared memory:
+the fixed struct payload should be usable as the shared ABI, while serialized
+FlatBuffers tables remain available for transports and languages that need root
+objects.
+
+Use FlatBuffers `table`, `string`, or vector fields only when the data is
+naturally variable-size, optional, or needs FlatBuffers root/union behavior.
+Common exceptions are thin root wrappers around fixed structs, transport
+envelopes, log records, text status, schema metadata, and definition records
+that consumers cache instead of processing in the control loop.
+
 ## Contents
 
 - `fbs/types.fbs`: shared fixed structs, topic IDs, units, and frame conventions.
@@ -32,10 +50,10 @@ efficiency.
 - `xtask/`: reproducible local and CI build driver.
 - `tools.lock`: pinned package, generator, and runtime versions.
 
-Generated Rust, Python, and JavaScript package trees are intentionally not committed. The
-`xtask` build stages package skeletons under `target/xtask/packages/`, renders
-`.jinja` templates, and generates bindings from `fbs/all.fbs` before
-building release packages.
+Generated Rust, Python, and JavaScript package trees are intentionally not
+committed. The `xtask` build stages package skeletons under
+`target/xtask/packages/`, renders `.jinja` templates, and generates bindings
+from `fbs/all.fbs` before building release packages.
 
 ROS packages should consume this repository as a dependency or git submodule and
 generate ROS interfaces or adapters outside this repo.

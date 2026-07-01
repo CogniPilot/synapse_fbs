@@ -52,8 +52,10 @@ struct FrameHeader {
   protocol_version:ubyte;
 }
 
-// Optional multiplexed transport frame. Zenoh deployments can still publish the
-// topic tables directly and use the topic name as the message discriminator.
+// Optional multiplexed transport frame. This is an intentional table boundary:
+// runtime topics should still prefer fixed-layout payload structs, especially
+// for shared-memory chip-to-chip links. Zenoh deployments can publish the topic
+// tables directly and use the topic name as the message discriminator.
 table Frame {
   header:FrameHeader;
   message:SynapseMessage;

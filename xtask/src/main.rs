@@ -1283,7 +1283,9 @@ fn render_schema_docs(docs: &SchemaDoc, version: &str, version_dir_name: &str) -
         "<header><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation <span>{}</span></h1>",
         escape_html(version)
     ));
-    html.push_str("<p>Generated from the FlatBuffers schemas in <code>fbs/</code>. High-rate payloads use fixed-layout structs wrapped by small tables so they can be published as FlatBuffers roots while keeping the payload layout stable. Coordinate frames follow <a href=\"https://www.ros.org/reps/rep-0103.html\">ROS REP-0103</a>: local/world vectors use ENU and body vectors use FLU.</p></header>");
+    html.push_str("<p>Generated from the FlatBuffers schemas in <code>fbs/</code>. Fixed memory layout is the default for runtime protocol payloads so chip-to-chip shared-memory transports can use the payload layout directly. Coordinate frames follow <a href=\"https://www.ros.org/reps/rep-0103.html\">ROS REP-0103</a>: local/world vectors use ENU and body vectors use FLU.</p></header>");
+    html.push_str("<section class=\"notice\"><h2>Layout Rules</h2>");
+    html.push_str("<p>Telemetry, state, command, and control samples should use FlatBuffers <code>struct</code> definitions. Use <code>table</code>, <code>string</code>, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.</p></section>");
     html.push_str("<section class=\"notice\"><h2>Unit And Scale Rules</h2>");
     html.push_str("<p>Fields encode units and frames in their names. Local/world vectors use <code>_enu_</code>; body vectors use <code>_flu_</code>. Global coordinates use <code>_deg_e7</code>, altitudes use <code>_mm</code>, speeds commonly use <code>_cm_s</code> or <code>_mm_s</code>, temperatures use <code>_cdeg</code>, currents use <code>_ca</code>, magnetic field uses <code>_tesla</code>, and normalized manual-control axes use <code>_milli</code>. The scale column below is generated from those suffixes.</p></section>");
     html.push_str("<nav class=\"toc\"><h2>Schemas</h2><ul>");

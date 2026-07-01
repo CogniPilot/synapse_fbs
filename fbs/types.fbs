@@ -3,6 +3,11 @@ namespace synapse.topic;
 // Default coordinate frames follow ROS REP-0103:
 // world/local vectors use ENU (x east, y north, z up);
 // body vectors use FLU (x forward, y left, z up).
+// Fixed memory layout is a protocol priority. Runtime telemetry, state,
+// command, and control payloads should be structs so shared-memory transports
+// between chips can use the payload layout directly. Use tables, strings, and
+// vectors only for FlatBuffers roots, unions, metadata, logs, or naturally
+// variable-size data.
 // Fixed-layout payload structs use explicit units in field names when the raw
 // representation is scaled. This keeps adapters predictable and avoids losing
 // precision in global coordinates or raw I/O.
