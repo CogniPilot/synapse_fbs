@@ -14,6 +14,18 @@ and FLU for body-frame vectors. Compact integer fields use explicit unit
 suffixes when a scaled representation is chosen for precision or wire
 efficiency.
 
+## Motivation
+
+Synapse messages are designed for vehicles that exchange state, sensor, and
+control data in real time. Fixed-layout payloads support shared-memory message
+passing between chips, while scaled integer fields preserve required precision
+without wasting bytes on high-rate or over-the-air links where latency, range,
+and reliability matter.
+
+The schemas also need to be easy to consume outside embedded firmware. The
+published npm, Python, Rust, C, and C++ artifacts keep browser tools, cloud
+services, developer scripts, and vehicle software on the same schema source.
+
 ## Schema Design Priorities
 
 Fixed memory layout is the default for protocol payloads. Runtime telemetry,
@@ -67,8 +79,8 @@ from `flatbuffers-build = "=0.2.4+flatc-25.12.19"` and verifies that the
 compiler reports `flatc version 25.12.19`. The Rust package depends on
 `flatbuffers = "=25.12.19"` and the Python package depends on
 `flatbuffers==25.12.19` so generated code and runtimes stay in lockstep. CI
-also builds pinned FlatCC and publishes generated C and C++ archives for
-downstream CMake consumers.
+also builds pinned FlatCC, uses pinned `mdbook` for schema documentation, and
+publishes generated C and C++ archives for downstream CMake consumers.
 
 ## Rust
 
@@ -156,13 +168,15 @@ CMake `FetchContent`.
 Generate the static schema documentation locally:
 
 ```sh
+cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
 cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.6 --out-dir target/xtask/docs
 ```
 
-The docs are generated from `fbs/*.fbs`, copy the source schemas
-alongside the HTML, and infer unit/scale notes from field suffixes such as
-`_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`, `_ca`, `_cdeg`, `_dpermille`, and
-`_milli`.
+The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
+navigation, search, selectable themes, and version selection. The generated
+site copies the source schemas alongside the HTML and infers unit/scale notes
+from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`, `_ca`,
+`_cdeg`, `_dpermille`, and `_milli`.
 
 ## Releases
 

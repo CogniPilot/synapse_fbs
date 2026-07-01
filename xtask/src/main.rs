@@ -1,5 +1,6 @@
 use std::{
-    collections::BTreeMap,
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet},
     env, fs, io,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -30,6 +31,7 @@ struct Tools {
     flatbuffers_build_version: String,
     flatcc_version: String,
     flatcc_commit: String,
+    mdbook_version: String,
 }
 
 #[derive(Debug)]
@@ -68,6 +70,7 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     build_archives(root, &tools, &flatc, &flatcc, &options.release_name)?;
     generate_docs_site(
         root,
+        &tools,
         &default_docs_version(&tools, options),
         &root.join("target/xtask/docs"),
     )?;
@@ -101,7 +104,7 @@ fn docs(root: &Path, options: &Options) -> Result<()> {
         .clone()
         .unwrap_or_else(|| root.join("target/xtask/docs"));
 
-    generate_docs_site(root, &version, &out_dir)
+    generate_docs_site(root, &tools, &version, &out_dir)
 }
 
 fn parse_args() -> Result<(String, Options)> {
@@ -177,6 +180,7 @@ fn read_tools(root: &Path) -> Result<Tools> {
         flatbuffers_build_version: required_value(&values, "FLATBUFFERS_BUILD_VERSION")?,
         flatcc_version: required_value(&values, "FLATCC_VERSION")?,
         flatcc_commit: required_value(&values, "FLATCC_COMMIT")?,
+        mdbook_version: required_value(&values, "MDBOOK_VERSION")?,
     })
 }
 
@@ -928,26 +932,43 @@ fn default_docs_version(tools: &Tools, options: &Options) -> String {
         })
 }
 
-fn generate_docs_site(root: &Path, version: &str, out_dir: &Path) -> Result<()> {
+fn generate_docs_site(root: &Path, tools: &Tools, version: &str, out_dir: &Path) -> Result<()> {
     let version = normalize_docs_version(version);
     let version_dir_name = docs_dir_name(&version);
     let version_dir = out_dir.join(&version_dir_name);
+    let book_dir = root
+        .join("target/xtask/docs-mdbook")
+        .join(&version_dir_name);
 
     println!(
         "generating schema docs for {version} into {}",
         version_dir.display()
     );
 
+    ensure_mdbook(&tools.mdbook_version)?;
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
+
+    fs::create_dir_all(out_dir)?;
+    let versions = docs_versions(out_dir, &version_dir_name)?;
+    reset_dir(&book_dir)?;
+    write_mdbook_source(
+        root,
+        &docs,
+        &version,
+        &version_dir_name,
+        &versions,
+        &book_dir,
+    )?;
     reset_dir(&version_dir)?;
+    run(Command::new("mdbook")
+        .arg("build")
+        .arg(&book_dir)
+        .arg("--dest-dir")
+        .arg(&version_dir))?;
     copy_dir_all(&root.join("fbs"), &version_dir.join("fbs"))?;
     write_file(&out_dir.join(".nojekyll"), "")?;
-    write_file(&out_dir.join("style.css"), DOCS_CSS)?;
-    write_file(
-        &version_dir.join("index.html"),
-        &render_schema_docs(&docs, &version, &version_dir_name),
-    )?;
+    remove_file_if_exists(&out_dir.join("style.css"))?;
     write_docs_root_index(out_dir, &version_dir_name)?;
 
     Ok(())
@@ -1313,252 +1334,573 @@ fn docs_dir_name(version: &str) -> String {
     }
 }
 
-fn render_schema_docs(docs: &SchemaDoc, version: &str, version_dir_name: &str) -> String {
-    let mut html = String::new();
-    html.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
-    html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-    html.push_str(&format!(
-        "<title>synapse_fbs {}</title><link rel=\"stylesheet\" href=\"../style.css\">",
-        escape_html(version)
-    ));
-    html.push_str("</head><body><main>");
-    html.push_str(&format!(
-        "<header><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation <span>{}</span></h1>",
-        escape_html(version)
-    ));
-    html.push_str("<p>Generated from the FlatBuffers schemas in <code>fbs/</code>. Fixed memory layout is the default for runtime protocol payloads so chip-to-chip shared-memory transports can use the payload layout directly. Coordinate frames follow <a href=\"https://www.ros.org/reps/rep-0103.html\">ROS REP-0103</a>: local/world vectors use ENU and body vectors use FLU.</p></header>");
-    html.push_str("<section class=\"notice\"><h2>Layout Rules</h2>");
-    html.push_str("<p>Telemetry, state, command, and control samples should use FlatBuffers <code>struct</code> definitions. Use <code>table</code>, <code>string</code>, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.</p></section>");
-    html.push_str("<section class=\"notice\"><h2>Unit And Scale Rules</h2>");
-    html.push_str("<p>Fields encode units and frames in their names. Local/world vectors use <code>_enu_</code>; body vectors use <code>_flu_</code>. Global coordinates use <code>_deg_e7</code>, altitudes use <code>_mm</code>, speeds commonly use <code>_cm_s</code> or <code>_mm_s</code>, temperatures use <code>_cdeg</code>, currents use <code>_ca</code>, magnetic field uses <code>_tesla</code>, and normalized manual-control axes use <code>_milli</code>. The scale column below is generated from those suffixes.</p></section>");
-    html.push_str("<div class=\"docs-layout\"><aside class=\"toc\" aria-label=\"Schema navigation\"><h2>Schemas</h2><ul>");
-    for file in &docs.files {
-        html.push_str(&format!(
-            "<li><a href=\"#{}\">{}</a>",
-            escape_attr(&anchor_id(&file.name, "")),
-            escape_html(&file.name)
-        ));
-        if !file.entities.is_empty() {
-            html.push_str("<ul>");
-            for entity in &file.entities {
-                html.push_str(&format!(
-                    "<li><a href=\"#{}\"><span>{}</span> {}</a></li>",
-                    escape_attr(&anchor_id(&file.name, &entity.name)),
-                    escape_html(entity.kind.as_str()),
-                    escape_html(&entity.name)
-                ));
-            }
-            html.push_str("</ul>");
-        }
-        html.push_str("</li>");
-    }
-    html.push_str("</ul></aside><div class=\"schema-content\">");
+#[derive(Clone, Debug)]
+struct DocVersion {
+    dir: String,
+    label: String,
+    current: bool,
+}
 
-    for file in &docs.files {
-        html.push_str(&format!(
-            "<section class=\"schema-file\" id=\"{}\"><h2>{}</h2>",
-            escape_attr(&anchor_id(&file.name, "")),
-            escape_html(&file.name)
-        ));
-        if !file.namespace.is_empty() {
-            html.push_str(&format!(
-                "<p><strong>Namespace:</strong> <code>{}</code></p>",
-                escape_html(&file.namespace)
+fn ensure_mdbook(expected_version: &str) -> Result<()> {
+    let actual = match output(Command::new("mdbook").arg("--version")) {
+        Ok(value) => value,
+        Err(err) => {
+            return fail(format!(
+                "mdbook {expected_version} is required to generate docs. Install it with: cargo install mdbook --version {expected_version} --locked\n{err}"
             ));
         }
-        if !file.includes.is_empty() {
-            html.push_str("<p><strong>Includes:</strong> ");
-            for (index, include) in file.includes.iter().enumerate() {
-                if index > 0 {
-                    html.push_str(", ");
+    };
+    let expected = format!("mdbook v{expected_version}");
+    if actual.trim() == expected {
+        Ok(())
+    } else {
+        fail(format!(
+            "unexpected mdbook version '{}', expected '{}'",
+            actual.trim(),
+            expected
+        ))
+    }
+}
+
+fn docs_versions(out_dir: &Path, current_version_dir: &str) -> Result<Vec<DocVersion>> {
+    let mut dirs = BTreeSet::new();
+    dirs.insert(current_version_dir.to_string());
+
+    if out_dir.is_dir() {
+        for entry in fs::read_dir(out_dir)? {
+            let path = entry?.path();
+            if path.is_dir() && path.join("index.html").is_file() {
+                if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                    dirs.insert(name.to_string());
                 }
-                html.push_str(&format!("<code>{}</code>", escape_html(include)));
             }
-            html.push_str("</p>");
         }
-        let source_href = file.name.strip_prefix("fbs/").unwrap_or(&file.name);
-        html.push_str(&format!(
-            "<p><a href=\"fbs/{}\">Source schema</a></p>",
-            escape_attr(source_href)
-        ));
+    }
+
+    let mut dirs = dirs.into_iter().collect::<Vec<_>>();
+    dirs.sort_by(|left, right| compare_doc_version_dirs(left, right));
+    Ok(dirs
+        .into_iter()
+        .map(|dir| DocVersion {
+            current: dir == current_version_dir,
+            label: doc_version_label(&dir),
+            dir,
+        })
+        .collect())
+}
+
+fn compare_doc_version_dirs(left: &str, right: &str) -> Ordering {
+    match (left == "main", right == "main") {
+        (true, false) => return Ordering::Less,
+        (false, true) => return Ordering::Greater,
+        _ => {}
+    }
+
+    match (doc_version_key(left), doc_version_key(right)) {
+        (Some(left_key), Some(right_key)) => right_key.cmp(&left_key).then_with(|| right.cmp(left)),
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => right.cmp(left),
+    }
+}
+
+fn doc_version_key(value: &str) -> Option<Vec<u64>> {
+    let parts = value.split('.').collect::<Vec<_>>();
+    if parts.is_empty() {
+        return None;
+    }
+
+    let mut key = Vec::new();
+    for part in parts {
+        if part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+        key.push(part.parse().ok()?);
+    }
+    Some(key)
+}
+
+fn doc_version_label(dir: &str) -> String {
+    if dir == "main" {
+        "main (development)".to_string()
+    } else {
+        dir.to_string()
+    }
+}
+
+fn write_mdbook_source(
+    root: &Path,
+    docs: &SchemaDoc,
+    version: &str,
+    version_dir_name: &str,
+    versions: &[DocVersion],
+    book_dir: &Path,
+) -> Result<()> {
+    let src_dir = book_dir.join("src");
+    write_file(&book_dir.join("book.toml"), &render_book_toml(version))?;
+    write_file(&book_dir.join("theme/synapse.css"), MDBOOK_CSS)?;
+    write_file(
+        &book_dir.join("theme/version-selector.js"),
+        &render_version_selector_js(versions, version_dir_name),
+    )?;
+    write_file(&src_dir.join("SUMMARY.md"), &render_book_summary(docs))?;
+    write_file(
+        &src_dir.join("index.md"),
+        &render_book_index(docs, version, version_dir_name),
+    )?;
+    copy_dir_all(&root.join("fbs"), &src_dir.join("fbs"))?;
+
+    for file in &docs.files {
+        let file_slug = schema_file_slug(file);
+        let file_page = src_dir.join("schemas").join(format!("{file_slug}.md"));
+        write_file(&file_page, &render_schema_file_page(file))?;
 
         for entity in &file.entities {
-            render_entity_docs(&mut html, file, entity);
+            let entity_page = src_dir
+                .join("schemas")
+                .join(&file_slug)
+                .join(format!("{}.md", entity_slug(entity)));
+            write_file(&entity_page, &render_entity_page(file, entity))?;
         }
-
-        html.push_str("</section>");
     }
-    html.push_str("</div></div>");
 
-    html.push_str(&format!(
-        "<footer><p>Version path: <code>{}</code>. Generated by <code>cargo run --locked --manifest-path xtask/Cargo.toml -- docs</code>.</p></footer>",
-        escape_html(version_dir_name)
-    ));
-    html.push_str("</main></body></html>");
-    html
+    Ok(())
 }
 
-fn render_entity_docs(html: &mut String, file: &SchemaFileDoc, entity: &SchemaEntityDoc) {
-    html.push_str(&format!(
-        "<article class=\"entity\" id=\"{}\"><h3><code>{}</code> {}</h3>",
-        escape_attr(&anchor_id(&file.name, &entity.name)),
-        escape_html(entity.kind.as_str()),
-        escape_html(&entity.name)
+fn render_book_toml(version: &str) -> String {
+    format!(
+        r#"[book]
+title = "synapse_fbs {version}"
+description = "Versioned FlatBuffers schema documentation for Synapse."
+src = "src"
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/CogniPilot/synapse_fbs"
+additional-css = ["theme/synapse.css"]
+additional-js = ["theme/version-selector.js"]
+"#,
+        version = escape_toml_basic(version)
+    )
+}
+
+fn render_book_summary(docs: &SchemaDoc) -> String {
+    let mut md = String::new();
+    md.push_str("# Summary\n\n");
+    md.push_str("[Introduction](index.md)\n\n");
+    md.push_str("# Schemas\n\n");
+
+    for file in &docs.files {
+        let file_slug = schema_file_slug(file);
+        md.push_str(&format!(
+            "- [{}](schemas/{file_slug}.md)\n",
+            markdown_link_text(&file.name)
+        ));
+        for entity in &file.entities {
+            md.push_str(&format!(
+                "  - [`{}` {}](schemas/{file_slug}/{}.md)\n",
+                entity.kind.as_str(),
+                markdown_link_text(&entity.name),
+                entity_slug(entity)
+            ));
+        }
+    }
+
+    md
+}
+
+fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) -> String {
+    let mut md = String::new();
+    md.push_str(&format!(
+        "# Schema Documentation `{}`\n\n",
+        markdown_text(version)
+    ));
+    md.push_str("<div data-synapse-version-picker></div>\n\n");
+    md.push_str("Generated from the FlatBuffers schemas in `fbs/`. Fixed memory layout is the default for runtime protocol payloads so chip-to-chip shared-memory transports can use the payload layout directly. Coordinate frames follow [ROS REP-0103](https://www.ros.org/reps/rep-0103.html): local/world vectors use ENU and body vectors use FLU.\n\n");
+    md.push_str("## Motivation\n\n");
+    md.push_str("Synapse messages are designed for vehicles that exchange state, sensor, and control data in real time. The schema should be efficient enough for shared-memory message passing between chips, compact enough for constrained over-the-air links, and still straightforward to use from ordinary application code.\n\n");
+    md.push_str("- **Fixed memory layout first:** runtime payloads prefer FlatBuffers `struct` definitions so producers and consumers can share predictable native layouts without allocation when the transport and language allow it.\n");
+    md.push_str("- **ROS-compatible conventions:** frames and units follow ROS REP-0103 by default: ENU for local/world vectors, FLU for body vectors, and SI units unless a field name explicitly declares a scaled integer representation.\n");
+    md.push_str("- **Bit-conscious transport:** scaled integer fields preserve needed fidelity without spending unnecessary bytes. Airborne systems pay for latency, range, and reliability, so schemas should avoid waste on high-rate or over-the-air messages.\n");
+    md.push_str("- **Native web and cross-platform use:** release artifacts for npm, Python, Rust, C, and C++ let browser tools, cloud services, embedded firmware, and developer scripts consume the same schema source.\n\n");
+    md.push_str("## Transport Boundaries\n\n");
+    md.push_str("Most deployments should publish typed topic payloads directly over transports such as Zenoh, UDP, or TCP and rely on those transports or links for framing, integrity checks, and optional security. The optional `Frame` envelope exists for links that need an explicit Synapse byte-stream container, especially serial-style transports where message delimiting, sequence tracking, and future opt-in integrity or authentication metadata belong at the frame boundary.\n\n");
+    md.push_str("Checksums, authentication tags, or encryption should not be hardcoded into every topic payload. When needed, they should be transport-envelope features so fixed-layout payloads remain compact, inspectable, and reusable across shared memory, local middleware, native web tooling, and constrained radio links.\n\n");
+    md.push_str("## Layout Rules\n\n");
+    md.push_str("Telemetry, state, command, and control samples should use FlatBuffers `struct` definitions. Use `table`, `string`, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.\n\n");
+    md.push_str("## Unit And Scale Rules\n\n");
+    md.push_str("Fields encode units and frames in their names. Local/world vectors use `_enu_`; body vectors use `_flu_`. Global coordinates use `_deg_e7`, altitudes use `_mm`, speeds commonly use `_cm_s` or `_mm_s`, temperatures use `_cdeg`, currents use `_ca`, magnetic field uses `_tesla`, and normalized manual-control axes use `_milli`. The scale column in each entity page is generated from those suffixes.\n\n");
+    md.push_str("## Schema Files\n\n");
+    for file in &docs.files {
+        md.push_str(&format!(
+            "- [{}](schemas/{}.md)\n",
+            markdown_link_text(&file.name),
+            schema_file_slug(file)
+        ));
+    }
+    md.push_str("\n");
+    md.push_str(&format!(
+        "Version path: `{}`. Generated by `cargo run --locked --manifest-path xtask/Cargo.toml -- docs`.\n",
+        markdown_text(version_dir_name)
+    ));
+    md
+}
+
+fn render_schema_file_page(file: &SchemaFileDoc) -> String {
+    let mut md = String::new();
+    md.push_str(&format!("# `{}`\n\n", markdown_text(&file.name)));
+    if !file.namespace.is_empty() {
+        md.push_str(&format!(
+            "**Namespace:** `{}`\n\n",
+            markdown_text(&file.namespace)
+        ));
+    }
+    if !file.includes.is_empty() {
+        md.push_str("**Includes:** ");
+        for (index, include) in file.includes.iter().enumerate() {
+            if index > 0 {
+                md.push_str(", ");
+            }
+            md.push_str(&format!("`{}`", markdown_text(include)));
+        }
+        md.push_str("\n\n");
+    }
+    md.push_str(&format!(
+        "[Source schema](../fbs/{})\n\n",
+        source_file_name(file)
+    ));
+
+    if file.entities.is_empty() {
+        md.push_str("This schema file does not define public entities.\n");
+        return md;
+    }
+
+    md.push_str("| Kind | Name | Description |\n");
+    md.push_str("| --- | --- | --- |\n");
+    for entity in &file.entities {
+        md.push_str(&format!(
+            "| `{}` | [{}]({}/{}.md) | {} |\n",
+            entity.kind.as_str(),
+            markdown_table_cell(&entity.name),
+            schema_file_slug(file),
+            entity_slug(entity),
+            markdown_table_cell(&comments_text(&entity.comments))
+        ));
+    }
+    md
+}
+
+fn render_entity_page(file: &SchemaFileDoc, entity: &SchemaEntityDoc) -> String {
+    let mut md = String::new();
+    md.push_str(&format!(
+        "# `{}` {}\n\n",
+        entity.kind.as_str(),
+        markdown_text(&entity.name)
+    ));
+    md.push_str(&format!(
+        "[{}](../{}.md) / [Source schema](../../fbs/{})\n\n",
+        markdown_link_text(&file.name),
+        schema_file_slug(file),
+        source_file_name(file)
     ));
     if let Some(value_type) = &entity.value_type {
-        html.push_str(&format!(
-            "<p><strong>Backing type:</strong> <code>{}</code></p>",
-            escape_html(value_type)
+        md.push_str(&format!(
+            "**Backing type:** `{}`\n\n",
+            markdown_text(value_type)
         ));
     }
-    render_comments(html, &entity.comments);
+    md.push_str(&format!("{}\n\n", comments_text(&entity.comments)));
+    render_member_table_md(&mut md, entity);
+    md
+}
 
+fn render_member_table_md(md: &mut String, entity: &SchemaEntityDoc) {
     let has_value = entity.members.iter().any(|member| member.value.is_some());
-    html.push_str("<div class=\"table-wrap\"><table><thead><tr>");
     match entity.kind {
         SchemaEntityKind::Struct | SchemaEntityKind::Table => {
-            html.push_str("<th>Name</th><th>Type</th>");
+            md.push_str("| Name | Type |");
             if has_value {
-                html.push_str("<th>Default</th>");
+                md.push_str(" Default |");
             }
-            html.push_str("<th>Unit / Scale</th><th>Notes</th>");
+            md.push_str(" Unit / Scale | Notes |\n");
+            md.push_str("| --- | --- |");
+            if has_value {
+                md.push_str(" --- |");
+            }
+            md.push_str(" --- | --- |\n");
+            for member in &entity.members {
+                md.push_str(&format!(
+                    "| {} | {} |",
+                    markdown_table_cell(&code_span(&member.name)),
+                    markdown_table_cell(
+                        &member
+                            .type_name
+                            .as_ref()
+                            .map(|value| code_span(value))
+                            .unwrap_or_default()
+                    )
+                ));
+                if has_value {
+                    md.push_str(&format!(
+                        " {} |",
+                        markdown_table_cell(
+                            &member
+                                .value
+                                .as_ref()
+                                .map(|value| code_span(value))
+                                .unwrap_or_default()
+                        )
+                    ));
+                }
+                md.push_str(&format!(
+                    " {} | {} |\n",
+                    markdown_table_cell(member.unit_scale.as_deref().unwrap_or_default()),
+                    markdown_table_cell(&comments_text(&member.comments))
+                ));
+            }
         }
         SchemaEntityKind::Enum => {
-            html.push_str("<th>Name</th><th>Value</th><th>Notes</th>");
+            md.push_str("| Name | Value | Notes |\n");
+            md.push_str("| --- | --- | --- |\n");
+            for member in &entity.members {
+                md.push_str(&format!(
+                    "| {} | {} | {} |\n",
+                    markdown_table_cell(&code_span(&member.name)),
+                    markdown_table_cell(
+                        &member
+                            .value
+                            .as_ref()
+                            .map(|value| code_span(value))
+                            .unwrap_or_default()
+                    ),
+                    markdown_table_cell(&comments_text(&member.comments))
+                ));
+            }
         }
         SchemaEntityKind::Union => {
-            html.push_str("<th>Name</th><th>Type</th><th>Notes</th>");
-        }
-    }
-    html.push_str("</tr></thead><tbody>");
-    for member in &entity.members {
-        html.push_str("<tr>");
-        html.push_str(&format!(
-            "<td class=\"member-name\"><code>{}</code></td>",
-            escape_html(&member.name)
-        ));
-        match entity.kind {
-            SchemaEntityKind::Struct | SchemaEntityKind::Table => {
-                render_type_cell(html, member);
-                if has_value {
-                    render_value_cell(html, member);
-                }
-                html.push_str(&format!(
-                    "<td class=\"unit-scale\">{}</td>",
-                    member
-                        .unit_scale
-                        .as_ref()
-                        .map(|value| escape_html(value))
-                        .unwrap_or_default()
+            md.push_str("| Name | Type | Notes |\n");
+            md.push_str("| --- | --- | --- |\n");
+            for member in &entity.members {
+                md.push_str(&format!(
+                    "| {} | {} | {} |\n",
+                    markdown_table_cell(&code_span(&member.name)),
+                    markdown_table_cell(
+                        &member
+                            .type_name
+                            .as_ref()
+                            .map(|value| code_span(value))
+                            .unwrap_or_default()
+                    ),
+                    markdown_table_cell(&comments_text(&member.comments))
                 ));
-                render_notes_cell(html, member);
-            }
-            SchemaEntityKind::Enum => {
-                render_value_cell(html, member);
-                render_notes_cell(html, member);
-            }
-            SchemaEntityKind::Union => {
-                render_type_cell(html, member);
-                render_notes_cell(html, member);
             }
         }
-        html.push_str("</tr>");
     }
-    html.push_str("</tbody></table></div></article>");
 }
 
-fn render_type_cell(html: &mut String, member: &SchemaMemberDoc) {
-    html.push_str(&format!(
-        "<td class=\"member-type\">{}</td>",
-        member
-            .type_name
-            .as_ref()
-            .map(|value| format!("<code>{}</code>", escape_html(value)))
-            .unwrap_or_default()
-    ));
-}
-
-fn render_value_cell(html: &mut String, member: &SchemaMemberDoc) {
-    html.push_str(&format!(
-        "<td class=\"member-value\">{}</td>",
-        member
-            .value
-            .as_ref()
-            .map(|value| format!("<code>{}</code>", escape_html(value)))
-            .unwrap_or_default()
-    ));
-}
-
-fn render_notes_cell(html: &mut String, member: &SchemaMemberDoc) {
-    html.push_str("<td class=\"member-notes\">");
-    render_comments(html, &member.comments);
-    html.push_str("</td>");
-}
-
-fn render_comments(html: &mut String, comments: &[String]) {
-    if comments.is_empty() {
-        return;
+fn render_version_selector_js(versions: &[DocVersion], current_version_dir: &str) -> String {
+    let mut js = String::new();
+    js.push_str("(function () {\n");
+    js.push_str("  const versions = [\n");
+    for version in versions {
+        js.push_str("    { dir: ");
+        js.push_str(&js_string(&version.dir));
+        js.push_str(", label: ");
+        js.push_str(&js_string(&version.label));
+        js.push_str(" },\n");
     }
-    html.push_str("<p>");
-    for (index, comment) in comments.iter().enumerate() {
-        if index > 0 {
-            html.push(' ');
-        }
-        html.push_str(&escape_html(comment));
+    js.push_str("  ];\n");
+    js.push_str("  const current = ");
+    js.push_str(&js_string(current_version_dir));
+    js.push_str(";\n");
+    js.push_str(
+        r#"  function docsBaseUrl() {
+    const script = document.currentScript || document.querySelector('script[src$="version-selector.js"]');
+    if (!script) {
+      return new URL('../', window.location.href);
     }
-    html.push_str("</p>");
+    const scriptUrl = new URL(script.getAttribute('src'), window.location.href);
+    return new URL('../', new URL('.', scriptUrl));
+  }
+
+  function targetUrl(dir) {
+    return new URL(dir.replace(/\/+$/, '') + '/', docsBaseUrl()).href;
+  }
+
+  function buildSelect() {
+    const select = document.createElement('select');
+    select.className = 'synapse-version-select';
+    select.setAttribute('aria-label', 'Schema documentation version');
+    for (const version of versions) {
+      const option = document.createElement('option');
+      option.value = version.dir;
+      option.textContent = version.label;
+      option.selected = version.dir === current;
+      select.appendChild(option);
+    }
+    select.addEventListener('change', () => {
+      window.location.href = targetUrl(select.value);
+    });
+    return select;
+  }
+
+  function mountMenu() {
+    const menu = document.getElementById('menu-bar');
+    if (!menu || menu.querySelector('.synapse-version-menu')) {
+      return;
+    }
+    const wrapper = document.createElement('div');
+    wrapper.className = 'synapse-version-menu';
+    const label = document.createElement('label');
+    label.textContent = 'Version';
+    wrapper.appendChild(label);
+    wrapper.appendChild(buildSelect());
+    menu.appendChild(wrapper);
+  }
+
+  function mountInlinePickers() {
+    for (const host of document.querySelectorAll('[data-synapse-version-picker]')) {
+      if (host.querySelector('select')) {
+        continue;
+      }
+      const wrapper = document.createElement('div');
+      wrapper.className = 'synapse-version-panel';
+      const label = document.createElement('label');
+      label.textContent = 'Documentation version';
+      wrapper.appendChild(label);
+      wrapper.appendChild(buildSelect());
+      host.appendChild(wrapper);
+    }
+  }
+
+  function mount() {
+    mountMenu();
+    mountInlinePickers();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
+})();
+"#,
+    );
+    js
 }
 
 fn write_docs_root_index(out_dir: &Path, current_version_dir: &str) -> Result<()> {
-    // TODO: Include a dropdown box to select the version.
-    let mut versions = Vec::new();
-    for entry in fs::read_dir(out_dir)? {
-        let path = entry?.path();
-        if path.is_dir() && path.join("index.html").is_file() {
-            if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
-                versions.push(name.to_string());
-            }
-        }
-    }
-    versions.sort();
-    versions.dedup();
-    versions.sort_by(|left, right| match (*left == "main", *right == "main") {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => right.cmp(left),
-    });
+    let versions = docs_versions(out_dir, current_version_dir)?;
 
     let mut html = String::new();
     html.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
     html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+    html.push_str("<title>synapse_fbs schema docs</title><style>");
+    html.push_str(ROOT_DOCS_CSS);
+    html.push_str("</style></head><body><main><section class=\"panel\"><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation</h1>");
     html.push_str(
-        "<title>synapse_fbs schema docs</title><link rel=\"stylesheet\" href=\"style.css\">",
+        "<p>Versioned FlatBuffers schema documentation generated from the source schemas.</p>",
     );
-    html.push_str("</head><body><main><header><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation</h1>");
-    html.push_str("<p>Versioned FlatBuffers schema documentation generated from the source schemas.</p></header>");
-    html.push_str("<section class=\"versions\"><h2>Versions</h2><ul>");
-    for version in versions {
-        let marker = if version == current_version_dir {
+    html.push_str("<label class=\"version-picker\">Version <select id=\"version-select\">");
+    for version in &versions {
+        html.push_str(&format!(
+            "<option value=\"{}/\"{}>{}</option>",
+            escape_attr(&version.dir),
+            if version.current { " selected" } else { "" },
+            escape_html(&version.label)
+        ));
+    }
+    html.push_str(
+        "</select></label></section><section class=\"panel\"><h2>Available Versions</h2><ul>",
+    );
+    for version in &versions {
+        let marker = if version.current {
             " <span class=\"current\">updated</span>"
         } else {
             ""
         };
         html.push_str(&format!(
-            "<li><a href=\"{0}/\">{0}</a>{1}</li>",
-            escape_html(&version),
+            "<li><a href=\"{}/\">{}</a>{}</li>",
+            escape_attr(&version.dir),
+            escape_html(&version.label),
             marker
         ));
     }
-    html.push_str("</ul></section></main></body></html>");
+    html.push_str("</ul></section></main><script>");
+    html.push_str("document.getElementById('version-select').addEventListener('change', function () { window.location.href = this.value; });");
+    html.push_str("</script></body></html>");
     write_file(&out_dir.join("index.html"), &html)
 }
 
-fn anchor_id(file_name: &str, entity_name: &str) -> String {
-    docs_dir_name(&format!(
-        "{}-{}",
-        file_name.replace('/', "-").trim_end_matches(".fbs"),
-        entity_name
-    ))
+fn schema_file_slug(file: &SchemaFileDoc) -> String {
+    docs_dir_name(
+        file.name
+            .strip_prefix("fbs/")
+            .unwrap_or(&file.name)
+            .trim_end_matches(".fbs"),
+    )
+}
+
+fn entity_slug(entity: &SchemaEntityDoc) -> String {
+    docs_dir_name(&entity.name)
+}
+
+fn source_file_name(file: &SchemaFileDoc) -> &str {
+    file.name.strip_prefix("fbs/").unwrap_or(&file.name)
+}
+
+fn comments_text(comments: &[String]) -> String {
+    comments.join(" ")
+}
+
+fn code_span(value: &str) -> String {
+    format!("`{}`", value.replace('`', "\\`"))
+}
+
+fn markdown_link_text(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('[', "\\[")
+        .replace(']', "\\]")
+}
+
+fn markdown_text(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('`', "\\`")
+}
+
+fn markdown_table_cell(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('|', "\\|")
+        .replace('\n', " ")
+        .trim()
+        .to_string()
+}
+
+fn escape_toml_basic(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"")
+        .replace('\n', "\\n")
+}
+
+fn js_string(value: &str) -> String {
+    let mut escaped = String::from("\"");
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '<' => escaped.push_str("\\u003c"),
+            '>' => escaped.push_str("\\u003e"),
+            '&' => escaped.push_str("\\u0026"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped.push('"');
+    escaped
 }
 
 fn escape_html(value: &str) -> String {
@@ -1574,15 +1916,76 @@ fn escape_attr(value: &str) -> String {
     escape_html(value)
 }
 
-const DOCS_CSS: &str = r#":root {
+const MDBOOK_CSS: &str = r#".synapse-version-menu {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  margin-left: auto;
+  padding: 0 0.7rem;
+}
+
+.synapse-version-menu label,
+.synapse-version-panel label {
+  color: var(--fg);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.synapse-version-select {
+  background: var(--bg);
+  border: 1px solid var(--table-border-color);
+  border-radius: 4px;
+  color: var(--fg);
+  font: inherit;
+  height: 1.9rem;
+  max-width: 15rem;
+  padding: 0 0.45rem;
+}
+
+.synapse-version-panel {
+  align-items: center;
+  background: var(--quote-bg);
+  border-left: 4px solid var(--links);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin: 1rem 0 1.5rem;
+  padding: 0.8rem 1rem;
+}
+
+.content table {
+  font-size: 0.9em;
+}
+
+.content table code {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .synapse-version-menu {
+    gap: 0.25rem;
+    padding: 0 0.35rem;
+  }
+
+  .synapse-version-menu label {
+    display: none;
+  }
+
+  .synapse-version-select {
+    max-width: 9.5rem;
+  }
+}
+"#;
+
+const ROOT_DOCS_CSS: &str = r#":root {
   color-scheme: light;
-  --bg: #f7f8fa;
+  --bg: #f5f7fa;
   --panel: #ffffff;
-  --text: #1f2933;
-  --muted: #5f6b7a;
-  --border: #d8dee8;
+  --text: #27313f;
+  --muted: #647184;
+  --border: #d7dee8;
   --accent: #0f766e;
-  --code: #eff3f7;
+  --code: #eef2f7;
 }
 
 * {
@@ -1598,25 +2001,17 @@ body {
 }
 
 main {
-  max-width: 1440px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 32px 20px 64px;
+  padding: 48px 20px 64px;
 }
 
-h1,
-h2,
-h3 {
-  line-height: 1.2;
-}
-
-h1 {
-  margin: 0;
-  font-size: 2.25rem;
-}
-
-h1 span,
-.current {
-  color: var(--accent);
+.panel {
+  margin-top: 20px;
+  padding: 24px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
 }
 
 .eyebrow {
@@ -1628,130 +2023,40 @@ h1 span,
   text-transform: uppercase;
 }
 
-.notice,
-.schema-file,
-.entity,
-.versions {
-  margin-top: 24px;
-  padding: 20px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+h1,
+h2 {
+  line-height: 1.2;
 }
 
-.docs-layout {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 24px;
-  align-items: start;
-}
-
-.toc {
-  position: sticky;
-  top: 16px;
-  max-height: calc(100vh - 32px);
-  overflow: auto;
-  margin-top: 24px;
-  padding: 16px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-}
-
-.toc h2 {
-  margin-top: 0;
-}
-
-.toc a {
-  text-decoration: none;
-}
-
-.toc a:hover {
-  text-decoration: underline;
-}
-
-.toc span {
-  color: var(--muted);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-}
-
-.schema-content {
-  min-width: 0;
-}
-
-.entity {
-  padding: 16px;
-}
-
-.toc ul,
-.versions ul {
-  padding-left: 1.2rem;
-}
-
-a {
-  color: var(--accent);
-}
-
-code {
-  padding: 0.1rem 0.3rem;
-  border-radius: 4px;
-  background: var(--code);
-  font-size: 0.92em;
-}
-
-.table-wrap {
-  overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-th,
-td {
-  padding: 9px 12px;
-  border-top: 1px solid var(--border);
-  text-align: left;
-  vertical-align: top;
-}
-
-th {
-  color: var(--muted);
-  font-size: 0.78rem;
-  text-transform: uppercase;
-}
-
-.member-name,
-.member-type,
-.member-value,
-.unit-scale {
-  white-space: nowrap;
-}
-
-.unit-scale {
-  color: var(--muted);
-}
-
-.member-notes {
-  min-width: 320px;
-}
-
-td p {
+h1 {
   margin: 0;
 }
 
-@media (max-width: 900px) {
-  .docs-layout {
-    display: block;
-  }
+a,
+.current {
+  color: var(--accent);
+}
 
-  .toc {
-    position: static;
-    max-height: none;
-  }
+.version-picker {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  font-weight: 600;
+}
+
+select {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  min-width: 14rem;
+  padding: 0.4rem 0.5rem;
+}
+
+ul {
+  padding-left: 1.2rem;
 }
 "#;
 

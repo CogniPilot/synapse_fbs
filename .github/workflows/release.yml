@@ -23,6 +23,8 @@ jobs:
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
+      - name: Install mdBook
+        run: cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
       - name: Install Python build tools
         run: python -m pip install --upgrade pip build twine
       - name: Build and verify

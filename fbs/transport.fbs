@@ -48,7 +48,7 @@ union SynapseMessage {
 struct FrameHeader {
   timestamp_us:ulong; // Frame publication timestamp in monotonic boot time.
   sequence:uint; // Monotonic sequence counter for loss/reorder detection.
-  flags:ushort; // Producer-defined transport flags.
+  flags:ushort; // Frame-envelope bitmask for serial or raw byte-stream features; zero means no envelope extensions.
   topic_id:TopicId; // Numeric topic identifier for the enclosed message.
   system_id:ubyte; // Source system identifier.
   component_id:ubyte; // Source component identifier.
@@ -58,7 +58,9 @@ struct FrameHeader {
 // Optional multiplexed transport frame. This is an intentional table boundary:
 // runtime topics should still prefer fixed-layout payload structs, especially
 // for shared-memory chip-to-chip links. Zenoh deployments can publish the topic
-// tables directly and use the topic name as the message discriminator.
+// tables directly and use the topic name as the message discriminator. Serial
+// or raw byte-stream links can wrap Frame with link-specific delimiting,
+// integrity, authentication, or encryption without changing topic payloads.
 table Frame {
   header:FrameHeader; // Fixed-layout transport header.
   message:SynapseMessage; // Variable message payload selected by the union discriminator.

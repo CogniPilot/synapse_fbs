@@ -24,6 +24,8 @@ jobs:
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install mdBook
+        run: cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
       - name: Resolve docs version
         shell: bash
         run: |
