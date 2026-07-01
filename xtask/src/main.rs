@@ -1177,6 +1177,7 @@ fn generate_docs_site(root: &Path, tools: &Tools, version: &str, out_dir: &Path)
     remove_file_if_exists(&out_dir.join("style.css"))?;
     write_docs_root_index(out_dir, &version_dir_name)?;
     refresh_docs_version_selectors(out_dir, &version_dir_name)?;
+    write_docs_version_redirect_aliases(out_dir, &version_dir_name)?;
 
     Ok(())
 }
@@ -2366,6 +2367,30 @@ fn refresh_docs_version_selectors(out_dir: &Path, current_version_dir: &str) -> 
         }
     }
     Ok(())
+}
+
+fn write_docs_version_redirect_aliases(out_dir: &Path, current_version_dir: &str) -> Result<()> {
+    let versions = docs_versions(out_dir, current_version_dir)?;
+    for source in &versions {
+        for target in &versions {
+            if source.dir == target.dir {
+                continue;
+            }
+            let href = format!("../../{}/", target.dir);
+            let html = render_redirect_page(&href);
+            write_file(&out_dir.join(&source.dir).join(&target.dir).join("index.html"), &html)?;
+        }
+    }
+    Ok(())
+}
+
+fn render_redirect_page(href: &str) -> String {
+    format!(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta http-equiv=\"refresh\" content=\"0; url={href_attr}\"><link rel=\"canonical\" href=\"{href_attr}\"><title>Redirecting</title></head><body><p>Redirecting to <a href=\"{href_attr}\">{href_text}</a>.</p><script>window.location.replace({href_js});</script></body></html>",
+        href_attr = escape_attr(href),
+        href_text = escape_html(href),
+        href_js = js_string(href)
+    )
 }
 
 fn schema_file_slug(file: &SchemaFileDoc) -> String {
