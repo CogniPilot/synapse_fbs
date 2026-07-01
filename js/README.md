@@ -33,14 +33,14 @@ import { fbsDir, bfbsDir, schemaFiles, schemaPath } from '@cognipilot/synapse-fb
 import { readFileSync } from 'node:fs';
 
 // Resolve and read the canonical Synapse log schema.
-const logSchema = readFileSync(schemaPath('synapse_log.fbs'), 'utf8');
+const logSchema = readFileSync(schemaPath('log.fbs'), 'utf8');
 
 // Or point a code generator at the shipped schema directory.
-// flatc --ts -I <fbsDir> <fbsDir>/synapse_all.fbs
+// flatc --ts -I <fbsDir> <fbsDir>/all.fbs
 ```
 
 Individual assets are also directly importable via subpath exports:
 
 ```js
-import logSchemaUrl from '@cognipilot/synapse-fbs/fbs/synapse_log.fbs';
+import logSchemaUrl from '@cognipilot/synapse-fbs/fbs/log.fbs';
 ```

@@ -1,0 +1,95 @@
+namespace synapse.topic;
+
+// Default coordinate frames follow ROS REP-0103:
+// world/local vectors use ENU (x east, y north, z up);
+// body vectors use FLU (x forward, y left, z up).
+// Fixed-layout payload structs use explicit units in field names when the raw
+// representation is scaled. This keeps adapters predictable and avoids losing
+// precision in global coordinates or raw I/O.
+
+enum TopicId:ushort {
+  Unknown = 0,
+  VehicleHealth = 1,
+  TimeReference = 2,
+  RadioControl = 3,
+  ManualControlCommand = 4,
+  InertialSample = 5,
+  AirData = 6,
+  PowerStatus = 7,
+  GnssFix = 8,
+  AttitudeEstimate = 9,
+  LocalPositionEstimate = 10,
+  GlobalPositionEstimate = 11,
+  OdometryEstimate = 12,
+  EstimatorHealth = 13,
+  MissionProgress = 14,
+  NavigationTarget = 15,
+  HomeReference = 16,
+  AttitudeCommand = 17,
+  RateCommand = 18,
+  LocalPositionCommand = 19,
+  VehicleCommand = 20,
+  GeoCommand = 21,
+  CommandResult = 22,
+  ActuatorCommand = 23,
+  ActuatorFeedback = 24,
+  PwmSignalOutputs = 25,
+  ControlLoopMetrics = 26,
+  MotorOutput = 27,
+  TextStatus = 28,
+}
+
+struct Vec2f {
+  x:float;
+  y:float;
+}
+
+struct Vec3f {
+  x:float;
+  y:float;
+  z:float;
+}
+
+// Quaternion order is w, x, y, z. A zero rotation is 1, 0, 0, 0.
+struct Quaternionf {
+  w:float;
+  x:float;
+  y:float;
+  z:float;
+}
+
+struct RateTriplet {
+  roll:float;
+  pitch:float;
+  yaw:float;
+}
+
+struct AttitudeEuler {
+  roll:float;
+  pitch:float;
+  yaw:float;
+}
+
+struct CovarianceUpperTriangle21f {
+  c0:float;
+  c1:float;
+  c2:float;
+  c3:float;
+  c4:float;
+  c5:float;
+  c6:float;
+  c7:float;
+  c8:float;
+  c9:float;
+  c10:float;
+  c11:float;
+  c12:float;
+  c13:float;
+  c14:float;
+  c15:float;
+  c16:float;
+  c17:float;
+  c18:float;
+  c19:float;
+  c20:float;
+}

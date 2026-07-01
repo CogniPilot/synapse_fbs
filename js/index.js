@@ -17,17 +17,21 @@ export const bfbsDir = fileURLToPath(new URL('bfbs/', packageRoot));
 
 /** Schema file names shipped under {@link fbsDir}, in FlatBuffers include order. */
 export const schemaFiles = Object.freeze([
-  'synapse_topics.fbs',
-  'synapse_optical_flow.fbs',
-  'synapse_mocap.fbs',
-  'synapse_log.fbs',
-  'synapse_sil.fbs',
-  'synapse_all.fbs'
+  'types.fbs',
+  'sensors.fbs',
+  'state.fbs',
+  'control.fbs',
+  'transport.fbs',
+  'optical_flow.fbs',
+  'mocap.fbs',
+  'log.fbs',
+  'sil.fbs',
+  'all.fbs'
 ]);
 
 /**
  * Resolve the absolute path to a shipped `.fbs` schema file.
- * @param {string} name Schema file name, e.g. `synapse_log.fbs`.
+ * @param {string} name Schema file name, e.g. `log.fbs`.
  * @returns {string} Absolute filesystem path.
  */
 export function schemaPath(name) {

@@ -10,12 +10,16 @@ use minijinja::{AutoEscape, Environment, Value, context};
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const SCHEMAS: &[&str] = &[
-    "fbs/synapse_topics.fbs",
-    "fbs/synapse_optical_flow.fbs",
-    "fbs/synapse_mocap.fbs",
-    "fbs/synapse_log.fbs",
-    "fbs/synapse_sil.fbs",
-    "fbs/synapse_all.fbs",
+    "fbs/types.fbs",
+    "fbs/sensors.fbs",
+    "fbs/state.fbs",
+    "fbs/control.fbs",
+    "fbs/transport.fbs",
+    "fbs/optical_flow.fbs",
+    "fbs/mocap.fbs",
+    "fbs/log.fbs",
+    "fbs/sil.fbs",
+    "fbs/all.fbs",
 ];
 
 #[derive(Debug)]
@@ -31,6 +35,8 @@ struct Tools {
 #[derive(Debug)]
 struct Options {
     release_name: String,
+    docs_version: Option<String>,
+    docs_out_dir: Option<PathBuf>,
 }
 
 fn main() -> Result<()> {
@@ -40,8 +46,9 @@ fn main() -> Result<()> {
     match command.as_str() {
         "ci" => ci(&root, &options),
         "js" => js(&root),
+        "docs" => docs(&root, &options),
         _ => fail(format!(
-            "unknown command '{command}'. expected 'ci' or 'js', e.g. cargo run --manifest-path xtask/Cargo.toml -- ci"
+            "unknown command '{command}'. expected: ci, js, or docs"
         )),
     }
 }
@@ -59,6 +66,11 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     build_python_package(root, &packages.python, &tools)?;
     build_js_package(root, &packages.js, &flatc)?;
     build_archives(root, &tools, &flatc, &flatcc, &options.release_name)?;
+    generate_docs_site(
+        root,
+        &default_docs_version(&tools, options),
+        &root.join("target/xtask/docs"),
+    )?;
 
     Ok(())
 }
@@ -76,10 +88,28 @@ fn js(root: &Path) -> Result<()> {
     Ok(())
 }
 
+fn docs(root: &Path, options: &Options) -> Result<()> {
+    let tools = read_tools(root)?;
+    let version = options
+        .docs_version
+        .clone()
+        .or_else(|| env::var("DOCS_VERSION").ok())
+        .or_else(|| env::var("GITHUB_REF_NAME").ok())
+        .unwrap_or_else(|| tools.package_version.clone());
+    let out_dir = options
+        .docs_out_dir
+        .clone()
+        .unwrap_or_else(|| root.join("target/xtask/docs"));
+
+    generate_docs_site(root, &version, &out_dir)
+}
+
 fn parse_args() -> Result<(String, Options)> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "ci".to_string());
     let mut release_name = env::var("GITHUB_REF_NAME").unwrap_or_else(|_| "local".to_string());
+    let mut docs_version = None;
+    let mut docs_out_dir = None;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -88,23 +118,40 @@ fn parse_args() -> Result<(String, Options)> {
                     .next()
                     .ok_or_else(|| io::Error::other("--release-name requires a value"))?;
             }
+            "--version" => {
+                docs_version = Some(
+                    args.next()
+                        .ok_or_else(|| io::Error::other("--version requires a value"))?,
+                );
+            }
+            "--out-dir" => {
+                docs_out_dir =
+                    Some(PathBuf::from(args.next().ok_or_else(|| {
+                        io::Error::other("--out-dir requires a value")
+                    })?));
+            }
             other => return fail(format!("unknown argument '{other}'")),
         }
     }
 
-    Ok((command, Options { release_name }))
+    Ok((
+        command,
+        Options {
+            release_name,
+            docs_version,
+            docs_out_dir,
+        },
+    ))
 }
 
 fn find_repo_root(start: &Path) -> Result<PathBuf> {
     let mut dir = start.to_path_buf();
     loop {
-        if dir.join("tools.lock").is_file() && dir.join("fbs/synapse_all.fbs").is_file() {
+        if dir.join("tools.lock").is_file() && dir.join("fbs/all.fbs").is_file() {
             return Ok(dir);
         }
         if !dir.pop() {
-            return fail(
-                "could not find repository root containing tools.lock and fbs/synapse_all.fbs",
-            );
+            return fail("could not find repository root containing tools.lock and fbs/all.fbs");
         }
     }
 }
@@ -552,8 +599,8 @@ import { join } from 'node:path';
 for (const name of schemaFiles) {
   if (!existsSync(schemaPath(name))) throw new Error('missing schema ' + name);
 }
-if (!existsSync(join(fbsDir, 'synapse_log.fbs'))) throw new Error('missing fbsDir');
-if (!existsSync(join(bfbsDir, 'synapse_log.bfbs'))) throw new Error('missing reflection schema');
+if (!existsSync(join(fbsDir, 'log.fbs'))) throw new Error('missing fbsDir');
+if (!existsSync(join(bfbsDir, 'log.bfbs'))) throw new Error('missing reflection schema');
 console.log('synapse-fbs js package ok');
 "#;
 
@@ -820,6 +867,734 @@ fn collect_fbs_files(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
     }
     Ok(())
 }
+
+#[derive(Clone, Debug)]
+struct SchemaDoc {
+    files: Vec<SchemaFileDoc>,
+}
+
+#[derive(Clone, Debug)]
+struct SchemaFileDoc {
+    name: String,
+    namespace: String,
+    includes: Vec<String>,
+    entities: Vec<SchemaEntityDoc>,
+}
+
+#[derive(Clone, Debug)]
+struct SchemaEntityDoc {
+    kind: SchemaEntityKind,
+    name: String,
+    value_type: Option<String>,
+    comments: Vec<String>,
+    members: Vec<SchemaMemberDoc>,
+}
+
+#[derive(Clone, Debug)]
+struct SchemaMemberDoc {
+    name: String,
+    type_name: Option<String>,
+    value: Option<String>,
+    comments: Vec<String>,
+    unit_scale: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SchemaEntityKind {
+    Struct,
+    Table,
+    Enum,
+    Union,
+}
+
+impl SchemaEntityKind {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Struct => "struct",
+            Self::Table => "table",
+            Self::Enum => "enum",
+            Self::Union => "union",
+        }
+    }
+}
+
+fn default_docs_version(tools: &Tools, options: &Options) -> String {
+    options
+        .docs_version
+        .clone()
+        .unwrap_or_else(|| match options.release_name.as_str() {
+            "local" => tools.package_version.clone(),
+            release_name => normalize_docs_version(release_name),
+        })
+}
+
+fn generate_docs_site(root: &Path, version: &str, out_dir: &Path) -> Result<()> {
+    let version = normalize_docs_version(version);
+    let version_dir_name = docs_dir_name(&version);
+    let version_dir = out_dir.join(&version_dir_name);
+
+    println!(
+        "generating schema docs for {version} into {}",
+        version_dir.display()
+    );
+
+    let docs = parse_schema_docs(root)?;
+    reset_dir(&version_dir)?;
+    copy_dir_all(&root.join("fbs"), &version_dir.join("fbs"))?;
+    write_file(&out_dir.join(".nojekyll"), "")?;
+    write_file(&out_dir.join("style.css"), DOCS_CSS)?;
+    write_file(
+        &version_dir.join("index.html"),
+        &render_schema_docs(&docs, &version, &version_dir_name),
+    )?;
+    write_docs_root_index(out_dir, &version_dir_name)?;
+
+    Ok(())
+}
+
+fn parse_schema_docs(root: &Path) -> Result<SchemaDoc> {
+    let mut files = Vec::new();
+    for path in schema_files(root)? {
+        let rel = path
+            .strip_prefix(root)?
+            .to_string_lossy()
+            .replace('\\', "/");
+        files.push(parse_schema_file(&path, &rel)?);
+    }
+    Ok(SchemaDoc { files })
+}
+
+fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
+    let content = fs::read_to_string(path)?;
+    let mut namespace = String::new();
+    let mut includes = Vec::new();
+    let mut entities = Vec::new();
+    let mut current: Option<SchemaEntityDoc> = None;
+    let mut pending_comments = Vec::new();
+
+    for raw_line in content.lines() {
+        let trimmed = raw_line.trim();
+        if let Some(comment) = trimmed.strip_prefix("//") {
+            pending_comments.push(comment.trim().to_string());
+            continue;
+        }
+
+        let code = trimmed
+            .split_once("//")
+            .map(|(before, _)| before)
+            .unwrap_or(trimmed)
+            .trim();
+        if code.is_empty() {
+            continue;
+        }
+
+        if let Some(entity) = current.as_mut() {
+            if code.starts_with('}') {
+                entities.push(current.take().expect("entity exists"));
+                pending_comments.clear();
+                continue;
+            }
+
+            if let Some(member) = parse_schema_member(entity.kind, code, &mut pending_comments) {
+                entity.members.push(member);
+            } else {
+                pending_comments.clear();
+            }
+            continue;
+        }
+
+        if let Some(rest) = code.strip_prefix("namespace ") {
+            namespace = rest.trim_end_matches(';').trim().to_string();
+            pending_comments.clear();
+            continue;
+        }
+
+        if let Some(rest) = code.strip_prefix("include ") {
+            includes.push(
+                rest.trim_end_matches(';')
+                    .trim()
+                    .trim_matches('"')
+                    .to_string(),
+            );
+            pending_comments.clear();
+            continue;
+        }
+
+        if let Some((kind, entity_name, value_type)) = parse_schema_entity_start(code) {
+            current = Some(SchemaEntityDoc {
+                kind,
+                name: entity_name,
+                value_type,
+                comments: take_comments(&mut pending_comments),
+                members: Vec::new(),
+            });
+            continue;
+        }
+
+        pending_comments.clear();
+    }
+
+    if let Some(entity) = current {
+        return fail(format!(
+            "{} ended while parsing {} {}",
+            path.display(),
+            entity.kind.as_str(),
+            entity.name
+        ));
+    }
+
+    Ok(SchemaFileDoc {
+        name: name.to_string(),
+        namespace,
+        includes,
+        entities,
+    })
+}
+
+fn parse_schema_entity_start(code: &str) -> Option<(SchemaEntityKind, String, Option<String>)> {
+    for (prefix, kind) in [
+        ("struct ", SchemaEntityKind::Struct),
+        ("table ", SchemaEntityKind::Table),
+        ("enum ", SchemaEntityKind::Enum),
+        ("union ", SchemaEntityKind::Union),
+    ] {
+        let Some(rest) = code.strip_prefix(prefix) else {
+            continue;
+        };
+        let head = rest.split_once('{')?.0.trim();
+        let (name, value_type) = head
+            .split_once(':')
+            .map(|(name, value_type)| {
+                (name.trim().to_string(), Some(value_type.trim().to_string()))
+            })
+            .unwrap_or_else(|| (head.to_string(), None));
+        return Some((kind, name, value_type));
+    }
+
+    None
+}
+
+fn parse_schema_member(
+    kind: SchemaEntityKind,
+    code: &str,
+    pending_comments: &mut Vec<String>,
+) -> Option<SchemaMemberDoc> {
+    match kind {
+        SchemaEntityKind::Struct | SchemaEntityKind::Table => {
+            let member = code.trim_end_matches(';').trim();
+            let (name, rest) = member.split_once(':')?;
+            let (type_name, value) = rest
+                .split_once('=')
+                .map(|(type_name, value)| {
+                    (
+                        type_name.trim().to_string(),
+                        Some(value.trim().trim_end_matches(';').to_string()),
+                    )
+                })
+                .unwrap_or_else(|| (rest.trim().to_string(), None));
+            let name = name.trim().to_string();
+            Some(SchemaMemberDoc {
+                unit_scale: unit_scale_note(&name),
+                name,
+                type_name: Some(type_name),
+                value,
+                comments: take_comments(pending_comments),
+            })
+        }
+        SchemaEntityKind::Enum => {
+            let member = code.trim_end_matches(',').trim();
+            if member.is_empty() {
+                return None;
+            }
+            let (name, value) = member
+                .split_once('=')
+                .map(|(name, value)| (name.trim().to_string(), Some(value.trim().to_string())))
+                .unwrap_or_else(|| (member.to_string(), None));
+            Some(SchemaMemberDoc {
+                unit_scale: unit_scale_note(&name),
+                name,
+                type_name: None,
+                value,
+                comments: take_comments(pending_comments),
+            })
+        }
+        SchemaEntityKind::Union => {
+            let member = code.trim_end_matches(',').trim();
+            if member.is_empty() {
+                return None;
+            }
+            let (name, type_name) = member
+                .split_once(':')
+                .map(|(name, type_name)| {
+                    (name.trim().to_string(), Some(type_name.trim().to_string()))
+                })
+                .unwrap_or_else(|| (member.to_string(), Some(member.to_string())));
+            Some(SchemaMemberDoc {
+                unit_scale: None,
+                name,
+                type_name,
+                value: None,
+                comments: take_comments(pending_comments),
+            })
+        }
+    }
+}
+
+fn take_comments(comments: &mut Vec<String>) -> Vec<String> {
+    std::mem::take(comments)
+        .into_iter()
+        .filter(|comment| !comment.is_empty())
+        .collect()
+}
+
+fn unit_scale_note(name: &str) -> Option<String> {
+    let lower = name.to_ascii_lowercase();
+    let note = if lower.contains("_enu_") && lower.ends_with("_m_s2") {
+        "ENU frame (x east, y north, z up), meters per second squared"
+    } else if lower.contains("_enu_") && lower.ends_with("_m_s") {
+        "ENU frame (x east, y north, z up), meters per second"
+    } else if lower.contains("_enu_") && lower.ends_with("_m") {
+        "ENU frame (x east, y north, z up), meters"
+    } else if lower.contains("_flu_") && lower.ends_with("_m_s2") {
+        "FLU body frame (x forward, y left, z up), meters per second squared"
+    } else if lower.contains("_flu_") && lower.ends_with("_rad_s") {
+        "FLU body frame (x forward, y left, z up), radians per second"
+    } else if lower.contains("_flu_") && lower.ends_with("_tesla") {
+        "FLU body frame (x forward, y left, z up), tesla"
+    } else if lower.contains("latitude_deg_e7") || lower.contains("longitude_deg_e7") {
+        "degrees scaled by 1e7; int32 preserves global-coordinate precision"
+    } else if lower.ends_with("_deg_e7") {
+        "degrees scaled by 1e7"
+    } else if lower.ends_with("_deg_e5") {
+        "degrees scaled by 1e5"
+    } else if lower.ends_with("_cdegc") || lower.ends_with("_cdeg") && lower.contains("temperature")
+    {
+        "centi-degrees Celsius; degC = value / 100"
+    } else if lower.ends_with("_cdeg") {
+        "centidegrees; degrees = value / 100"
+    } else if lower.ends_with("_milli") {
+        "normalized milli-units; value / 1000, usually [-1, 1]"
+    } else if lower.ends_with("_centi") {
+        "centi-units; value / 100"
+    } else if lower.ends_with("_dpermille") {
+        "deci-percent; percent = value / 10, 1000 means 100%"
+    } else if lower.ends_with("_cpercent") {
+        "centi-percent; percent = value / 100"
+    } else if lower.ends_with("_raw_us") {
+        "raw pulse width in microseconds"
+    } else if lower.ends_with("_us") {
+        "microseconds"
+    } else if lower.ends_with("_ms") {
+        "milliseconds"
+    } else if lower.ends_with("_mm_s") {
+        "millimeters per second"
+    } else if lower.ends_with("_cm_s") {
+        "centimeters per second"
+    } else if lower.ends_with("_m_s2") {
+        "meters per second squared"
+    } else if lower.ends_with("_m_s") {
+        "meters per second"
+    } else if lower.ends_with("_rad_s") {
+        "radians per second"
+    } else if lower.ends_with("_rad") {
+        "radians"
+    } else if lower.ends_with("_mm") {
+        "millimeters"
+    } else if lower.ends_with("_mv") {
+        "millivolts"
+    } else if lower.ends_with("_ca") {
+        "centi-amps; amps = value / 100"
+    } else if lower.ends_with("_mah") {
+        "milliamp-hours"
+    } else if lower.ends_with("_hj") {
+        "hecto-joules; joules = value * 100"
+    } else if lower.ends_with("_pct") {
+        "percent"
+    } else if lower.ends_with("_hpa") {
+        "hectopascals"
+    } else if lower.ends_with("_tesla") {
+        "tesla"
+    } else if lower.ends_with("_deg") {
+        "degrees"
+    } else if lower.ends_with("_m") {
+        "meters"
+    } else if lower.ends_with("_s") {
+        "seconds"
+    } else if lower.contains("flags") || lower.contains("bitmask") || lower.ends_with("_mask") {
+        "bitmask"
+    } else {
+        return None;
+    };
+
+    Some(note.to_string())
+}
+
+fn normalize_docs_version(version: &str) -> String {
+    let version = version
+        .strip_prefix("refs/tags/")
+        .or_else(|| version.strip_prefix("refs/heads/"))
+        .unwrap_or(version)
+        .trim();
+    let version = if version
+        .strip_prefix('v')
+        .is_some_and(|rest| rest.chars().next().is_some_and(|ch| ch.is_ascii_digit()))
+    {
+        &version[1..]
+    } else {
+        version
+    };
+
+    if version.is_empty() {
+        "local".to_string()
+    } else {
+        version.to_string()
+    }
+}
+
+fn docs_dir_name(version: &str) -> String {
+    let sanitized = version
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+
+    if sanitized.is_empty() || sanitized == "." || sanitized == ".." {
+        "local".to_string()
+    } else {
+        sanitized
+    }
+}
+
+fn render_schema_docs(docs: &SchemaDoc, version: &str, version_dir_name: &str) -> String {
+    let mut html = String::new();
+    html.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+    html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+    html.push_str(&format!(
+        "<title>synapse_fbs {}</title><link rel=\"stylesheet\" href=\"../style.css\">",
+        escape_html(version)
+    ));
+    html.push_str("</head><body><main>");
+    html.push_str(&format!(
+        "<header><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation <span>{}</span></h1>",
+        escape_html(version)
+    ));
+    html.push_str("<p>Generated from the FlatBuffers schemas in <code>fbs/</code>. High-rate payloads use fixed-layout structs wrapped by small tables so they can be published as FlatBuffers roots while keeping the payload layout stable. Coordinate frames follow <a href=\"https://www.ros.org/reps/rep-0103.html\">ROS REP-0103</a>: local/world vectors use ENU and body vectors use FLU.</p></header>");
+    html.push_str("<section class=\"notice\"><h2>Unit And Scale Rules</h2>");
+    html.push_str("<p>Fields encode units and frames in their names. Local/world vectors use <code>_enu_</code>; body vectors use <code>_flu_</code>. Global coordinates use <code>_deg_e7</code>, altitudes use <code>_mm</code>, speeds commonly use <code>_cm_s</code> or <code>_mm_s</code>, temperatures use <code>_cdeg</code>, currents use <code>_ca</code>, magnetic field uses <code>_tesla</code>, and normalized manual-control axes use <code>_milli</code>. The scale column below is generated from those suffixes.</p></section>");
+    html.push_str("<nav class=\"toc\"><h2>Schemas</h2><ul>");
+    for file in &docs.files {
+        html.push_str(&format!(
+            "<li><a href=\"#{}\">{}</a><ul>",
+            escape_attr(&anchor_id(&file.name, "")),
+            escape_html(&file.name)
+        ));
+        for entity in &file.entities {
+            html.push_str(&format!(
+                "<li><a href=\"#{}\"><code>{}</code> {}</a></li>",
+                escape_attr(&anchor_id(&file.name, &entity.name)),
+                escape_html(entity.kind.as_str()),
+                escape_html(&entity.name)
+            ));
+        }
+        html.push_str("</ul></li>");
+    }
+    html.push_str("</ul></nav>");
+
+    for file in &docs.files {
+        html.push_str(&format!(
+            "<section class=\"schema-file\" id=\"{}\"><h2>{}</h2>",
+            escape_attr(&anchor_id(&file.name, "")),
+            escape_html(&file.name)
+        ));
+        if !file.namespace.is_empty() {
+            html.push_str(&format!(
+                "<p><strong>Namespace:</strong> <code>{}</code></p>",
+                escape_html(&file.namespace)
+            ));
+        }
+        if !file.includes.is_empty() {
+            html.push_str("<p><strong>Includes:</strong> ");
+            for (index, include) in file.includes.iter().enumerate() {
+                if index > 0 {
+                    html.push_str(", ");
+                }
+                html.push_str(&format!("<code>{}</code>", escape_html(include)));
+            }
+            html.push_str("</p>");
+        }
+        let source_href = file.name.strip_prefix("fbs/").unwrap_or(&file.name);
+        html.push_str(&format!(
+            "<p><a href=\"fbs/{}\">Source schema</a></p>",
+            escape_attr(source_href)
+        ));
+
+        for entity in &file.entities {
+            render_entity_docs(&mut html, file, entity);
+        }
+
+        html.push_str("</section>");
+    }
+
+    html.push_str(&format!(
+        "<footer><p>Version path: <code>{}</code>. Generated by <code>cargo run --locked --manifest-path xtask/Cargo.toml -- docs</code>.</p></footer>",
+        escape_html(version_dir_name)
+    ));
+    html.push_str("</main></body></html>");
+    html
+}
+
+fn render_entity_docs(html: &mut String, file: &SchemaFileDoc, entity: &SchemaEntityDoc) {
+    html.push_str(&format!(
+        "<article class=\"entity\" id=\"{}\"><h3><code>{}</code> {}</h3>",
+        escape_attr(&anchor_id(&file.name, &entity.name)),
+        escape_html(entity.kind.as_str()),
+        escape_html(&entity.name)
+    ));
+    if let Some(value_type) = &entity.value_type {
+        html.push_str(&format!(
+            "<p><strong>Backing type:</strong> <code>{}</code></p>",
+            escape_html(value_type)
+        ));
+    }
+    render_comments(html, &entity.comments);
+
+    html.push_str("<div class=\"table-wrap\"><table><thead><tr>");
+    html.push_str("<th>Name</th><th>Type</th><th>Value</th><th>Unit / Scale</th><th>Notes</th>");
+    html.push_str("</tr></thead><tbody>");
+    for member in &entity.members {
+        html.push_str("<tr>");
+        html.push_str(&format!(
+            "<td><code>{}</code></td>",
+            escape_html(&member.name)
+        ));
+        html.push_str(&format!(
+            "<td>{}</td>",
+            member
+                .type_name
+                .as_ref()
+                .map(|value| format!("<code>{}</code>", escape_html(value)))
+                .unwrap_or_default()
+        ));
+        html.push_str(&format!(
+            "<td>{}</td>",
+            member
+                .value
+                .as_ref()
+                .map(|value| format!("<code>{}</code>", escape_html(value)))
+                .unwrap_or_default()
+        ));
+        html.push_str(&format!(
+            "<td>{}</td>",
+            member
+                .unit_scale
+                .as_ref()
+                .map(|value| escape_html(value))
+                .unwrap_or_default()
+        ));
+        html.push_str("<td>");
+        render_comments(html, &member.comments);
+        html.push_str("</td></tr>");
+    }
+    html.push_str("</tbody></table></div></article>");
+}
+
+fn render_comments(html: &mut String, comments: &[String]) {
+    if comments.is_empty() {
+        return;
+    }
+    html.push_str("<p>");
+    for (index, comment) in comments.iter().enumerate() {
+        if index > 0 {
+            html.push(' ');
+        }
+        html.push_str(&escape_html(comment));
+    }
+    html.push_str("</p>");
+}
+
+fn write_docs_root_index(out_dir: &Path, current_version_dir: &str) -> Result<()> {
+    let mut versions = Vec::new();
+    for entry in fs::read_dir(out_dir)? {
+        let path = entry?.path();
+        if path.is_dir() && path.join("index.html").is_file() {
+            if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+                versions.push(name.to_string());
+            }
+        }
+    }
+    versions.sort();
+    versions.dedup();
+    versions.sort_by(|left, right| match (*left == "main", *right == "main") {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => right.cmp(left),
+    });
+
+    let mut html = String::new();
+    html.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+    html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
+    html.push_str(
+        "<title>synapse_fbs schema docs</title><link rel=\"stylesheet\" href=\"style.css\">",
+    );
+    html.push_str("</head><body><main><header><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation</h1>");
+    html.push_str("<p>Versioned FlatBuffers schema documentation generated from the source schemas.</p></header>");
+    html.push_str("<section class=\"versions\"><h2>Versions</h2><ul>");
+    for version in versions {
+        let marker = if version == current_version_dir {
+            " <span class=\"current\">updated</span>"
+        } else {
+            ""
+        };
+        html.push_str(&format!(
+            "<li><a href=\"{0}/\">{0}</a>{1}</li>",
+            escape_html(&version),
+            marker
+        ));
+    }
+    html.push_str("</ul></section></main></body></html>");
+    write_file(&out_dir.join("index.html"), &html)
+}
+
+fn anchor_id(file_name: &str, entity_name: &str) -> String {
+    docs_dir_name(&format!(
+        "{}-{}",
+        file_name.replace('/', "-").trim_end_matches(".fbs"),
+        entity_name
+    ))
+}
+
+fn escape_html(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+fn escape_attr(value: &str) -> String {
+    escape_html(value)
+}
+
+const DOCS_CSS: &str = r#":root {
+  color-scheme: light;
+  --bg: #f7f8fa;
+  --panel: #ffffff;
+  --text: #1f2933;
+  --muted: #5f6b7a;
+  --border: #d8dee8;
+  --accent: #0f766e;
+  --code: #eff3f7;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+
+main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 32px 20px 64px;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.25rem;
+}
+
+h1 span,
+.current {
+  color: var(--accent);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.notice,
+.toc,
+.schema-file,
+.entity,
+.versions {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.entity {
+  padding: 16px;
+}
+
+.toc ul,
+.versions ul {
+  padding-left: 1.2rem;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  background: var(--code);
+  font-size: 0.92em;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+td p {
+  margin: 0;
+}
+"#;
 
 struct Templates {
     env: Environment<'static>,

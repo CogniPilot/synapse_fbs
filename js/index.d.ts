@@ -9,7 +9,7 @@ export const schemaFiles: readonly string[];
 
 /**
  * Resolve the absolute path to a shipped `.fbs` schema file.
- * @param name Schema file name, e.g. `synapse_log.fbs`.
+ * @param name Schema file name, e.g. `log.fbs`.
  * @returns Absolute filesystem path.
  */
 export function schemaPath(name: string): string;

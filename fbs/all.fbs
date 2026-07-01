@@ -1,0 +1,7 @@
+include "transport.fbs";
+include "optical_flow.fbs";
+include "mocap.fbs";
+include "log.fbs";
+include "sil.fbs";
+
+namespace synapse;

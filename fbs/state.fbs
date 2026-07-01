@@ -1,0 +1,173 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+struct VehicleHealthData {
+  timestamp_us:ulong;
+  sensors_present:uint;
+  sensors_enabled:uint;
+  sensors_health:uint;
+  sensors_present_ext:uint;
+  sensors_enabled_ext:uint;
+  sensors_health_ext:uint;
+  load_dpermille:ushort;
+  voltage_battery_mv:ushort;
+  current_battery_ca:short;
+  battery_remaining_pct:byte;
+  drop_rate_comm_cpercent:ushort;
+  errors_comm:ushort;
+  errors_count0:ushort;
+  errors_count1:ushort;
+  errors_count2:ushort;
+  errors_count3:ushort;
+  vehicle_type:ubyte;
+  flight_mode:ubyte;
+  system_state:ubyte;
+  link_quality:ubyte;
+  armed:bool;
+  failsafe:bool;
+}
+
+struct TimeReferenceData {
+  time_unix_us:ulong;
+  time_boot_us:ulong;
+}
+
+struct AttitudeEstimateData {
+  timestamp_us:ulong;
+  attitude:Quaternionf;
+  euler_rad:AttitudeEuler;
+  angular_velocity_flu_rad_s:RateTriplet;
+  valid:bool;
+}
+
+struct LocalPositionEstimateData {
+  timestamp_us:ulong;
+  position_enu_m:Vec3f;
+  velocity_enu_m_s:Vec3f;
+  acceleration_enu_m_s2:Vec3f;
+  yaw_rad:float;
+  yaw_rate_rad_s:float;
+  xy_valid:bool;
+  z_valid:bool;
+  v_xy_valid:bool;
+  v_z_valid:bool;
+}
+
+struct GlobalPositionEstimateData {
+  timestamp_us:ulong;
+  latitude_deg_e7:int;
+  longitude_deg_e7:int;
+  altitude_msl_mm:int;
+  relative_altitude_mm:int;
+  velocity_east_cm_s:short;
+  velocity_north_cm_s:short;
+  velocity_up_cm_s:short;
+  // Yaw follows ROS REP-0103: zero east, positive counter-clockwise.
+  yaw_cdeg:short;
+  source:ubyte;
+  flags:ubyte;
+  valid:bool;
+}
+
+struct OdometryEstimateData {
+  timestamp_us:ulong;
+  position_enu_m:Vec3f;
+  attitude:Quaternionf;
+  velocity_enu_m_s:Vec3f;
+  angular_velocity_flu_rad_s:RateTriplet;
+  pose_covariance:CovarianceUpperTriangle21f;
+  velocity_covariance:CovarianceUpperTriangle21f;
+  frame_id:ubyte;
+  child_frame_id:ubyte;
+  reset_counter:ubyte;
+  estimator_type:ubyte;
+  quality_pct:byte;
+}
+
+struct EstimatorHealthData {
+  timestamp_us:ulong;
+  flags:ushort;
+  velocity_test_ratio:float;
+  pos_horiz_test_ratio:float;
+  pos_vert_test_ratio:float;
+  mag_test_ratio:float;
+  hagl_test_ratio:float;
+  tas_test_ratio:float;
+  pos_horiz_accuracy_m:float;
+  pos_vert_accuracy_m:float;
+}
+
+struct MissionProgressData {
+  timestamp_us:ulong;
+  current_seq:ushort;
+  total:ushort;
+  mission_state:ubyte;
+  mission_mode:ubyte;
+  mission_id:uint;
+  fence_id:uint;
+  rally_points_id:uint;
+}
+
+struct NavigationTargetData {
+  timestamp_us:ulong;
+  desired_roll_deg:float;
+  desired_pitch_deg:float;
+  // Yaw follows ROS REP-0103: zero east, positive counter-clockwise.
+  desired_yaw_cdeg:short;
+  target_yaw_cdeg:short;
+  distance_to_waypoint_m:ushort;
+  altitude_error_m:float;
+  airspeed_error_m_s:float;
+  xtrack_error_m:float;
+}
+
+struct HomeReferenceData {
+  timestamp_us:ulong;
+  latitude_deg_e7:int;
+  longitude_deg_e7:int;
+  altitude_msl_mm:int;
+  local_position_enu_m:Vec3f;
+  attitude:Quaternionf;
+  approach_enu_m:Vec3f;
+}
+
+table VehicleHealth {
+  data:VehicleHealthData;
+}
+
+table TimeReference {
+  data:TimeReferenceData;
+}
+
+table AttitudeEstimate {
+  data:AttitudeEstimateData;
+}
+
+table LocalPositionEstimate {
+  data:LocalPositionEstimateData;
+}
+
+table GlobalPositionEstimate {
+  data:GlobalPositionEstimateData;
+}
+
+table OdometryEstimate {
+  data:OdometryEstimateData;
+}
+
+table EstimatorHealth {
+  data:EstimatorHealthData;
+}
+
+table MissionProgress {
+  data:MissionProgressData;
+}
+
+table NavigationTarget {
+  data:NavigationTargetData;
+}
+
+table HomeReference {
+  data:HomeReferenceData;
+}

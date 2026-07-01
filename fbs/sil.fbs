@@ -1,11 +1,12 @@
-include "synapse_topics.fbs";
+include "types.fbs";
+include "control.fbs";
 
 namespace synapse.sil;
 
 table SimInput {
-  gyro:synapse.topic.Vec3f;
-  accel:synapse.topic.Vec3f;
-  rc:synapse.topic.RcChannels16;
+  gyro_flu_rad_s:synapse.topic.Vec3f;
+  accel_flu_m_s2:synapse.topic.Vec3f;
+  rc:synapse.topic.RadioControlData;
   rc_link_quality:ubyte;
   rc_valid:bool;
   imu_valid:bool;

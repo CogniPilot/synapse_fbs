@@ -1,0 +1,282 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+struct RadioControlData {
+  timestamp_us:ulong;
+  channel_count:ubyte;
+  rssi:ubyte;
+  chan0_raw_us:ushort;
+  chan1_raw_us:ushort;
+  chan2_raw_us:ushort;
+  chan3_raw_us:ushort;
+  chan4_raw_us:ushort;
+  chan5_raw_us:ushort;
+  chan6_raw_us:ushort;
+  chan7_raw_us:ushort;
+  chan8_raw_us:ushort;
+  chan9_raw_us:ushort;
+  chan10_raw_us:ushort;
+  chan11_raw_us:ushort;
+  chan12_raw_us:ushort;
+  chan13_raw_us:ushort;
+  chan14_raw_us:ushort;
+  chan15_raw_us:ushort;
+  chan16_raw_us:ushort;
+  chan17_raw_us:ushort;
+}
+
+// Signed normalized manual-control axes in milli-units. INT16_MAX means invalid.
+struct ManualControlData {
+  timestamp_us:ulong;
+  buttons:uint;
+  active_axes:ubyte;
+  pitch_milli:short;
+  roll_milli:short;
+  throttle_milli:short;
+  yaw_milli:short;
+  aux0_milli:short;
+  aux1_milli:short;
+  aux2_milli:short;
+  aux3_milli:short;
+  aux4_milli:short;
+  aux5_milli:short;
+  flight_mode:ubyte;
+  arm_switch:bool;
+  kill_switch:bool;
+  active:bool;
+  valid:bool;
+}
+
+struct AttitudeCommandData {
+  timestamp_us:ulong;
+  attitude:Quaternionf;
+  body_rate_flu_rad_s:RateTriplet;
+  thrust:float;
+  thrust_body_flu:Vec3f;
+  type_mask:ubyte;
+}
+
+struct RateCommandData {
+  timestamp_us:ulong;
+  body_rate_flu_rad_s:RateTriplet;
+  thrust:float;
+  thrust_body_flu:Vec3f;
+  type_mask:ubyte;
+}
+
+struct LocalPositionCommandData {
+  timestamp_us:ulong;
+  position_enu_m:Vec3f;
+  velocity_enu_m_s:Vec3f;
+  acceleration_or_force_enu:Vec3f;
+  yaw_rad:float;
+  yaw_rate_rad_s:float;
+  type_mask:ushort;
+  coordinate_frame:ubyte;
+}
+
+struct VehicleCommandData {
+  timestamp_us:ulong;
+  arg0:float;
+  arg1:float;
+  arg2:float;
+  arg3:float;
+  arg4:float;
+  arg5:float;
+  arg6:float;
+  command_id:ushort;
+  target_system:ubyte;
+  target_component:ubyte;
+  confirmation:ubyte;
+}
+
+// Geographic command form for preserving global-coordinate precision.
+struct GeoCommandData {
+  timestamp_us:ulong;
+  arg0:float;
+  arg1:float;
+  arg2:float;
+  arg3:float;
+  latitude_deg_e7:int;
+  longitude_deg_e7:int;
+  altitude_m:float;
+  command_id:ushort;
+  frame:ubyte;
+  target_system:ubyte;
+  target_component:ubyte;
+  current:ubyte;
+  autocontinue:ubyte;
+}
+
+struct CommandResultData {
+  timestamp_us:ulong;
+  result_detail:int;
+  command_id:ushort;
+  result_code:ubyte;
+  progress_pct:ubyte;
+  target_system:ubyte;
+  target_component:ubyte;
+}
+
+struct ActuatorCommandData {
+  timestamp_us:ulong;
+  active_mask:uint;
+  control0:float;
+  control1:float;
+  control2:float;
+  control3:float;
+  control4:float;
+  control5:float;
+  control6:float;
+  control7:float;
+  control8:float;
+  control9:float;
+  control10:float;
+  control11:float;
+  control12:float;
+  control13:float;
+  control14:float;
+  control15:float;
+}
+
+struct ActuatorFeedbackData {
+  timestamp_us:ulong;
+  active_mask:uint;
+  output0:float;
+  output1:float;
+  output2:float;
+  output3:float;
+  output4:float;
+  output5:float;
+  output6:float;
+  output7:float;
+  output8:float;
+  output9:float;
+  output10:float;
+  output11:float;
+  output12:float;
+  output13:float;
+  output14:float;
+  output15:float;
+  output16:float;
+  output17:float;
+  output18:float;
+  output19:float;
+  output20:float;
+  output21:float;
+  output22:float;
+  output23:float;
+  output24:float;
+  output25:float;
+  output26:float;
+  output27:float;
+  output28:float;
+  output29:float;
+  output30:float;
+  output31:float;
+}
+
+struct PwmSignalOutputsData {
+  timestamp_us:ulong;
+  active_mask:uint;
+  port:ubyte;
+  output0_us:ushort;
+  output1_us:ushort;
+  output2_us:ushort;
+  output3_us:ushort;
+  output4_us:ushort;
+  output5_us:ushort;
+  output6_us:ushort;
+  output7_us:ushort;
+  output8_us:ushort;
+  output9_us:ushort;
+  output10_us:ushort;
+  output11_us:ushort;
+  output12_us:ushort;
+  output13_us:ushort;
+  output14_us:ushort;
+  output15_us:ushort;
+}
+
+struct ControlLoopMetricsData {
+  timestamp_us:ulong;
+  period_us:uint;
+  latency_us:uint;
+  overruns:uint;
+  load_dpermille:ushort;
+}
+
+struct MotorValues4f {
+  m0:float;
+  m1:float;
+  m2:float;
+  m3:float;
+}
+
+struct MotorRaw4u16 {
+  m0:ushort;
+  m1:ushort;
+  m2:ushort;
+  m3:ushort;
+}
+
+struct MotorOutputData {
+  timestamp_us:ulong;
+  motors:MotorValues4f;
+  raw:MotorRaw4u16;
+  armed:bool;
+  test_mode:bool;
+}
+
+table RadioControl {
+  data:RadioControlData;
+}
+
+table ManualControlCommand {
+  data:ManualControlData;
+}
+
+table AttitudeCommand {
+  data:AttitudeCommandData;
+}
+
+table RateCommand {
+  data:RateCommandData;
+}
+
+table LocalPositionCommand {
+  data:LocalPositionCommandData;
+}
+
+table VehicleCommand {
+  data:VehicleCommandData;
+}
+
+table GeoCommand {
+  data:GeoCommandData;
+}
+
+table CommandResult {
+  data:CommandResultData;
+}
+
+table ActuatorCommand {
+  data:ActuatorCommandData;
+}
+
+table ActuatorFeedback {
+  data:ActuatorFeedbackData;
+}
+
+table PwmSignalOutputs {
+  data:PwmSignalOutputsData;
+}
+
+table ControlLoopMetrics {
+  data:ControlLoopMetricsData;
+}
+
+table MotorOutput {
+  data:MotorOutputData;
+}

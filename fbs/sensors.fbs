@@ -1,0 +1,103 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// SI inertial sample in the body FLU frame.
+struct InertialSampleData {
+  timestamp_us:ulong;
+  accel_flu_m_s2:Vec3f;
+  gyro_flu_rad_s:Vec3f;
+  mag_flu_tesla:Vec3f;
+  absolute_pressure_hpa:float;
+  differential_pressure_hpa:float;
+  pressure_altitude_m:float;
+  temperature_c:float;
+  fields_updated:ushort;
+  id:ubyte;
+}
+
+struct AirDataData {
+  timestamp_us:ulong;
+  absolute_pressure_hpa:float;
+  differential_pressure_hpa:float;
+  pressure_altitude_m:float;
+  indicated_airspeed_m_s:float;
+  true_airspeed_m_s:float;
+  angle_of_attack_rad:float;
+  sideslip_rad:float;
+  temperature_cdeg:short;
+  differential_pressure_temperature_cdeg:short;
+  valid_flags:uint;
+}
+
+struct BatteryCellVoltages14 {
+  cell0_mv:ushort;
+  cell1_mv:ushort;
+  cell2_mv:ushort;
+  cell3_mv:ushort;
+  cell4_mv:ushort;
+  cell5_mv:ushort;
+  cell6_mv:ushort;
+  cell7_mv:ushort;
+  cell8_mv:ushort;
+  cell9_mv:ushort;
+  cell10_mv:ushort;
+  cell11_mv:ushort;
+  cell12_mv:ushort;
+  cell13_mv:ushort;
+}
+
+struct PowerStatusData {
+  timestamp_us:ulong;
+  voltages:BatteryCellVoltages14;
+  current_consumed_mah:int;
+  energy_consumed_hj:int;
+  time_remaining_s:int;
+  fault_flags:uint;
+  current_battery_ca:short;
+  temperature_cdeg:short;
+  remaining_pct:byte;
+  id:ubyte;
+  battery_function:ubyte;
+  battery_type:ubyte;
+  charge_state:ubyte;
+  mode:ubyte;
+  connected:bool;
+}
+
+struct GnssFixData {
+  timestamp_us:ulong;
+  latitude_deg_e7:int;
+  longitude_deg_e7:int;
+  altitude_msl_mm:int;
+  altitude_ellipsoid_mm:int;
+  horizontal_accuracy_mm:uint;
+  vertical_accuracy_mm:uint;
+  velocity_accuracy_mm_s:uint;
+  yaw_accuracy_deg_e5:uint;
+  hdop_centi:ushort;
+  vdop_centi:ushort;
+  ground_speed_cm_s:ushort;
+  // Yaw follows ROS REP-0103: zero east, positive counter-clockwise.
+  course_over_ground_cdeg:ushort;
+  yaw_cdeg:ushort;
+  fix_type:ubyte;
+  satellites_visible:ubyte;
+  id:ubyte;
+}
+
+table InertialSample {
+  data:InertialSampleData;
+}
+
+table AirData {
+  data:AirDataData;
+}
+
+table PowerStatus {
+  data:PowerStatusData;
+}
+
+table GnssFix {
+  data:GnssFixData;
+}

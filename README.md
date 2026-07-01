@@ -6,9 +6,21 @@ This repository is the schema source of truth for Synapse messages. It keeps the
 checked-in source small and uses CI to generate the language bindings and release
 artifacts from the pinned toolchain in `tools.lock`.
 
+Synapse schemas use [ROS REP-0103](https://www.ros.org/reps/rep-0103.html)
+conventions by default: SI units where practical, ENU for local/world vectors,
+and FLU for body-frame vectors. Compact integer fields use explicit unit
+suffixes when a scaled representation is chosen for precision or wire
+efficiency.
+
 ## Contents
 
-- `fbs/*.fbs`: canonical FlatBuffers schemas.
+- `fbs/types.fbs`: shared fixed structs, topic IDs, units, and frame conventions.
+- `fbs/sensors.fbs`: GNSS, inertial, air data, and power telemetry.
+- `fbs/state.fbs`: vehicle health, estimates, mission progress, and navigation status.
+- `fbs/control.fbs`: manual input, setpoints, commands, actuators, and loop metrics.
+- `fbs/transport.fbs`: optional multiplexed frame and message union.
+- `fbs/{mocap,optical_flow,log,sil}.fbs`: focused support schemas.
+- `fbs/all.fbs`: aggregate include used by package generation.
 - `bfbs/*.bfbs`: generated FlatBuffers reflection schemas included in C/C++
   release archives.
 - `rust/`: Rust package skeleton, published as the `synapse_fbs` crate.
@@ -20,9 +32,9 @@ artifacts from the pinned toolchain in `tools.lock`.
 - `xtask/`: reproducible local and CI build driver.
 - `tools.lock`: pinned package, generator, and runtime versions.
 
-Generated Rust and Python package trees are intentionally not committed. The
+Generated Rust, Python, and JavaScript package trees are intentionally not committed. The
 `xtask` build stages package skeletons under `target/xtask/packages/`, renders
-`.jinja` templates, and generates bindings from `fbs/synapse_all.fbs` before
+`.jinja` templates, and generates bindings from `fbs/all.fbs` before
 building release packages.
 
 ROS packages should consume this repository as a dependency or git submodule and
@@ -43,7 +55,7 @@ downstream CMake consumers.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.1.5"
+synapse_fbs = "0.1.6"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -93,7 +105,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.5/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.6/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -115,18 +127,29 @@ Run the same Rust task that CI runs:
 cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 ```
 
-The task builds pinned `flatc` and FlatCC, stages Rust/Python packages under
+The task builds pinned `flatc` and FlatCC, stages Rust/Python/JavaScript packages under
 `target/xtask/packages/`, creates the C/C++ tarballs under
 `target/xtask/artifacts/`, includes pinned `bfbs/*.bfbs` reflection schemas and
 `bfbs.sha256` manifests in those archives, and smoke-tests the C archive through
 CMake `FetchContent`.
 
+Generate the static schema documentation locally:
+
+```sh
+cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.6 --out-dir target/xtask/docs
+```
+
+The docs are generated from `fbs/*.fbs`, copy the source schemas
+alongside the HTML, and infer unit/scale notes from field suffixes such as
+`_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`, `_ca`, `_cdeg`, `_dpermille`, and
+`_milli`.
+
 ## Releases
 
-CI generates bindings and builds both packages on pull requests and branch
+CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.1.5` publishes:
+Pushing a tag like `v0.1.6` publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
@@ -142,3 +165,10 @@ Pushing a tag like `v0.1.5` publishes:
 The generated C archive is intentionally generic. Downstream firmware projects
 that need it should fetch the release tarball directly from their own CMake
 using a versioned URL and `URL_HASH SHA256=...`.
+
+## Schema Docs
+
+The docs workflow publishes versioned schema documentation to the `gh-pages`
+branch. Pushes to `main` update `/main/`; release tags like `v0.1.6` update
+`/0.1.6/`. The root docs page is regenerated from the published version
+directories so older releases remain available.

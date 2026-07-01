@@ -11,8 +11,8 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(synapse_fbs)
 
-if(NOT EXISTS "${synapse_fbs_SOURCE_DIR}/bfbs/synapse_sil.bfbs")
-  message(FATAL_ERROR "missing packaged reflection schema: bfbs/synapse_sil.bfbs")
+if(NOT EXISTS "${synapse_fbs_SOURCE_DIR}/bfbs/sil.bfbs")
+  message(FATAL_ERROR "missing packaged reflection schema: bfbs/sil.bfbs")
 endif()
 
 add_executable(smoke main.c)

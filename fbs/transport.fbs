@@ -1,0 +1,62 @@
+include "types.fbs";
+include "sensors.fbs";
+include "state.fbs";
+include "control.fbs";
+
+namespace synapse.topic;
+
+table TextStatus {
+  timestamp_us:ulong;
+  severity:ubyte;
+  text:string;
+}
+
+union SynapseMessage {
+  VehicleHealth,
+  TimeReference,
+  RadioControl,
+  ManualControlCommand,
+  InertialSample,
+  AirData,
+  PowerStatus,
+  GnssFix,
+  AttitudeEstimate,
+  LocalPositionEstimate,
+  GlobalPositionEstimate,
+  OdometryEstimate,
+  EstimatorHealth,
+  MissionProgress,
+  NavigationTarget,
+  HomeReference,
+  AttitudeCommand,
+  RateCommand,
+  LocalPositionCommand,
+  VehicleCommand,
+  GeoCommand,
+  CommandResult,
+  ActuatorCommand,
+  ActuatorFeedback,
+  PwmSignalOutputs,
+  ControlLoopMetrics,
+  MotorOutput,
+  TextStatus,
+}
+
+struct FrameHeader {
+  timestamp_us:ulong;
+  sequence:uint;
+  flags:ushort;
+  topic_id:TopicId;
+  system_id:ubyte;
+  component_id:ubyte;
+  protocol_version:ubyte;
+}
+
+// Optional multiplexed transport frame. Zenoh deployments can still publish the
+// topic tables directly and use the topic name as the message discriminator.
+table Frame {
+  header:FrameHeader;
+  message:SynapseMessage;
+}
+
+root_type Frame;

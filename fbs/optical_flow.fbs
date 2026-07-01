@@ -1,0 +1,33 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Fixed-size structs used as native zROS topic types.
+struct OpticalFlowData {
+  timestamp_us:ulong;
+  pixel_flow:Vec2f;
+  delta_angle_flu_rad:Vec3f;
+  distance_m:float;
+  integration_timespan_us:uint;
+  quality:ubyte;
+  max_flow_rate_rad_s:float;
+  min_ground_distance_m:float;
+  max_ground_distance_m:float;
+}
+
+struct OpticalFlowVelocityData {
+  timestamp_us:ulong;
+  velocity_flu_m_s:Vec2f;
+  velocity_enu_m_s:Vec2f;
+  flow_rate_uncompensated_rad_s:Vec2f;
+  flow_rate_compensated_rad_s:Vec2f;
+  gyro_flu_rad_s:Vec3f;
+}
+
+table OpticalFlow {
+  data:OpticalFlowData;
+}
+
+table OpticalFlowVelocity {
+  data:OpticalFlowVelocityData;
+}
