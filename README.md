@@ -6,6 +6,8 @@ This repository is the schema source of truth for Synapse messages. It keeps the
 checked-in source small and uses CI to generate the language bindings and release
 artifacts from the pinned toolchain in `tools.lock`.
 
+Published schema documentation: <https://cognipilot.github.io/synapse_fbs/>
+
 Synapse schemas use [ROS REP-0103](https://www.ros.org/reps/rep-0103.html)
 conventions by default: SI units where practical, ENU for local/world vectors,
 and FLU for body-frame vectors. Compact integer fields use explicit unit
@@ -189,4 +191,4 @@ using a versioned URL and `URL_HASH SHA256=...`.
 The docs workflow publishes versioned schema documentation to the `gh-pages`
 branch. Pushes to `main` update `/main/`; release tags like `v0.1.6` update
 `/0.1.6/`. The root docs page is regenerated from the published version
-directories so older releases remain available.
+directories so older releases remain available: <https://cognipilot.github.io/synapse_fbs/>.
