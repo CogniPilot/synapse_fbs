@@ -1,0 +1,19 @@
+{
+  "version": {{ version }},
+  "key_prefix": {{ key_prefix|tojson }},
+  "topics": [
+{%- for topic in topics %}
+    {
+      "id": {{ topic.id }},
+      "name": {{ topic.name|tojson }},
+      "key": {{ topic.key|tojson }},
+      "key_suffix": {{ topic.key_suffix|tojson }},
+      "root_table": {{ topic.root_table|tojson }},
+      "payload_type": {{ topic.payload_type|tojson }},
+      "schema_file": {{ topic.schema_file|tojson }},
+      "fixed_layout": {{ topic.fixed_layout|tojson }},
+      "description": {{ topic.description|tojson }}
+    }{% if not loop.last %},{% endif %}
+{%- endfor %}
+  ]
+}

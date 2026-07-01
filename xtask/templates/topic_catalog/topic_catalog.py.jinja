@@ -1,0 +1,64 @@
+"""Generated Synapse topic catalog helpers."""
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass(frozen=True)
+class TopicInfo:
+    id: int
+    name: str
+    key: str
+    key_suffix: str
+    root_table: str
+    payload_type: Optional[str]
+    schema_file: str
+    fixed_layout: bool
+    description: str
+
+
+TOPICS = (
+{%- for topic in topics %}
+    TopicInfo(
+        id={{ topic.id }},
+        name={{ topic.name_literal }},
+        key={{ topic.key_literal }},
+        key_suffix={{ topic.key_suffix_literal }},
+        root_table={{ topic.root_table_literal }},
+        payload_type={{ topic.payload_type_python }},
+        schema_file={{ topic.schema_file_literal }},
+        fixed_layout={{ topic.fixed_layout_python }},
+        description={{ topic.description_literal }},
+    ),
+{%- endfor %}
+)
+
+_TOPIC_BY_ID = {topic.id: topic for topic in TOPICS}
+_TOPIC_BY_NAME = {topic.name: topic for topic in TOPICS}
+_TOPIC_BY_KEY = {topic.key: topic for topic in TOPICS}
+_TOPIC_BY_SUFFIX = {topic.key_suffix: topic for topic in TOPICS}
+
+
+def _normalize_key(key: str) -> str:
+    return str(key).lstrip("/")
+
+
+def topic_by_id(topic_id: int) -> Optional[TopicInfo]:
+    return _TOPIC_BY_ID.get(int(topic_id))
+
+
+def topic_by_name(name: str) -> Optional[TopicInfo]:
+    return _TOPIC_BY_NAME.get(str(name))
+
+
+def topic_by_key(key: str) -> Optional[TopicInfo]:
+    normalized = _normalize_key(key)
+    return _TOPIC_BY_KEY.get(normalized) or _TOPIC_BY_SUFFIX.get(normalized)
+
+
+def key_for_topic(topic) -> Optional[str]:
+    info = (
+        topic_by_id(topic)
+        if isinstance(topic, int)
+        else topic_by_name(topic) or topic_by_key(topic)
+    )
+    return None if info is None else info.key

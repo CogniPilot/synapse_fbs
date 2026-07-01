@@ -34,6 +34,12 @@ expression and let the key expression identify the stream. That keeps messages
 small, avoids redundant envelope fields, and lets subscribers use native Zenoh
 selectors.
 
+Release artifacts include a generated topic catalog with canonical key
+expressions under `synapse/topic/<topic_name>`, plus helper functions for
+looking up a topic by `TopicId`, root table name, or key. Deployments can prefix
+those keys with a vehicle, swarm, or site namespace without changing the
+message payload.
+
 The optional `Frame` envelope is mainly for serial or other raw byte-stream
 links that need an explicit Synapse container. Zenoh deployments should usually
 publish typed topic values directly and reserve `TopicId` for bridges, logs,
@@ -42,6 +48,64 @@ serial frames, or compact routing tables.
 The release artifacts make this practical across platforms: Rust, Python, C,
 and C++ packages provide generated bindings, while the npm package ships schema
 assets and reflection schemas for browser tools, dashboards, and gateways.
+
+## Topic Catalog
+
+The generated catalog is the source of truth for bridge and routing metadata:
+`TopicId`, canonical Zenoh key, FlatBuffers root table, fixed-layout payload
+struct, schema file, and a short description.
+
+JavaScript:
+
+```js
+import { keyForTopic, topicById } from '@cognipilot/synapse-fbs';
+
+const key = keyForTopic('VehicleHealth');
+const payloadType = topicById(1)?.payloadType;
+```
+
+Python:
+
+```py
+from synapse import topic_catalog
+
+key = topic_catalog.key_for_topic("VehicleHealth")
+payload_type = topic_catalog.topic_by_id(1).payload_type
+```
+
+Rust:
+
+```rust
+let key = synapse_fbs::topic_catalog::key_for_topic("VehicleHealth");
+let topic = synapse_fbs::topic_catalog::topic_by_id(1);
+```
+
+C and C++ archives include `topics.json` and `include/synapse/topic_catalog.h`:
+
+```c
+#include <synapse/topic_catalog.h>
+
+const synapse_topic_info_t *topic = synapse_topic_by_key("vehicle_health");
+```
+
+## ROS And FlatROS
+
+ROS messages are local integration types, not the Synapse over-the-air format.
+They are intentionally more general and can be too bulky for constrained radio
+links. Synapse should remain the compact FlatBuffers protocol for vehicles,
+shared memory, Zenoh, logs, and serial frames.
+
+ROS 2 integration should happen at the edge through bridge nodes that translate
+selected Synapse topics into ROS concepts for visualization, autonomy stacks,
+simulation, rosbag tooling, and operator workflows. The generated topic catalog
+gives those bridges stable keys and type metadata without hand-maintained lookup
+tables.
+
+The planned flatros2 path is to provide a ROS workspace/release archive that
+depends on `flatros2`, consumes the Synapse FlatBuffers schemas and catalog, and
+offers adapter nodes for selected topics. That archive should preserve Synapse
+payloads as FlatBuffers at the protocol boundary and only translate into ROS
+message views where ROS tooling needs them.
 
 ## Schema Design Priorities
 
@@ -70,6 +134,8 @@ that consumers cache instead of processing in the control loop.
 - `fbs/transport.fbs`: optional multiplexed frame and message union.
 - `fbs/{mocap,optical_flow,log,sil}.fbs`: focused support schemas.
 - `fbs/all.fbs`: aggregate include used by package generation.
+- `topics.json` / topic catalog helpers: generated topic IDs, canonical keys,
+  root tables, and fixed-layout payload metadata in release artifacts.
 - `bfbs/*.bfbs`: generated FlatBuffers reflection schemas included in C/C++
   release archives.
 - `rust/`: Rust package skeleton, published as the `synapse_fbs` crate.
@@ -86,9 +152,6 @@ committed. The `xtask` build stages package skeletons under
 `target/xtask/packages/`, renders `.jinja` templates, and generates bindings
 from `fbs/all.fbs` before building release packages.
 
-ROS packages should consume this repository as a dependency or git submodule and
-generate ROS interfaces or adapters outside this repo.
-
 ## Version Pins
 
 Generation is version-locked from `tools.lock`. CI builds a vendored `flatc`
@@ -104,7 +167,7 @@ publishes generated C and C++ archives for downstream CMake consumers.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.1.7"
+synapse_fbs = "0.1.8"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -154,7 +217,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.7/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.8/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -186,7 +249,7 @@ Generate the static schema documentation locally:
 
 ```sh
 cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
-cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.7 --out-dir target/xtask/docs
+cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.8 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -200,7 +263,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`, `_ca`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.1.7` publishes:
+Pushing a tag like `v0.1.8` publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
@@ -220,6 +283,6 @@ using a versioned URL and `URL_HASH SHA256=...`.
 ## Schema Docs
 
 The docs workflow publishes versioned schema documentation to the `gh-pages`
-branch. Pushes to `main` update `/main/`; release tags like `v0.1.7` update
-`/0.1.7/`. The root docs page is regenerated from the published version
+branch. Pushes to `main` update `/main/`; release tags like `v0.1.8` update
+`/0.1.8/`. The root docs page is regenerated from the published version
 directories so older releases remain available: <https://cognipilot.github.io/synapse_fbs/>.

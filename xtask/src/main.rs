@@ -7,6 +7,7 @@ use std::{
 };
 
 use minijinja::{AutoEscape, Environment, Value, context};
+use serde::Serialize;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -22,6 +23,8 @@ const SCHEMAS: &[&str] = &[
     "fbs/sil.fbs",
     "fbs/all.fbs",
 ];
+
+const LEGACY_DOC_DIRS: &[&str] = &["0.1.6"];
 
 #[derive(Debug)]
 struct Tools {
@@ -63,10 +66,10 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     check_pins(&packages, &tools)?;
     let flatc = build_flatc(root, &tools)?;
     let flatcc = build_flatcc(root, &tools)?;
-    generate_bindings(root, &flatc, &packages)?;
+    generate_bindings(root, &flatc, &templates, &packages)?;
     check_rust_package(&packages.rust)?;
     build_python_package(root, &packages.python, &tools)?;
-    build_js_package(root, &packages.js, &flatc)?;
+    build_js_package(root, &templates, &packages.js, &flatc)?;
     build_archives(root, &tools, &flatc, &flatcc, &options.release_name)?;
     generate_docs_site(
         root,
@@ -85,7 +88,7 @@ fn js(root: &Path) -> Result<()> {
     let package = root.join("target/xtask/packages/js");
     stage_template_tree(root, "js", &package, &templates, package_context(&tools))?;
     let flatc = build_flatc(root, &tools)?;
-    build_js_package(root, &package, &flatc)?;
+    build_js_package(root, &templates, &package, &flatc)?;
 
     println!("staged npm package at {}", package.display());
     Ok(())
@@ -403,7 +406,12 @@ fn build_flatcc(root: &Path, tools: &Tools) -> Result<FlatccBuild> {
     Ok(FlatccBuild { binary, source })
 }
 
-fn generate_bindings(root: &Path, flatc: &Path, packages: &PackagePaths) -> Result<()> {
+fn generate_bindings(
+    root: &Path,
+    flatc: &Path,
+    templates: &Templates,
+    packages: &PackagePaths,
+) -> Result<()> {
     println!("generating Rust and Python bindings");
 
     reset_dir(&packages.rust.join("src/generated"))?;
@@ -432,7 +440,138 @@ fn generate_bindings(root: &Path, flatc: &Path, packages: &PackagePaths) -> Resu
         .args(SCHEMAS);
     run(&mut python_cmd)?;
 
+    let docs = parse_schema_docs(root)?;
+    validate_schema_docs(&docs)?;
+    let topics = topic_entries(&docs)?;
+    write_package_topic_catalogs(templates, packages, &topics)?;
+
     Ok(())
+}
+
+fn write_package_topic_catalogs(
+    templates: &Templates,
+    packages: &PackagePaths,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    write_js_topic_catalogs(templates, &packages.js, topics)?;
+    write_rust_topic_catalog(templates, &packages.rust, topics)?;
+    write_python_topic_catalog(templates, &packages.python, topics)?;
+    Ok(())
+}
+
+fn write_js_topic_catalogs(
+    templates: &Templates,
+    package_root: &Path,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    let context = topic_catalog_context(topics);
+    templates.render_to_file(
+        "xtask/topic_catalog/topics.json.jinja",
+        context.clone(),
+        &package_root.join("topics.json"),
+    )?;
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_catalog.js.jinja",
+        context.clone(),
+        &package_root.join("topic_catalog.js"),
+    )?;
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_catalog.d.ts.jinja",
+        context,
+        &package_root.join("topic_catalog.d.ts"),
+    )
+}
+
+fn write_rust_topic_catalog(
+    templates: &Templates,
+    package_root: &Path,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_catalog.rs.jinja",
+        topic_catalog_context(topics),
+        &package_root.join("src/topic_catalog.rs"),
+    )
+}
+
+fn write_python_topic_catalog(
+    templates: &Templates,
+    package_root: &Path,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_catalog.py.jinja",
+        topic_catalog_context(topics),
+        &package_root.join("synapse/topic_catalog.py"),
+    )
+}
+
+fn write_c_topic_catalogs(
+    templates: &Templates,
+    package_root: &Path,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    let context = topic_catalog_context(topics);
+    templates.render_to_file(
+        "xtask/topic_catalog/topics.json.jinja",
+        context.clone(),
+        &package_root.join("topics.json"),
+    )?;
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_catalog.h.jinja",
+        context,
+        &package_root.join("include/synapse/topic_catalog.h"),
+    )
+}
+
+fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
+    Value::from_serialize(TopicCatalogContext {
+        version: 1,
+        key_prefix: "synapse/topic",
+        topics: topics
+            .iter()
+            .map(|topic| {
+                let payload_type_c = topic
+                    .payload_type
+                    .as_deref()
+                    .map(source_string_literal)
+                    .unwrap_or_else(|| "NULL".to_string());
+                let payload_type_python = topic
+                    .payload_type
+                    .as_deref()
+                    .map(source_string_literal)
+                    .unwrap_or_else(|| "None".to_string());
+                let payload_type_rust = topic
+                    .payload_type
+                    .as_deref()
+                    .map(|value| format!("Some({})", source_string_literal(value)))
+                    .unwrap_or_else(|| "None".to_string());
+
+                TopicTemplateEntry {
+                    id: topic.id,
+                    name: topic.name.clone(),
+                    key: topic.key.clone(),
+                    key_suffix: topic.key_suffix.clone(),
+                    root_table: topic.root_table.clone(),
+                    payload_type: topic.payload_type.clone(),
+                    schema_file: topic.schema_file.clone(),
+                    fixed_layout: topic.fixed_layout,
+                    description: topic.description.clone(),
+                    name_literal: source_string_literal(&topic.name),
+                    key_literal: source_string_literal(&topic.key),
+                    key_suffix_literal: source_string_literal(&topic.key_suffix),
+                    root_table_literal: source_string_literal(&topic.root_table),
+                    payload_type_c,
+                    payload_type_python,
+                    payload_type_rust,
+                    schema_file_literal: source_string_literal(&topic.schema_file),
+                    fixed_layout_python: if topic.fixed_layout { "True" } else { "False" },
+                    fixed_layout_c: if topic.fixed_layout { "true" } else { "false" },
+                    description_literal: source_string_literal(&topic.description),
+                }
+            })
+            .collect(),
+    })
 }
 
 fn check_rust_package(package_root: &Path) -> Result<()> {
@@ -566,10 +705,13 @@ fn smoke_python_package(
 
     let code = format!(
         r#"import importlib.metadata as metadata
+from synapse import topic_catalog
 from synapse.topic.Vec3f import Vec3f
 from synapse.log.LogRecord import LogRecord
 assert metadata.version("flatbuffers") == "{}"
 assert Vec3f is not None and LogRecord is not None
+assert topic_catalog.key_for_topic("VehicleHealth") == "synapse/topic/vehicle_health"
+assert topic_catalog.topic_by_id(1).payload_type == "VehicleHealthData"
 "#,
         tools.flatbuffers_version
     );
@@ -578,13 +720,21 @@ assert Vec3f is not None and LogRecord is not None
     Ok(())
 }
 
-fn build_js_package(root: &Path, package_root: &Path, flatc: &Path) -> Result<()> {
+fn build_js_package(
+    root: &Path,
+    templates: &Templates,
+    package_root: &Path,
+    flatc: &Path,
+) -> Result<()> {
     println!("building JavaScript schema-assets package");
 
     remove_dir_if_exists(&package_root.join("fbs"))?;
     remove_dir_if_exists(&package_root.join("bfbs"))?;
     copy_common_archive_files(root, package_root)?;
     generate_reflection_schemas(root, flatc, &package_root.join("bfbs"))?;
+    let docs = parse_schema_docs(root)?;
+    validate_schema_docs(&docs)?;
+    write_js_topic_catalogs(templates, package_root, &topic_entries(&docs)?)?;
     write_schema_hashes(root, &package_root.join("schema.sha256"))?;
     write_bfbs_hashes(package_root, &package_root.join("bfbs.sha256"))?;
 
@@ -597,7 +747,7 @@ fn smoke_js_package(package_root: &Path) -> Result<()> {
     println!("smoke-testing JavaScript package");
 
     let node = node_bin()?;
-    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath } from './index.js';
+    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath, keyForTopic, topicById } from './index.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 for (const name of schemaFiles) {
@@ -605,6 +755,9 @@ for (const name of schemaFiles) {
 }
 if (!existsSync(join(fbsDir, 'log.fbs'))) throw new Error('missing fbsDir');
 if (!existsSync(join(bfbsDir, 'log.bfbs'))) throw new Error('missing reflection schema');
+if (!existsSync(join(fbsDir, '..', 'topics.json'))) throw new Error('missing topic catalog');
+if (keyForTopic('VehicleHealth') !== 'synapse/topic/vehicle_health') throw new Error('bad topic key helper');
+if (topicById(1)?.payloadType !== 'VehicleHealthData') throw new Error('bad topic id helper');
 console.log('synapse-fbs js package ok');
 "#;
 
@@ -654,6 +807,9 @@ fn build_archives(
     reset_dir(&artifacts)?;
     reset_dir(&workdir)?;
     let templates = Templates::new(root)?;
+    let docs = parse_schema_docs(root)?;
+    validate_schema_docs(&docs)?;
+    let topics = topic_entries(&docs)?;
 
     let flatbuffers_source = workdir.join("flatbuffers");
     fetch_git_commit(
@@ -690,6 +846,7 @@ fn build_archives(
         cpp_root.join("third_party/flatbuffers/LICENSE"),
     )?;
     copy_common_archive_files(root, &cpp_root)?;
+    write_c_topic_catalogs(&templates, &cpp_root, &topics)?;
     write_schema_hashes(root, &cpp_root.join("schema.sha256"))?;
     write_bfbs_hashes(&cpp_root, &cpp_root.join("bfbs.sha256"))?;
     copy_render_template_tree(
@@ -751,6 +908,7 @@ fn build_archives(
         c_root.join("third_party/flatcc/NOTICE"),
     )?;
     copy_common_archive_files(root, &c_root)?;
+    write_c_topic_catalogs(&templates, &c_root, &topics)?;
     write_schema_hashes(root, &c_root.join("schema.sha256"))?;
     write_bfbs_hashes(&c_root, &c_root.join("bfbs.sha256"))?;
     let runtime_source_paths = runtime_source_names(&c_root.join("src/flatcc-runtime"))?
@@ -903,6 +1061,53 @@ struct SchemaMemberDoc {
     unit_scale: Option<String>,
 }
 
+type EntityLinkMap = BTreeMap<String, String>;
+type RootWrapperMap = BTreeMap<String, Vec<String>>;
+
+#[derive(Clone, Debug)]
+struct TopicEntry {
+    id: u16,
+    name: String,
+    key: String,
+    key_suffix: String,
+    root_table: String,
+    payload_type: Option<String>,
+    schema_file: String,
+    fixed_layout: bool,
+    description: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct TopicCatalogContext {
+    version: u8,
+    key_prefix: &'static str,
+    topics: Vec<TopicTemplateEntry>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct TopicTemplateEntry {
+    id: u16,
+    name: String,
+    key: String,
+    key_suffix: String,
+    root_table: String,
+    payload_type: Option<String>,
+    schema_file: String,
+    fixed_layout: bool,
+    description: String,
+    name_literal: String,
+    key_literal: String,
+    key_suffix_literal: String,
+    root_table_literal: String,
+    payload_type_c: String,
+    payload_type_python: String,
+    payload_type_rust: String,
+    schema_file_literal: String,
+    fixed_layout_python: &'static str,
+    fixed_layout_c: &'static str,
+    description_literal: String,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum SchemaEntityKind {
     Struct,
@@ -950,6 +1155,7 @@ fn generate_docs_site(root: &Path, tools: &Tools, version: &str, out_dir: &Path)
     validate_schema_docs(&docs)?;
 
     fs::create_dir_all(out_dir)?;
+    remove_legacy_docs(out_dir)?;
     let versions = docs_versions(out_dir, &version_dir_name)?;
     reset_dir(&book_dir)?;
     write_mdbook_source(
@@ -1113,6 +1319,83 @@ fn validate_schema_docs(docs: &SchemaDoc) -> Result<()> {
             missing.join("\n")
         ))
     }
+}
+
+fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
+    let topic_enum = docs
+        .files
+        .iter()
+        .flat_map(|file| &file.entities)
+        .find(|entity| entity.kind == SchemaEntityKind::Enum && entity.name == "TopicId")
+        .ok_or_else(|| io::Error::other("TopicId enum not found"))?;
+
+    let mut topics = Vec::new();
+    for member in &topic_enum.members {
+        let Some(value) = &member.value else {
+            return fail(format!(
+                "TopicId {} is missing an explicit value",
+                member.name
+            ));
+        };
+        let id = value.parse::<u16>().map_err(|err| {
+            io::Error::other(format!(
+                "TopicId {} has invalid value {value}: {err}",
+                member.name
+            ))
+        })?;
+        if id == 0 || member.name == "Unknown" {
+            continue;
+        }
+
+        let (schema_file, root_table) =
+            find_schema_entity(docs, &member.name).ok_or_else(|| {
+                io::Error::other(format!(
+                    "TopicId {} does not match a root table in the schema",
+                    member.name
+                ))
+            })?;
+        if root_table.kind != SchemaEntityKind::Table {
+            return fail(format!(
+                "TopicId {} resolves to {} {}, expected a table",
+                member.name,
+                root_table.kind.as_str(),
+                root_table.name
+            ));
+        }
+
+        let payload_type = thin_root_wrapper_payload(root_table).map(type_lookup_name);
+        let fixed_layout = payload_type
+            .as_ref()
+            .and_then(|payload| find_schema_entity(docs, payload))
+            .is_some_and(|(_, entity)| entity.kind == SchemaEntityKind::Struct);
+        let key_suffix = snake_case(&member.name);
+        topics.push(TopicEntry {
+            id,
+            name: member.name.clone(),
+            key: format!("synapse/topic/{key_suffix}"),
+            key_suffix,
+            root_table: root_table.name.clone(),
+            payload_type,
+            schema_file: schema_file.name.clone(),
+            fixed_layout,
+            description: comments_text(&member.comments),
+        });
+    }
+
+    Ok(topics)
+}
+
+fn find_schema_entity<'a>(
+    docs: &'a SchemaDoc,
+    name: &str,
+) -> Option<(&'a SchemaFileDoc, &'a SchemaEntityDoc)> {
+    let lookup = type_lookup_name(name);
+    docs.files.iter().find_map(|file| {
+        file.entities
+            .iter()
+            .find(|entity| entity.name == lookup)
+            .map(|entity| (file, entity))
+    })
 }
 
 fn parse_schema_entity_start(code: &str) -> Option<(SchemaEntityKind, String, Option<String>)> {
@@ -1428,6 +1711,13 @@ fn doc_version_label(dir: &str) -> String {
     }
 }
 
+fn remove_legacy_docs(out_dir: &Path) -> Result<()> {
+    for dir in LEGACY_DOC_DIRS {
+        remove_dir_if_exists(&out_dir.join(dir))?;
+    }
+    Ok(())
+}
+
 fn write_mdbook_source(
     root: &Path,
     docs: &SchemaDoc,
@@ -1437,6 +1727,8 @@ fn write_mdbook_source(
     book_dir: &Path,
 ) -> Result<()> {
     let src_dir = book_dir.join("src");
+    let entity_links = entity_link_map(docs);
+    let root_wrappers = root_wrapper_map(docs);
     write_file(&book_dir.join("book.toml"), &render_book_toml(version))?;
     write_file(&book_dir.join("theme/synapse.css"), MDBOOK_CSS)?;
     write_file(
@@ -1453,14 +1745,20 @@ fn write_mdbook_source(
     for file in &docs.files {
         let file_slug = schema_file_slug(file);
         let file_page = src_dir.join("schemas").join(format!("{file_slug}.md"));
-        write_file(&file_page, &render_schema_file_page(file))?;
+        write_file(
+            &file_page,
+            &render_schema_file_page(docs, file, &entity_links),
+        )?;
 
         for entity in &file.entities {
             let entity_page = src_dir
                 .join("schemas")
                 .join(&file_slug)
                 .join(format!("{}.md", entity_slug(entity)));
-            write_file(&entity_page, &render_entity_page(file, entity))?;
+            write_file(
+                &entity_page,
+                &render_entity_page(file, entity, &entity_links, &root_wrappers),
+            )?;
         }
     }
 
@@ -1498,6 +1796,9 @@ fn render_book_summary(docs: &SchemaDoc) -> String {
             markdown_link_text(&file.name)
         ));
         for entity in &file.entities {
+            if thin_root_wrapper_payload(entity).is_some() {
+                continue;
+            }
             md.push_str(&format!(
                 "  - [`{}` {}](schemas/{file_slug}/{}.md)\n",
                 entity.kind.as_str(),
@@ -1516,7 +1817,6 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
         "# Synapse FlatBuffers `{}`\n\n",
         markdown_text(version)
     ));
-    md.push_str("<div data-synapse-version-picker></div>\n\n");
     md.push_str("Generated from the FlatBuffers schemas in `fbs/`. Fixed memory layout is the default for runtime protocol payloads so chip-to-chip shared-memory transports can use the payload layout directly. Coordinate frames follow [ROS REP-0103](https://www.ros.org/reps/rep-0103.html): local/world vectors use ENU and body vectors use FLU.\n\n");
     md.push_str("## Motivation\n\n");
     md.push_str("Synapse messages are designed for vehicles that exchange state, sensor, and control data in real time. The schema should be efficient enough for shared-memory message passing between chips, compact enough for constrained over-the-air links, and still straightforward to use from ordinary application code.\n\n");
@@ -1531,10 +1831,17 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("Synapse is intended to be straightforward to use with Zenoh. In the normal Zenoh path, publish each topic's FlatBuffers root table directly on a stable key expression and let the key expression identify the stream. That keeps messages small, avoids redundant envelope fields, and lets subscribers express interest with Zenoh's native selectors.\n\n");
     md.push_str("Several parts of the schema already support this model:\n\n");
     md.push_str("- **Typed root tables:** every high-rate fixed-layout payload has a thin FlatBuffers root table, so Zenoh samples can carry one topic value without a multiplexing wrapper.\n");
-    md.push_str("- **Stable topic identifiers:** `TopicId` is available for bridges, logs, serial frames, or compact routing tables, but Zenoh deployments can use key expressions as the primary discriminator.\n");
+    md.push_str("- **Generated topic catalog:** release artifacts include `TopicId`, canonical Zenoh key, root table, payload struct, schema file, and helper lookups so applications do not hand-maintain routing tables.\n");
+    md.push_str("- **Stable topic identifiers:** `TopicId` is available for bridges, logs, serial frames, or compact routing tables, while Zenoh deployments can use key expressions as the primary discriminator.\n");
     md.push_str("- **No transport checksums in payloads:** Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.\n");
     md.push_str("- **Schema assets in every release:** npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.\n\n");
-    md.push_str("Useful follow-on work is to standardize recommended Zenoh key expressions, provide small publish/subscribe examples in each supported language, and ship helper code that maps key expressions to topic root types and `TopicId` values without requiring applications to hand-maintain that table.\n\n");
+    md.push_str("Canonical keys use `synapse/topic/<topic_name>`; deployments can prepend vehicle or site namespaces outside the catalog. The package helpers can look up a topic by `TopicId`, root table name, full key, or key suffix.\n\n");
+    md.push_str("## Topic Catalog\n\n");
+    md.push_str("The generated topic catalog is included as `topics.json` in schema-asset archives and as language helpers where the package has a public API. It records `TopicId`, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.\n\n");
+    md.push_str("Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.\n\n");
+    md.push_str("## ROS And FlatROS\n\n");
+    md.push_str("ROS messages are local integration types, not the Synapse over-the-air format. They are useful for visualization, autonomy stacks, simulation, rosbag tooling, and operator workflows, but they should not replace compact Synapse FlatBuffers payloads on constrained vehicle links.\n\n");
+    md.push_str("ROS 2 integration should happen at the edge through bridge nodes that translate selected Synapse topics into ROS concepts only where ROS tooling needs them. The planned flatros2 path is a generated ROS workspace or release archive that consumes the Synapse schemas and topic catalog, depends on `flatros2`, and provides adapter nodes without making ROS message definitions the protocol source of truth.\n\n");
     md.push_str("## Layout Rules\n\n");
     md.push_str("Telemetry, state, command, and control samples should use FlatBuffers `struct` definitions. Use `table`, `string`, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.\n\n");
     md.push_str("## Unit And Scale Rules\n\n");
@@ -1555,8 +1862,13 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md
 }
 
-fn render_schema_file_page(file: &SchemaFileDoc) -> String {
+fn render_schema_file_page(
+    docs: &SchemaDoc,
+    file: &SchemaFileDoc,
+    entity_links: &EntityLinkMap,
+) -> String {
     let mut md = String::new();
+    let current_page = schema_file_page_path(file);
     md.push_str(&format!("# `{}`\n\n", markdown_text(&file.name)));
     if !file.namespace.is_empty() {
         md.push_str(&format!(
@@ -1570,7 +1882,7 @@ fn render_schema_file_page(file: &SchemaFileDoc) -> String {
             if index > 0 {
                 md.push_str(", ");
             }
-            md.push_str(&format!("`{}`", markdown_text(include)));
+            md.push_str(&render_include_ref(include, docs, &current_page));
         }
         md.push_str("\n\n");
     }
@@ -1588,19 +1900,23 @@ fn render_schema_file_page(file: &SchemaFileDoc) -> String {
     md.push_str("| --- | --- | --- |\n");
     for entity in &file.entities {
         md.push_str(&format!(
-            "| `{}` | [{}]({}/{}.md) | {} |\n",
+            "| `{}` | {} | {} |\n",
             entity.kind.as_str(),
-            markdown_table_cell(&entity.name),
-            schema_file_slug(file),
-            entity_slug(entity),
+            markdown_table_cell(&render_entity_name_ref(entity, entity_links, &current_page)),
             markdown_table_cell(&comments_text(&entity.comments))
         ));
     }
     md
 }
 
-fn render_entity_page(file: &SchemaFileDoc, entity: &SchemaEntityDoc) -> String {
+fn render_entity_page(
+    file: &SchemaFileDoc,
+    entity: &SchemaEntityDoc,
+    entity_links: &EntityLinkMap,
+    root_wrappers: &RootWrapperMap,
+) -> String {
     let mut md = String::new();
+    let current_page = entity_page_path(file, entity);
     md.push_str(&format!(
         "# `{}` {}\n\n",
         entity.kind.as_str(),
@@ -1619,11 +1935,31 @@ fn render_entity_page(file: &SchemaFileDoc, entity: &SchemaEntityDoc) -> String 
         ));
     }
     md.push_str(&format!("{}\n\n", comments_text(&entity.comments)));
-    render_member_table_md(&mut md, entity);
+    if let Some(payload) = thin_root_wrapper_payload(entity) {
+        md.push_str(&format!(
+            "**Payload:** {}\n\n",
+            render_type_ref(payload, entity_links, &current_page)
+        ));
+    } else if let Some(wrappers) = root_wrappers.get(&entity.name) {
+        if !wrappers.is_empty() {
+            let links = wrappers
+                .iter()
+                .map(|wrapper| code_span(wrapper))
+                .collect::<Vec<_>>()
+                .join(", ");
+            md.push_str(&format!("**FlatBuffers root table:** {links}\n\n"));
+        }
+    }
+    render_member_table_md(&mut md, entity, entity_links, &current_page);
     md
 }
 
-fn render_member_table_md(md: &mut String, entity: &SchemaEntityDoc) {
+fn render_member_table_md(
+    md: &mut String,
+    entity: &SchemaEntityDoc,
+    entity_links: &EntityLinkMap,
+    current_page: &str,
+) {
     let has_value = entity.members.iter().any(|member| member.value.is_some());
     match entity.kind {
         SchemaEntityKind::Struct | SchemaEntityKind::Table => {
@@ -1645,7 +1981,7 @@ fn render_member_table_md(md: &mut String, entity: &SchemaEntityDoc) {
                         &member
                             .type_name
                             .as_ref()
-                            .map(|value| code_span(value))
+                            .map(|value| render_type_ref(value, entity_links, current_page))
                             .unwrap_or_default()
                     )
                 ));
@@ -1692,12 +2028,12 @@ fn render_member_table_md(md: &mut String, entity: &SchemaEntityDoc) {
             for member in &entity.members {
                 md.push_str(&format!(
                     "| {} | {} | {} |\n",
-                    markdown_table_cell(&code_span(&member.name)),
+                    markdown_table_cell(&render_type_ref(&member.name, entity_links, current_page)),
                     markdown_table_cell(
                         &member
                             .type_name
                             .as_ref()
-                            .map(|value| code_span(value))
+                            .map(|value| render_type_ref(value, entity_links, current_page))
                             .unwrap_or_default()
                     ),
                     markdown_table_cell(&comments_text(&member.comments))
@@ -1705,6 +2041,196 @@ fn render_member_table_md(md: &mut String, entity: &SchemaEntityDoc) {
             }
         }
     }
+}
+
+fn entity_link_map(docs: &SchemaDoc) -> EntityLinkMap {
+    let mut direct_links = BTreeMap::new();
+    for file in &docs.files {
+        for entity in &file.entities {
+            let path = entity_page_path(file, entity);
+            direct_links.insert(entity.name.clone(), path.clone());
+            if !file.namespace.is_empty() {
+                direct_links.insert(format!("{}.{}", file.namespace, entity.name), path);
+            }
+        }
+    }
+
+    let mut links = BTreeMap::new();
+    for file in &docs.files {
+        for entity in &file.entities {
+            let path = thin_root_wrapper_payload(entity)
+                .and_then(|payload| direct_links.get(&type_lookup_name(payload)))
+                .cloned()
+                .unwrap_or_else(|| entity_page_path(file, entity));
+            links.insert(entity.name.clone(), path.clone());
+            if !file.namespace.is_empty() {
+                links.insert(format!("{}.{}", file.namespace, entity.name), path);
+            }
+        }
+    }
+    links
+}
+
+fn root_wrapper_map(docs: &SchemaDoc) -> RootWrapperMap {
+    let mut wrappers = BTreeMap::new();
+    for file in &docs.files {
+        for entity in &file.entities {
+            if let Some(payload) = thin_root_wrapper_payload(entity) {
+                wrappers
+                    .entry(type_lookup_name(payload))
+                    .or_insert_with(Vec::new)
+                    .push(entity.name.clone());
+            }
+        }
+    }
+    wrappers
+}
+
+fn render_entity_name_ref(
+    entity: &SchemaEntityDoc,
+    entity_links: &EntityLinkMap,
+    current_page: &str,
+) -> String {
+    if let Some(payload) = thin_root_wrapper_payload(entity) {
+        return format!(
+            "{} -> {}",
+            code_span(&entity.name),
+            render_type_ref(payload, entity_links, current_page)
+        );
+    }
+
+    render_type_ref(&entity.name, entity_links, current_page)
+}
+
+fn thin_root_wrapper_payload(entity: &SchemaEntityDoc) -> Option<&str> {
+    if entity.kind != SchemaEntityKind::Table || entity.members.len() != 1 {
+        return None;
+    }
+
+    let member = &entity.members[0];
+    if member.name != "data" {
+        return None;
+    }
+
+    member
+        .type_name
+        .as_deref()
+        .filter(|type_name| type_lookup_name(type_name).ends_with("Data"))
+}
+
+fn render_include_ref(include: &str, docs: &SchemaDoc, current_page: &str) -> String {
+    let Some(target) = docs.files.iter().find(|file| {
+        source_file_name(file) == include
+            || file.name == include
+            || file.name == format!("fbs/{include}")
+    }) else {
+        return code_span(include);
+    };
+
+    format!(
+        "[{}]({})",
+        code_span(include),
+        relative_md_link(current_page, &schema_file_page_path(target))
+    )
+}
+
+fn render_type_ref(type_name: &str, entity_links: &EntityLinkMap, current_page: &str) -> String {
+    let type_name = type_name.trim();
+    if type_name.is_empty() {
+        return String::new();
+    }
+
+    if let Some(inner) = type_name
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+    {
+        let inner = inner.trim();
+        if type_link_target(inner, entity_links).is_some() {
+            return format!(
+                "<code>[</code>{}<code>]</code>",
+                render_type_atom(inner, entity_links, current_page)
+            );
+        }
+        return code_span(type_name);
+    }
+
+    render_type_atom(type_name, entity_links, current_page)
+}
+
+fn render_type_atom(type_name: &str, entity_links: &EntityLinkMap, current_page: &str) -> String {
+    let Some(target) = type_link_target(type_name, entity_links) else {
+        return code_span(type_name);
+    };
+
+    format!(
+        "[{}]({})",
+        code_span(type_name),
+        relative_md_link(current_page, target)
+    )
+}
+
+fn type_link_target<'a>(type_name: &str, entity_links: &'a EntityLinkMap) -> Option<&'a String> {
+    entity_links
+        .get(type_name)
+        .or_else(|| entity_links.get(&type_lookup_name(type_name)))
+}
+
+fn type_lookup_name(type_name: &str) -> String {
+    type_name
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .rsplit('.')
+        .next()
+        .unwrap_or(type_name)
+        .trim()
+        .to_string()
+}
+
+fn schema_file_page_path(file: &SchemaFileDoc) -> String {
+    format!("schemas/{}.md", schema_file_slug(file))
+}
+
+fn entity_page_path(file: &SchemaFileDoc, entity: &SchemaEntityDoc) -> String {
+    format!(
+        "schemas/{}/{}.md",
+        schema_file_slug(file),
+        entity_slug(entity)
+    )
+}
+
+fn relative_md_link(from_file: &str, to_file: &str) -> String {
+    let from_dir = from_file
+        .rsplit_once('/')
+        .map(|(dir, _)| dir)
+        .unwrap_or_default();
+    let from_parts = split_relative_path(from_dir);
+    let to_parts = split_relative_path(to_file);
+    let mut common = 0;
+    while common < from_parts.len()
+        && common < to_parts.len()
+        && from_parts[common] == to_parts[common]
+    {
+        common += 1;
+    }
+
+    let mut parts = Vec::new();
+    for _ in common..from_parts.len() {
+        parts.push("..".to_string());
+    }
+    for part in &to_parts[common..] {
+        parts.push((*part).to_string());
+    }
+
+    if parts.is_empty() {
+        ".".to_string()
+    } else {
+        parts.join("/")
+    }
+}
+
+fn split_relative_path(path: &str) -> Vec<&str> {
+    path.split('/').filter(|part| !part.is_empty()).collect()
 }
 
 fn render_version_selector_js(versions: &[DocVersion], current_version_dir: &str) -> String {
@@ -1724,7 +2250,7 @@ fn render_version_selector_js(versions: &[DocVersion], current_version_dir: &str
     js.push_str(";\n");
     js.push_str(
         r#"  function docsBaseUrl() {
-    const script = document.currentScript || document.querySelector('script[src$="version-selector.js"]');
+    const script = document.currentScript || document.querySelector('script[src*="version-selector"]');
     if (!script) {
       return new URL('../', window.location.href);
     }
@@ -1754,37 +2280,22 @@ fn render_version_selector_js(versions: &[DocVersion], current_version_dir: &str
   }
 
   function mountMenu() {
-    const menu = document.getElementById('menu-bar');
+    const menu = document.getElementById('mdbook-menu-bar');
     if (!menu || menu.querySelector('.synapse-version-menu')) {
       return;
     }
+    const target = menu.querySelector('.right-buttons') || menu;
     const wrapper = document.createElement('div');
     wrapper.className = 'synapse-version-menu';
     const label = document.createElement('label');
-    label.textContent = 'Version';
+    label.textContent = 'Docs';
     wrapper.appendChild(label);
     wrapper.appendChild(buildSelect());
-    menu.appendChild(wrapper);
-  }
-
-  function mountInlinePickers() {
-    for (const host of document.querySelectorAll('[data-synapse-version-picker]')) {
-      if (host.querySelector('select')) {
-        continue;
-      }
-      const wrapper = document.createElement('div');
-      wrapper.className = 'synapse-version-panel';
-      const label = document.createElement('label');
-      label.textContent = 'Documentation version';
-      wrapper.appendChild(label);
-      wrapper.appendChild(buildSelect());
-      host.appendChild(wrapper);
-    }
+    target.insertBefore(wrapper, target.firstChild);
   }
 
   function mount() {
     mountMenu();
-    mountInlinePickers();
   }
 
   if (document.readyState === 'loading') {
@@ -1911,6 +2422,51 @@ fn js_string(value: &str) -> String {
     escaped
 }
 
+fn source_string_literal(value: &str) -> String {
+    let mut escaped = String::from("\"");
+    for ch in value.chars() {
+        match ch {
+            '\\' => escaped.push_str("\\\\"),
+            '"' => escaped.push_str("\\\""),
+            '\n' => escaped.push_str("\\n"),
+            '\r' => escaped.push_str("\\r"),
+            '\t' => escaped.push_str("\\t"),
+            '\0' => escaped.push_str("\\0"),
+            ch if ch.is_control() => escaped.push_str(&format!("\\x{:02x}", ch as u32)),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped.push('"');
+    escaped
+}
+
+fn snake_case(value: &str) -> String {
+    let mut result = String::new();
+    let mut previous_was_separator = true;
+
+    for (index, ch) in value.chars().enumerate() {
+        if ch.is_ascii_alphanumeric() {
+            if ch.is_ascii_uppercase()
+                && index > 0
+                && !previous_was_separator
+                && value
+                    .chars()
+                    .nth(index + 1)
+                    .is_some_and(|next| next.is_ascii_lowercase())
+            {
+                result.push('_');
+            }
+            result.push(ch.to_ascii_lowercase());
+            previous_was_separator = false;
+        } else if !previous_was_separator {
+            result.push('_');
+            previous_was_separator = true;
+        }
+    }
+
+    result.trim_matches('_').to_string()
+}
+
 fn escape_html(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -1927,15 +2483,14 @@ fn escape_attr(value: &str) -> String {
 const MDBOOK_CSS: &str = r#".synapse-version-menu {
   align-items: center;
   display: flex;
-  gap: 0.45rem;
-  margin-left: auto;
-  padding: 0 0.7rem;
+  gap: 0.4rem;
+  height: var(--menu-bar-height);
+  padding: 0 0.55rem;
 }
 
-.synapse-version-menu label,
-.synapse-version-panel label {
+.synapse-version-menu label {
   color: var(--fg);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1947,18 +2502,8 @@ const MDBOOK_CSS: &str = r#".synapse-version-menu {
   font: inherit;
   height: 1.9rem;
   max-width: 15rem;
+  min-width: 8.5rem;
   padding: 0 0.45rem;
-}
-
-.synapse-version-panel {
-  align-items: center;
-  background: var(--quote-bg);
-  border-left: 4px solid var(--links);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-  margin: 1rem 0 1.5rem;
-  padding: 0.8rem 1rem;
 }
 
 .content table {
@@ -1972,7 +2517,7 @@ const MDBOOK_CSS: &str = r#".synapse-version-menu {
 @media (max-width: 700px) {
   .synapse-version-menu {
     gap: 0.25rem;
-    padding: 0 0.35rem;
+    padding: 0 0.25rem;
   }
 
   .synapse-version-menu label {
@@ -1980,7 +2525,8 @@ const MDBOOK_CSS: &str = r#".synapse-version-menu {
   }
 
   .synapse-version-select {
-    max-width: 9.5rem;
+    max-width: 8.5rem;
+    min-width: 7rem;
   }
 }
 "#;

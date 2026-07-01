@@ -19,4 +19,6 @@ pub mod sil {
     pub use crate::generated::synapse::sil::*;
 }
 
+pub mod topic_catalog;
+
 pub use generated::synapse;

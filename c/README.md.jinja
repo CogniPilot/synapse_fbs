@@ -1,7 +1,9 @@
 # synapse_fbs C headers
 
 Generated with flatcc {{ flatcc_version }}. Reflection schemas generated with
-flatc {{ flatbuffers_version }} are included under `bfbs/`.
+flatc {{ flatbuffers_version }} are included under `bfbs/`. The archive also
+ships `topics.json` and `include/synapse/topic_catalog.h` for canonical Zenoh
+keys, `TopicId`, root table names, and payload types.
 
 This archive is a generic CMake dependency, not a Zephyr module. Add it with
 CMake `FetchContent` and link `synapse_fbs::c` for reader-only accessors.
@@ -22,3 +24,9 @@ target_link_libraries(app PRIVATE synapse_fbs::c)
 
 Link `synapse_fbs::flatcc_runtime` when using generated builders, verifiers, or
 JSON helpers.
+
+```c
+#include <synapse/topic_catalog.h>
+
+const synapse_topic_info_t *topic = synapse_topic_by_key("vehicle_health");
+```

@@ -1,3 +1,5 @@
+export * from './topic_catalog.js';
+
 /** Absolute path to the directory containing the canonical `.fbs` schema files. */
 export const fbsDir: string;
 

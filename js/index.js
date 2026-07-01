@@ -6,6 +6,7 @@
 // runtime release cadence does not track the pinned `flatc` version, so JS
 // consumers generate or bring their own bindings from these assets.
 import { fileURLToPath } from 'node:url';
+export * from './topic_catalog.js';
 
 const packageRoot = new URL('./', import.meta.url);
 

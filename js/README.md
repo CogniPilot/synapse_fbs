@@ -17,6 +17,8 @@ cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 - `fbs/*.fbs` — canonical Synapse schemas.
 - `bfbs/*.bfbs` — generated FlatBuffers reflection schemas (same assets bundled
   in the C/C++ release archives).
+- `topics.json` and `topic_catalog.js` — generated topic metadata and helpers
+  for canonical Zenoh keys, `TopicId`, root table names, and payload types.
 - `schema.sha256` / `bfbs.sha256` — content hashes for the shipped assets.
 
 Runtime protocol payloads prioritize fixed memory layout. Telemetry, state,
@@ -43,6 +45,15 @@ const logSchema = readFileSync(schemaPath('log.fbs'), 'utf8');
 
 // Or point a code generator at the shipped schema directory.
 // flatc --ts -I <fbsDir> <fbsDir>/all.fbs
+```
+
+Topic helpers avoid hand-maintained bridge and routing tables:
+
+```js
+import { keyForTopic, topicById } from '@cognipilot/synapse-fbs';
+
+const key = keyForTopic('VehicleHealth');
+const payloadType = topicById(1)?.payloadType;
 ```
 
 Individual assets are also directly importable via subpath exports:

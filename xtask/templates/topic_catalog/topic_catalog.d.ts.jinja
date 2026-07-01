@@ -1,0 +1,18 @@
+export interface TopicInfo {
+  readonly id: number;
+  readonly name: string;
+  readonly key: string;
+  readonly keySuffix: string;
+  readonly rootTable: string;
+  readonly payloadType: string | null;
+  readonly schemaFile: string;
+  readonly fixedLayout: boolean;
+  readonly description: string;
+}
+
+export const topicCatalog: readonly TopicInfo[];
+
+export function topicById(id: number): TopicInfo | undefined;
+export function topicByName(name: string): TopicInfo | undefined;
+export function topicByKey(key: string): TopicInfo | undefined;
+export function keyForTopic(topic: number | string): string | undefined;

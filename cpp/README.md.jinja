@@ -1,6 +1,14 @@
 # synapse_fbs C++ headers
 
 Generated with flatc {{ flatbuffers_version }}. Reflection schemas are included
-under `bfbs/`.
+under `bfbs/`. The archive also ships `topics.json` and
+`include/synapse/topic_catalog.h` for canonical Zenoh keys, `TopicId`, root
+table names, and payload types.
 
 Add `include/` to the compiler include path.
+
+```cpp
+#include <synapse/topic_catalog.h>
+
+const synapse_topic_info_t *topic = synapse_topic_by_name("VehicleHealth");
+```

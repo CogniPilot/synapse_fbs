@@ -15,3 +15,13 @@ Install the staged wheel locally with:
 ```sh
 pip install target/xtask/packages/python/dist/*.whl
 ```
+
+The generated package includes topic catalog helpers for bridge and routing
+code:
+
+```py
+from synapse import topic_catalog
+
+key = topic_catalog.key_for_topic("VehicleHealth")
+payload_type = topic_catalog.topic_by_id(1).payload_type
+```

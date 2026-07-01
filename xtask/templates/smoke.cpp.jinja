@@ -1,3 +1,4 @@
 #include <synapse/transport_generated.h>
+#include <synapse/topic_catalog.h>
 
-int main() { return 0; }
+int main() { return synapse_topic_by_name("VehicleHealth") == nullptr; }
