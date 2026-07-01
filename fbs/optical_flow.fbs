@@ -2,32 +2,35 @@ include "types.fbs";
 
 namespace synapse.topic;
 
-// Fixed-size structs used as native zROS topic types.
+// Integrated optical-flow sample from an image sensor or flow module.
 struct OpticalFlowData {
-  timestamp_us:ulong;
-  pixel_flow:Vec2f;
-  delta_angle_flu_rad:Vec3f;
-  distance_m:float;
-  integration_timespan_us:uint;
-  quality:ubyte;
-  max_flow_rate_rad_s:float;
-  min_ground_distance_m:float;
-  max_ground_distance_m:float;
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  pixel_flow:Vec2f; // Integrated image-plane flow over integration_timespan_us.
+  delta_angle_flu_rad:Vec3f; // Integrated body rotation in the FLU frame during the same interval.
+  distance_m:float; // Measured distance to the observed surface.
+  integration_timespan_us:uint; // Integration interval for pixel_flow and delta_angle_flu_rad.
+  quality:ubyte; // Producer-defined flow quality from 0 to 255.
+  max_flow_rate_rad_s:float; // Maximum measurable angular flow rate.
+  min_ground_distance_m:float; // Minimum valid range for distance-compensated flow.
+  max_ground_distance_m:float; // Maximum valid range for distance-compensated flow.
 }
 
+// Velocity estimate derived from optical flow.
 struct OpticalFlowVelocityData {
-  timestamp_us:ulong;
-  velocity_flu_m_s:Vec2f;
-  velocity_enu_m_s:Vec2f;
-  flow_rate_uncompensated_rad_s:Vec2f;
-  flow_rate_compensated_rad_s:Vec2f;
-  gyro_flu_rad_s:Vec3f;
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  velocity_flu_m_s:Vec2f; // Planar velocity estimate in the body FLU frame.
+  velocity_enu_m_s:Vec2f; // Planar velocity estimate in the local ENU frame.
+  flow_rate_uncompensated_rad_s:Vec2f; // Raw angular flow rate before gyro compensation.
+  flow_rate_compensated_rad_s:Vec2f; // Angular flow rate after gyro compensation.
+  gyro_flu_rad_s:Vec3f; // Body angular rate used for compensation.
 }
 
+// FlatBuffers root wrapper for OpticalFlowData.
 table OpticalFlow {
-  data:OpticalFlowData;
+  data:OpticalFlowData; // Fixed-layout optical-flow payload.
 }
 
+// FlatBuffers root wrapper for OpticalFlowVelocityData.
 table OpticalFlowVelocity {
-  data:OpticalFlowVelocityData;
+  data:OpticalFlowVelocityData; // Fixed-layout optical-flow velocity payload.
 }

@@ -939,6 +939,7 @@ fn generate_docs_site(root: &Path, version: &str, out_dir: &Path) -> Result<()> 
     );
 
     let docs = parse_schema_docs(root)?;
+    validate_schema_docs(&docs)?;
     reset_dir(&version_dir)?;
     copy_dir_all(&root.join("fbs"), &version_dir.join("fbs"))?;
     write_file(&out_dir.join(".nojekyll"), "")?;
@@ -979,11 +980,10 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
             continue;
         }
 
-        let code = trimmed
+        let (code, trailing_comment) = trimmed
             .split_once("//")
-            .map(|(before, _)| before)
-            .unwrap_or(trimmed)
-            .trim();
+            .map(|(before, comment)| (before.trim(), Some(comment.trim().to_string())))
+            .unwrap_or((trimmed, None));
         if code.is_empty() {
             continue;
         }
@@ -995,6 +995,11 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
                 continue;
             }
 
+            if let Some(comment) = trailing_comment {
+                if !comment.is_empty() {
+                    pending_comments.push(comment);
+                }
+            }
             if let Some(member) = parse_schema_member(entity.kind, code, &mut pending_comments) {
                 entity.members.push(member);
             } else {
@@ -1049,6 +1054,44 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
         includes,
         entities,
     })
+}
+
+fn validate_schema_docs(docs: &SchemaDoc) -> Result<()> {
+    let mut missing = Vec::new();
+
+    for file in &docs.files {
+        for entity in &file.entities {
+            if entity.comments.is_empty() {
+                missing.push(format!(
+                    "{}: missing comment for {} {}",
+                    file.name,
+                    entity.kind.as_str(),
+                    entity.name
+                ));
+            }
+
+            for member in &entity.members {
+                if member.comments.is_empty() {
+                    missing.push(format!(
+                        "{}: missing comment for {} {} member {}",
+                        file.name,
+                        entity.kind.as_str(),
+                        entity.name,
+                        member.name
+                    ));
+                }
+            }
+        }
+    }
+
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        fail(format!(
+            "schema documentation is incomplete:\n{}",
+            missing.join("\n")
+        ))
+    }
 }
 
 fn parse_schema_entity_start(code: &str) -> Option<(SchemaEntityKind, String, Option<String>)> {
@@ -1288,24 +1331,28 @@ fn render_schema_docs(docs: &SchemaDoc, version: &str, version_dir_name: &str) -
     html.push_str("<p>Telemetry, state, command, and control samples should use FlatBuffers <code>struct</code> definitions. Use <code>table</code>, <code>string</code>, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.</p></section>");
     html.push_str("<section class=\"notice\"><h2>Unit And Scale Rules</h2>");
     html.push_str("<p>Fields encode units and frames in their names. Local/world vectors use <code>_enu_</code>; body vectors use <code>_flu_</code>. Global coordinates use <code>_deg_e7</code>, altitudes use <code>_mm</code>, speeds commonly use <code>_cm_s</code> or <code>_mm_s</code>, temperatures use <code>_cdeg</code>, currents use <code>_ca</code>, magnetic field uses <code>_tesla</code>, and normalized manual-control axes use <code>_milli</code>. The scale column below is generated from those suffixes.</p></section>");
-    html.push_str("<nav class=\"toc\"><h2>Schemas</h2><ul>");
+    html.push_str("<div class=\"docs-layout\"><aside class=\"toc\" aria-label=\"Schema navigation\"><h2>Schemas</h2><ul>");
     for file in &docs.files {
         html.push_str(&format!(
-            "<li><a href=\"#{}\">{}</a><ul>",
+            "<li><a href=\"#{}\">{}</a>",
             escape_attr(&anchor_id(&file.name, "")),
             escape_html(&file.name)
         ));
-        for entity in &file.entities {
-            html.push_str(&format!(
-                "<li><a href=\"#{}\"><code>{}</code> {}</a></li>",
-                escape_attr(&anchor_id(&file.name, &entity.name)),
-                escape_html(entity.kind.as_str()),
-                escape_html(&entity.name)
-            ));
+        if !file.entities.is_empty() {
+            html.push_str("<ul>");
+            for entity in &file.entities {
+                html.push_str(&format!(
+                    "<li><a href=\"#{}\"><span>{}</span> {}</a></li>",
+                    escape_attr(&anchor_id(&file.name, &entity.name)),
+                    escape_html(entity.kind.as_str()),
+                    escape_html(&entity.name)
+                ));
+            }
+            html.push_str("</ul>");
         }
-        html.push_str("</ul></li>");
+        html.push_str("</li>");
     }
-    html.push_str("</ul></nav>");
+    html.push_str("</ul></aside><div class=\"schema-content\">");
 
     for file in &docs.files {
         html.push_str(&format!(
@@ -1341,6 +1388,7 @@ fn render_schema_docs(docs: &SchemaDoc, version: &str, version_dir_name: &str) -
 
         html.push_str("</section>");
     }
+    html.push_str("</div></div>");
 
     html.push_str(&format!(
         "<footer><p>Version path: <code>{}</code>. Generated by <code>cargo run --locked --manifest-path xtask/Cargo.toml -- docs</code>.</p></footer>",
@@ -1365,44 +1413,86 @@ fn render_entity_docs(html: &mut String, file: &SchemaFileDoc, entity: &SchemaEn
     }
     render_comments(html, &entity.comments);
 
+    let has_value = entity.members.iter().any(|member| member.value.is_some());
     html.push_str("<div class=\"table-wrap\"><table><thead><tr>");
-    html.push_str("<th>Name</th><th>Type</th><th>Value</th><th>Unit / Scale</th><th>Notes</th>");
+    match entity.kind {
+        SchemaEntityKind::Struct | SchemaEntityKind::Table => {
+            html.push_str("<th>Name</th><th>Type</th>");
+            if has_value {
+                html.push_str("<th>Default</th>");
+            }
+            html.push_str("<th>Unit / Scale</th><th>Notes</th>");
+        }
+        SchemaEntityKind::Enum => {
+            html.push_str("<th>Name</th><th>Value</th><th>Notes</th>");
+        }
+        SchemaEntityKind::Union => {
+            html.push_str("<th>Name</th><th>Type</th><th>Notes</th>");
+        }
+    }
     html.push_str("</tr></thead><tbody>");
     for member in &entity.members {
         html.push_str("<tr>");
         html.push_str(&format!(
-            "<td><code>{}</code></td>",
+            "<td class=\"member-name\"><code>{}</code></td>",
             escape_html(&member.name)
         ));
-        html.push_str(&format!(
-            "<td>{}</td>",
-            member
-                .type_name
-                .as_ref()
-                .map(|value| format!("<code>{}</code>", escape_html(value)))
-                .unwrap_or_default()
-        ));
-        html.push_str(&format!(
-            "<td>{}</td>",
-            member
-                .value
-                .as_ref()
-                .map(|value| format!("<code>{}</code>", escape_html(value)))
-                .unwrap_or_default()
-        ));
-        html.push_str(&format!(
-            "<td>{}</td>",
-            member
-                .unit_scale
-                .as_ref()
-                .map(|value| escape_html(value))
-                .unwrap_or_default()
-        ));
-        html.push_str("<td>");
-        render_comments(html, &member.comments);
-        html.push_str("</td></tr>");
+        match entity.kind {
+            SchemaEntityKind::Struct | SchemaEntityKind::Table => {
+                render_type_cell(html, member);
+                if has_value {
+                    render_value_cell(html, member);
+                }
+                html.push_str(&format!(
+                    "<td class=\"unit-scale\">{}</td>",
+                    member
+                        .unit_scale
+                        .as_ref()
+                        .map(|value| escape_html(value))
+                        .unwrap_or_default()
+                ));
+                render_notes_cell(html, member);
+            }
+            SchemaEntityKind::Enum => {
+                render_value_cell(html, member);
+                render_notes_cell(html, member);
+            }
+            SchemaEntityKind::Union => {
+                render_type_cell(html, member);
+                render_notes_cell(html, member);
+            }
+        }
+        html.push_str("</tr>");
     }
     html.push_str("</tbody></table></div></article>");
+}
+
+fn render_type_cell(html: &mut String, member: &SchemaMemberDoc) {
+    html.push_str(&format!(
+        "<td class=\"member-type\">{}</td>",
+        member
+            .type_name
+            .as_ref()
+            .map(|value| format!("<code>{}</code>", escape_html(value)))
+            .unwrap_or_default()
+    ));
+}
+
+fn render_value_cell(html: &mut String, member: &SchemaMemberDoc) {
+    html.push_str(&format!(
+        "<td class=\"member-value\">{}</td>",
+        member
+            .value
+            .as_ref()
+            .map(|value| format!("<code>{}</code>", escape_html(value)))
+            .unwrap_or_default()
+    ));
+}
+
+fn render_notes_cell(html: &mut String, member: &SchemaMemberDoc) {
+    html.push_str("<td class=\"member-notes\">");
+    render_comments(html, &member.comments);
+    html.push_str("</td>");
 }
 
 fn render_comments(html: &mut String, comments: &[String]) {
@@ -1420,6 +1510,7 @@ fn render_comments(html: &mut String, comments: &[String]) {
 }
 
 fn write_docs_root_index(out_dir: &Path, current_version_dir: &str) -> Result<()> {
+    // TODO: Include a dropdown box to select the version.
     let mut versions = Vec::new();
     for entry in fs::read_dir(out_dir)? {
         let path = entry?.path();
@@ -1507,7 +1598,7 @@ body {
 }
 
 main {
-  max-width: 1180px;
+  max-width: 1440px;
   margin: 0 auto;
   padding: 32px 20px 64px;
 }
@@ -1538,7 +1629,6 @@ h1 span,
 }
 
 .notice,
-.toc,
 .schema-file,
 .entity,
 .versions {
@@ -1547,6 +1637,47 @@ h1 span,
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
+}
+
+.docs-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.toc {
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  margin-top: 24px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.toc h2 {
+  margin-top: 0;
+}
+
+.toc a {
+  text-decoration: none;
+}
+
+.toc a:hover {
+  text-decoration: underline;
+}
+
+.toc span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.schema-content {
+  min-width: 0;
 }
 
 .entity {
@@ -1576,12 +1707,12 @@ code {
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.92rem;
+  font-size: 0.9rem;
 }
 
 th,
 td {
-  padding: 10px 12px;
+  padding: 9px 12px;
   border-top: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
@@ -1593,8 +1724,34 @@ th {
   text-transform: uppercase;
 }
 
+.member-name,
+.member-type,
+.member-value,
+.unit-scale {
+  white-space: nowrap;
+}
+
+.unit-scale {
+  color: var(--muted);
+}
+
+.member-notes {
+  min-width: 320px;
+}
+
 td p {
   margin: 0;
+}
+
+@media (max-width: 900px) {
+  .docs-layout {
+    display: block;
+  }
+
+  .toc {
+    position: static;
+    max-height: none;
+  }
 }
 "#;
 

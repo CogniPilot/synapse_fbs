@@ -3,14 +3,15 @@ include "control.fbs";
 
 namespace synapse.sil;
 
+// Simulation input root passed from a simulator into a controller under test.
 table SimInput {
-  gyro_flu_rad_s:synapse.topic.Vec3f;
-  accel_flu_m_s2:synapse.topic.Vec3f;
-  rc:synapse.topic.RadioControlData;
-  rc_link_quality:ubyte;
-  rc_valid:bool;
-  imu_valid:bool;
-  target_boot_time_ns:ulong;
+  gyro_flu_rad_s:synapse.topic.Vec3f; // Simulated body angular velocity in the FLU frame.
+  accel_flu_m_s2:synapse.topic.Vec3f; // Simulated body linear acceleration in the FLU frame.
+  rc:synapse.topic.RadioControlData; // Simulated raw receiver input sample.
+  rc_link_quality:ubyte; // Simulated receiver link quality from 0 to 100 when available.
+  rc_valid:bool; // True when rc contains a valid receiver sample.
+  imu_valid:bool; // True when gyro and accel contain valid inertial data.
+  target_boot_time_ns:ulong; // Target controller boot time for deterministic simulation stepping.
 }
 
 root_type SimInput;

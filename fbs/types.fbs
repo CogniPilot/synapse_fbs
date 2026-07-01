@@ -1,5 +1,3 @@
-namespace synapse.topic;
-
 // Default coordinate frames follow ROS REP-0103:
 // world/local vectors use ENU (x east, y north, z up);
 // body vectors use FLU (x forward, y left, z up).
@@ -12,89 +10,97 @@ namespace synapse.topic;
 // representation is scaled. This keeps adapters predictable and avoids losing
 // precision in global coordinates or raw I/O.
 
+namespace synapse.topic;
+
+// Stable numeric identifiers for well-known Synapse topics.
 enum TopicId:ushort {
-  Unknown = 0,
-  VehicleHealth = 1,
-  TimeReference = 2,
-  RadioControl = 3,
-  ManualControlCommand = 4,
-  InertialSample = 5,
-  AirData = 6,
-  PowerStatus = 7,
-  GnssFix = 8,
-  AttitudeEstimate = 9,
-  LocalPositionEstimate = 10,
-  GlobalPositionEstimate = 11,
-  OdometryEstimate = 12,
-  EstimatorHealth = 13,
-  MissionProgress = 14,
-  NavigationTarget = 15,
-  HomeReference = 16,
-  AttitudeCommand = 17,
-  RateCommand = 18,
-  LocalPositionCommand = 19,
-  VehicleCommand = 20,
-  GeoCommand = 21,
-  CommandResult = 22,
-  ActuatorCommand = 23,
-  ActuatorFeedback = 24,
-  PwmSignalOutputs = 25,
-  ControlLoopMetrics = 26,
-  MotorOutput = 27,
-  TextStatus = 28,
+  Unknown = 0, // Reserved value for invalid, unassigned, or externally named topics.
+  VehicleHealth = 1, // Vehicle-level arming, failsafe, mode, link, and health summary.
+  TimeReference = 2, // Correlates boot-relative time with an absolute Unix time reference.
+  RadioControl = 3, // Raw receiver channel input and link quality.
+  ManualControlCommand = 4, // Normalized manual pilot intent after input mapping.
+  InertialSample = 5, // IMU, magnetometer, pressure, and temperature sample.
+  AirData = 6, // Barometric and aerodynamic measurements used by fixed-wing control.
+  PowerStatus = 7, // Battery, current, energy, and power-source state.
+  GnssFix = 8, // Global navigation fix, accuracy, velocity, and heading information.
+  AttitudeEstimate = 9, // Vehicle attitude estimate and angular velocity.
+  LocalPositionEstimate = 10, // Local ENU position, velocity, acceleration, and yaw estimate.
+  GlobalPositionEstimate = 11, // Global latitude/longitude/altitude estimate with ENU velocity.
+  OdometryEstimate = 12, // Combined pose, twist, covariance, and estimator quality sample.
+  EstimatorHealth = 13, // Estimator consistency metrics and accuracy estimates.
+  MissionProgress = 14, // Mission item progress and mission database identifiers.
+  NavigationTarget = 15, // Current navigation target and tracking-error summary.
+  HomeReference = 16, // Home geodetic origin and corresponding local-frame reference.
+  AttitudeCommand = 17, // Attitude setpoint with optional body-rate and thrust feed-forward.
+  RateCommand = 18, // Body-rate setpoint with thrust feed-forward.
+  LocalPositionCommand = 19, // Local ENU position/velocity/acceleration/yaw setpoint.
+  VehicleCommand = 20, // Generic command with floating-point arguments.
+  GeoCommand = 21, // Geographic command with scaled latitude/longitude precision.
+  CommandResult = 22, // Result and progress for a previously issued command.
+  ActuatorCommand = 23, // Normalized actuator control request.
+  ActuatorFeedback = 24, // Normalized actuator output feedback.
+  PwmSignalOutputs = 25, // Raw PWM output pulse widths.
+  ControlLoopMetrics = 26, // Control-loop timing, overrun, and load telemetry.
+  MotorOutput = 27, // Compact four-motor output state for small multirotor controllers.
+  TextStatus = 28, // Human-readable status or diagnostic text.
 }
 
+// Two-component float vector used for planar rates, flow, and image motion.
 struct Vec2f {
-  x:float;
-  y:float;
+  x:float; // First axis component; frame and unit are defined by the containing field name.
+  y:float; // Second axis component; frame and unit are defined by the containing field name.
 }
 
+// Three-component float vector used for ENU world vectors and FLU body vectors.
 struct Vec3f {
-  x:float;
-  y:float;
-  z:float;
+  x:float; // X component; east in ENU fields and forward in FLU fields.
+  y:float; // Y component; north in ENU fields and left in FLU fields.
+  z:float; // Z component; up in both ENU and FLU fields.
 }
 
 // Quaternion order is w, x, y, z. A zero rotation is 1, 0, 0, 0.
 struct Quaternionf {
-  w:float;
-  x:float;
-  y:float;
-  z:float;
+  w:float; // Scalar component.
+  x:float; // Vector X component.
+  y:float; // Vector Y component.
+  z:float; // Vector Z component.
 }
 
+// Roll, pitch, and yaw rates or setpoints in the frame named by the field.
 struct RateTriplet {
-  roll:float;
-  pitch:float;
-  yaw:float;
+  roll:float; // Rotation about the body X axis.
+  pitch:float; // Rotation about the body Y axis.
+  yaw:float; // Rotation about the body Z axis.
 }
 
+// Roll, pitch, and yaw Euler angles in radians unless the containing field name says otherwise.
 struct AttitudeEuler {
-  roll:float;
-  pitch:float;
-  yaw:float;
+  roll:float; // Rotation about the body X axis.
+  pitch:float; // Rotation about the body Y axis.
+  yaw:float; // Heading/yaw angle following the frame convention of the containing message.
 }
 
+// Upper-triangular 6x6 covariance matrix stored row-major as 21 float values.
 struct CovarianceUpperTriangle21f {
-  c0:float;
-  c1:float;
-  c2:float;
-  c3:float;
-  c4:float;
-  c5:float;
-  c6:float;
-  c7:float;
-  c8:float;
-  c9:float;
-  c10:float;
-  c11:float;
-  c12:float;
-  c13:float;
-  c14:float;
-  c15:float;
-  c16:float;
-  c17:float;
-  c18:float;
-  c19:float;
-  c20:float;
+  c0:float; // Matrix element (0,0).
+  c1:float; // Matrix element (0,1).
+  c2:float; // Matrix element (0,2).
+  c3:float; // Matrix element (0,3).
+  c4:float; // Matrix element (0,4).
+  c5:float; // Matrix element (0,5).
+  c6:float; // Matrix element (1,1).
+  c7:float; // Matrix element (1,2).
+  c8:float; // Matrix element (1,3).
+  c9:float; // Matrix element (1,4).
+  c10:float; // Matrix element (1,5).
+  c11:float; // Matrix element (2,2).
+  c12:float; // Matrix element (2,3).
+  c13:float; // Matrix element (2,4).
+  c14:float; // Matrix element (2,5).
+  c15:float; // Matrix element (3,3).
+  c16:float; // Matrix element (3,4).
+  c17:float; // Matrix element (3,5).
+  c18:float; // Matrix element (4,4).
+  c19:float; // Matrix element (4,5).
+  c20:float; // Matrix element (5,5).
 }

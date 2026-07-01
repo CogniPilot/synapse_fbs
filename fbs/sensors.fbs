@@ -2,102 +2,109 @@ include "types.fbs";
 
 namespace synapse.topic;
 
-// SI inertial sample in the body FLU frame.
+// Time-correlated inertial and environmental sample from an IMU-class sensor.
 struct InertialSampleData {
-  timestamp_us:ulong;
-  accel_flu_m_s2:Vec3f;
-  gyro_flu_rad_s:Vec3f;
-  mag_flu_tesla:Vec3f;
-  absolute_pressure_hpa:float;
-  differential_pressure_hpa:float;
-  pressure_altitude_m:float;
-  temperature_c:float;
-  fields_updated:ushort;
-  id:ubyte;
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  accel_flu_m_s2:Vec3f; // Linear acceleration in the body FLU frame.
+  gyro_flu_rad_s:Vec3f; // Angular rate in the body FLU frame.
+  mag_flu_tesla:Vec3f; // Magnetic field measurement in the body FLU frame.
+  absolute_pressure_hpa:float; // Static pressure from the sensor barometer.
+  differential_pressure_hpa:float; // Differential pressure from a pitot/static sensor when available.
+  pressure_altitude_m:float; // Altitude estimate derived from pressure using the producer's atmosphere model.
+  temperature_c:float; // Sensor temperature in degrees Celsius.
+  fields_updated:ushort; // Producer-defined bitmask indicating which fields changed in this sample.
+  id:ubyte; // Sensor instance identifier assigned by the producer.
 }
 
+// Air-data sample used by fixed-wing estimators and controllers.
 struct AirDataData {
-  timestamp_us:ulong;
-  absolute_pressure_hpa:float;
-  differential_pressure_hpa:float;
-  pressure_altitude_m:float;
-  indicated_airspeed_m_s:float;
-  true_airspeed_m_s:float;
-  angle_of_attack_rad:float;
-  sideslip_rad:float;
-  temperature_cdeg:short;
-  differential_pressure_temperature_cdeg:short;
-  valid_flags:uint;
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  absolute_pressure_hpa:float; // Static pressure used for altitude and air-density calculations.
+  differential_pressure_hpa:float; // Pitot/static differential pressure used for airspeed.
+  pressure_altitude_m:float; // Pressure-derived altitude in meters.
+  indicated_airspeed_m_s:float; // Indicated airspeed before density correction.
+  true_airspeed_m_s:float; // True airspeed after density correction when available.
+  angle_of_attack_rad:float; // Angle between body X axis and relative wind in the pitch plane.
+  sideslip_rad:float; // Angle between body X axis and relative wind in the yaw plane.
+  temperature_cdeg:short; // Static-air temperature in centi-degrees Celsius.
+  differential_pressure_temperature_cdeg:short; // Differential-pressure sensor temperature in centi-degrees Celsius.
+  valid_flags:uint; // Producer-defined bitmask describing valid air-data fields and health.
 }
 
+// Per-cell battery voltages for packs with up to fourteen monitored cells.
 struct BatteryCellVoltages14 {
-  cell0_mv:ushort;
-  cell1_mv:ushort;
-  cell2_mv:ushort;
-  cell3_mv:ushort;
-  cell4_mv:ushort;
-  cell5_mv:ushort;
-  cell6_mv:ushort;
-  cell7_mv:ushort;
-  cell8_mv:ushort;
-  cell9_mv:ushort;
-  cell10_mv:ushort;
-  cell11_mv:ushort;
-  cell12_mv:ushort;
-  cell13_mv:ushort;
+  cell0_mv:ushort; // Cell 0 voltage, or zero when unavailable.
+  cell1_mv:ushort; // Cell 1 voltage, or zero when unavailable.
+  cell2_mv:ushort; // Cell 2 voltage, or zero when unavailable.
+  cell3_mv:ushort; // Cell 3 voltage, or zero when unavailable.
+  cell4_mv:ushort; // Cell 4 voltage, or zero when unavailable.
+  cell5_mv:ushort; // Cell 5 voltage, or zero when unavailable.
+  cell6_mv:ushort; // Cell 6 voltage, or zero when unavailable.
+  cell7_mv:ushort; // Cell 7 voltage, or zero when unavailable.
+  cell8_mv:ushort; // Cell 8 voltage, or zero when unavailable.
+  cell9_mv:ushort; // Cell 9 voltage, or zero when unavailable.
+  cell10_mv:ushort; // Cell 10 voltage, or zero when unavailable.
+  cell11_mv:ushort; // Cell 11 voltage, or zero when unavailable.
+  cell12_mv:ushort; // Cell 12 voltage, or zero when unavailable.
+  cell13_mv:ushort; // Cell 13 voltage, or zero when unavailable.
 }
 
+// Battery or power-source state used for monitoring and failsafe decisions.
 struct PowerStatusData {
-  timestamp_us:ulong;
-  voltages:BatteryCellVoltages14;
-  current_consumed_mah:int;
-  energy_consumed_hj:int;
-  time_remaining_s:int;
-  fault_flags:uint;
-  current_battery_ca:short;
-  temperature_cdeg:short;
-  remaining_pct:byte;
-  id:ubyte;
-  battery_function:ubyte;
-  battery_type:ubyte;
-  charge_state:ubyte;
-  mode:ubyte;
-  connected:bool;
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  voltages:BatteryCellVoltages14; // Per-cell voltages for the monitored pack.
+  current_consumed_mah:int; // Integrated discharged capacity since the producer's reset point.
+  energy_consumed_hj:int; // Integrated discharged energy since the producer's reset point.
+  time_remaining_s:int; // Estimated remaining runtime, or a negative value when unknown.
+  fault_flags:uint; // Producer-defined bitmask of battery or power faults.
+  current_battery_ca:short; // Signed battery current; positive means discharge.
+  temperature_cdeg:short; // Battery or power-module temperature in centi-degrees Celsius.
+  remaining_pct:byte; // Remaining state of charge, or negative when unknown.
+  id:ubyte; // Battery or power-source instance identifier.
+  battery_function:ubyte; // Producer-defined role such as propulsion, avionics, or payload.
+  battery_type:ubyte; // Producer-defined chemistry or power-source type.
+  charge_state:ubyte; // Producer-defined charging/discharging state.
+  mode:ubyte; // Producer-defined battery operating mode.
+  connected:bool; // True when the power source is physically present and reporting.
 }
 
+// Global navigation satellite receiver fix and motion estimate.
 struct GnssFixData {
-  timestamp_us:ulong;
-  latitude_deg_e7:int;
-  longitude_deg_e7:int;
-  altitude_msl_mm:int;
-  altitude_ellipsoid_mm:int;
-  horizontal_accuracy_mm:uint;
-  vertical_accuracy_mm:uint;
-  velocity_accuracy_mm_s:uint;
-  yaw_accuracy_deg_e5:uint;
-  hdop_centi:ushort;
-  vdop_centi:ushort;
-  ground_speed_cm_s:ushort;
-  // Yaw follows ROS REP-0103: zero east, positive counter-clockwise.
-  course_over_ground_cdeg:ushort;
-  yaw_cdeg:ushort;
-  fix_type:ubyte;
-  satellites_visible:ubyte;
-  id:ubyte;
+  timestamp_us:ulong; // Fix timestamp in monotonic boot time.
+  latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
+  longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
+  altitude_msl_mm:int; // Height above mean sea level.
+  altitude_ellipsoid_mm:int; // Height above the WGS-84 ellipsoid.
+  horizontal_accuracy_mm:uint; // One-sigma horizontal position accuracy estimate.
+  vertical_accuracy_mm:uint; // One-sigma vertical position accuracy estimate.
+  velocity_accuracy_mm_s:uint; // One-sigma ground velocity accuracy estimate.
+  yaw_accuracy_deg_e5:uint; // One-sigma yaw accuracy estimate when receiver yaw is available.
+  hdop_centi:ushort; // Horizontal dilution of precision scaled by 100.
+  vdop_centi:ushort; // Vertical dilution of precision scaled by 100.
+  ground_speed_cm_s:ushort; // Horizontal ground speed magnitude.
+  course_over_ground_cdeg:ushort; // Course over ground; zero east and positive counter-clockwise per ROS REP-0103 yaw.
+  yaw_cdeg:ushort; // Vehicle yaw from the receiver when available; zero east and positive counter-clockwise.
+  fix_type:ubyte; // Producer-defined fix quality such as no fix, 2D, 3D, RTK float, or RTK fixed.
+  satellites_visible:ubyte; // Number of satellites used or visible according to the receiver.
+  id:ubyte; // GNSS receiver instance identifier.
 }
 
+// FlatBuffers root wrapper for InertialSampleData.
 table InertialSample {
-  data:InertialSampleData;
+  data:InertialSampleData; // Fixed-layout inertial payload.
 }
 
+// FlatBuffers root wrapper for AirDataData.
 table AirData {
-  data:AirDataData;
+  data:AirDataData; // Fixed-layout air-data payload.
 }
 
+// FlatBuffers root wrapper for PowerStatusData.
 table PowerStatus {
-  data:PowerStatusData;
+  data:PowerStatusData; // Fixed-layout power-status payload.
 }
 
+// FlatBuffers root wrapper for GnssFixData.
 table GnssFix {
-  data:GnssFixData;
+  data:GnssFixData; // Fixed-layout GNSS fix payload.
 }

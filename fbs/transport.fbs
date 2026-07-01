@@ -5,51 +5,54 @@ include "control.fbs";
 
 namespace synapse.topic;
 
+// Human-readable status text for diagnostics, operator messages, and logs.
 table TextStatus {
-  timestamp_us:ulong;
-  severity:ubyte;
-  text:string;
+  timestamp_us:ulong; // Message timestamp in monotonic boot time.
+  severity:ubyte; // Producer-defined severity level.
+  text:string; // UTF-8 status text; this table is variable-size by design.
 }
 
+// Union of topic root tables supported by the optional multiplexed Frame transport.
 union SynapseMessage {
-  VehicleHealth,
-  TimeReference,
-  RadioControl,
-  ManualControlCommand,
-  InertialSample,
-  AirData,
-  PowerStatus,
-  GnssFix,
-  AttitudeEstimate,
-  LocalPositionEstimate,
-  GlobalPositionEstimate,
-  OdometryEstimate,
-  EstimatorHealth,
-  MissionProgress,
-  NavigationTarget,
-  HomeReference,
-  AttitudeCommand,
-  RateCommand,
-  LocalPositionCommand,
-  VehicleCommand,
-  GeoCommand,
-  CommandResult,
-  ActuatorCommand,
-  ActuatorFeedback,
-  PwmSignalOutputs,
-  ControlLoopMetrics,
-  MotorOutput,
-  TextStatus,
+  VehicleHealth, // Vehicle-level arming, failsafe, mode, link, and health summary.
+  TimeReference, // Boot-time to Unix-time reference sample.
+  RadioControl, // Raw receiver channel input sample.
+  ManualControlCommand, // Normalized manual pilot intent command.
+  InertialSample, // IMU, magnetometer, pressure, and temperature sample.
+  AirData, // Barometric and aerodynamic measurement sample.
+  PowerStatus, // Battery or power-source state sample.
+  GnssFix, // GNSS fix and motion estimate.
+  AttitudeEstimate, // Attitude and angular-velocity estimate.
+  LocalPositionEstimate, // Local ENU position, velocity, acceleration, and yaw estimate.
+  GlobalPositionEstimate, // Global geodetic position and velocity estimate.
+  OdometryEstimate, // Combined pose, twist, covariance, and estimator metadata.
+  EstimatorHealth, // Estimator health and innovation-test summary.
+  MissionProgress, // Mission progress and mission database identifiers.
+  NavigationTarget, // Navigation target and tracking-error summary.
+  HomeReference, // Home geodetic origin and local-frame reference.
+  AttitudeCommand, // Attitude setpoint command.
+  RateCommand, // Body-rate setpoint command.
+  LocalPositionCommand, // Local position/velocity/acceleration/yaw command.
+  VehicleCommand, // Generic command with floating-point arguments.
+  GeoCommand, // Geographic command with scaled latitude/longitude precision.
+  CommandResult, // Command result and progress response.
+  ActuatorCommand, // Normalized actuator command.
+  ActuatorFeedback, // Normalized actuator feedback.
+  PwmSignalOutputs, // Raw PWM output pulse widths.
+  ControlLoopMetrics, // Control-loop timing and load metrics.
+  MotorOutput, // Compact four-motor output state.
+  TextStatus, // Human-readable status text.
 }
 
+// Fixed-layout header carried by the optional multiplexed Frame transport.
 struct FrameHeader {
-  timestamp_us:ulong;
-  sequence:uint;
-  flags:ushort;
-  topic_id:TopicId;
-  system_id:ubyte;
-  component_id:ubyte;
-  protocol_version:ubyte;
+  timestamp_us:ulong; // Frame publication timestamp in monotonic boot time.
+  sequence:uint; // Monotonic sequence counter for loss/reorder detection.
+  flags:ushort; // Producer-defined transport flags.
+  topic_id:TopicId; // Numeric topic identifier for the enclosed message.
+  system_id:ubyte; // Source system identifier.
+  component_id:ubyte; // Source component identifier.
+  protocol_version:ubyte; // Synapse wire/schema compatibility version used by the publisher.
 }
 
 // Optional multiplexed transport frame. This is an intentional table boundary:
@@ -57,8 +60,8 @@ struct FrameHeader {
 // for shared-memory chip-to-chip links. Zenoh deployments can publish the topic
 // tables directly and use the topic name as the message discriminator.
 table Frame {
-  header:FrameHeader;
-  message:SynapseMessage;
+  header:FrameHeader; // Fixed-layout transport header.
+  message:SynapseMessage; // Variable message payload selected by the union discriminator.
 }
 
 root_type Frame;

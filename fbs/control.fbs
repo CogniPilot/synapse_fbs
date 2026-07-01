@@ -2,281 +2,307 @@ include "types.fbs";
 
 namespace synapse.topic;
 
+// Raw receiver channel sample before pilot-input normalization.
 struct RadioControlData {
-  timestamp_us:ulong;
-  channel_count:ubyte;
-  rssi:ubyte;
-  chan0_raw_us:ushort;
-  chan1_raw_us:ushort;
-  chan2_raw_us:ushort;
-  chan3_raw_us:ushort;
-  chan4_raw_us:ushort;
-  chan5_raw_us:ushort;
-  chan6_raw_us:ushort;
-  chan7_raw_us:ushort;
-  chan8_raw_us:ushort;
-  chan9_raw_us:ushort;
-  chan10_raw_us:ushort;
-  chan11_raw_us:ushort;
-  chan12_raw_us:ushort;
-  chan13_raw_us:ushort;
-  chan14_raw_us:ushort;
-  chan15_raw_us:ushort;
-  chan16_raw_us:ushort;
-  chan17_raw_us:ushort;
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  channel_count:ubyte; // Number of valid channels in this sample, starting at channel 0.
+  rssi:ubyte; // Receiver link strength or quality from 0 to 100 when available.
+  chan0_raw_us:ushort; // Raw channel 0 pulse width.
+  chan1_raw_us:ushort; // Raw channel 1 pulse width.
+  chan2_raw_us:ushort; // Raw channel 2 pulse width.
+  chan3_raw_us:ushort; // Raw channel 3 pulse width.
+  chan4_raw_us:ushort; // Raw channel 4 pulse width.
+  chan5_raw_us:ushort; // Raw channel 5 pulse width.
+  chan6_raw_us:ushort; // Raw channel 6 pulse width.
+  chan7_raw_us:ushort; // Raw channel 7 pulse width.
+  chan8_raw_us:ushort; // Raw channel 8 pulse width.
+  chan9_raw_us:ushort; // Raw channel 9 pulse width.
+  chan10_raw_us:ushort; // Raw channel 10 pulse width.
+  chan11_raw_us:ushort; // Raw channel 11 pulse width.
+  chan12_raw_us:ushort; // Raw channel 12 pulse width.
+  chan13_raw_us:ushort; // Raw channel 13 pulse width.
+  chan14_raw_us:ushort; // Raw channel 14 pulse width.
+  chan15_raw_us:ushort; // Raw channel 15 pulse width.
+  chan16_raw_us:ushort; // Raw channel 16 pulse width.
+  chan17_raw_us:ushort; // Raw channel 17 pulse width.
 }
 
-// Signed normalized manual-control axes in milli-units. INT16_MAX means invalid.
+// Normalized pilot intent after receiver decoding, mapping, and validity checks.
 struct ManualControlData {
-  timestamp_us:ulong;
-  buttons:uint;
-  active_axes:ubyte;
-  pitch_milli:short;
-  roll_milli:short;
-  throttle_milli:short;
-  yaw_milli:short;
-  aux0_milli:short;
-  aux1_milli:short;
-  aux2_milli:short;
-  aux3_milli:short;
-  aux4_milli:short;
-  aux5_milli:short;
-  flight_mode:ubyte;
-  arm_switch:bool;
-  kill_switch:bool;
-  active:bool;
-  valid:bool;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  buttons:uint; // Bitmask of active momentary buttons or switches.
+  active_axes:ubyte; // Bitmask indicating which normalized axes are meaningful.
+  pitch_milli:short; // Signed pitch command in milli-units; INT16_MAX means invalid.
+  roll_milli:short; // Signed roll command in milli-units; INT16_MAX means invalid.
+  throttle_milli:short; // Throttle command in milli-units; convention is producer-defined for reverse-capable vehicles.
+  yaw_milli:short; // Signed yaw command in milli-units; INT16_MAX means invalid.
+  aux0_milli:short; // Auxiliary axis 0 in milli-units; INT16_MAX means invalid.
+  aux1_milli:short; // Auxiliary axis 1 in milli-units; INT16_MAX means invalid.
+  aux2_milli:short; // Auxiliary axis 2 in milli-units; INT16_MAX means invalid.
+  aux3_milli:short; // Auxiliary axis 3 in milli-units; INT16_MAX means invalid.
+  aux4_milli:short; // Auxiliary axis 4 in milli-units; INT16_MAX means invalid.
+  aux5_milli:short; // Auxiliary axis 5 in milli-units; INT16_MAX means invalid.
+  flight_mode:ubyte; // Producer-defined requested flight mode.
+  arm_switch:bool; // True when the pilot arm switch is in the arm position.
+  kill_switch:bool; // True when the pilot kill switch requests immediate output inhibition.
+  active:bool; // True when manual input is currently selected or influencing control.
+  valid:bool; // True when the manual input sample is fresh and passes validation.
 }
 
+// Attitude setpoint with optional angular-rate and thrust feed-forward.
 struct AttitudeCommandData {
-  timestamp_us:ulong;
-  attitude:Quaternionf;
-  body_rate_flu_rad_s:RateTriplet;
-  thrust:float;
-  thrust_body_flu:Vec3f;
-  type_mask:ubyte;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  attitude:Quaternionf; // Desired vehicle attitude as a unit quaternion.
+  body_rate_flu_rad_s:RateTriplet; // Optional body-rate feed-forward in the FLU frame.
+  thrust:float; // Normalized collective thrust command when applicable.
+  thrust_body_flu:Vec3f; // Body-frame thrust vector for controllers that accept vector thrust.
+  type_mask:ubyte; // Producer-defined bitmask indicating ignored or feed-forward fields.
 }
 
+// Body-rate setpoint with optional thrust feed-forward.
 struct RateCommandData {
-  timestamp_us:ulong;
-  body_rate_flu_rad_s:RateTriplet;
-  thrust:float;
-  thrust_body_flu:Vec3f;
-  type_mask:ubyte;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  body_rate_flu_rad_s:RateTriplet; // Desired body angular rates in the FLU frame.
+  thrust:float; // Normalized collective thrust command when applicable.
+  thrust_body_flu:Vec3f; // Body-frame thrust vector for controllers that accept vector thrust.
+  type_mask:ubyte; // Producer-defined bitmask indicating ignored or feed-forward fields.
 }
 
+// Local-frame position, velocity, acceleration, and yaw setpoint.
 struct LocalPositionCommandData {
-  timestamp_us:ulong;
-  position_enu_m:Vec3f;
-  velocity_enu_m_s:Vec3f;
-  acceleration_or_force_enu:Vec3f;
-  yaw_rad:float;
-  yaw_rate_rad_s:float;
-  type_mask:ushort;
-  coordinate_frame:ubyte;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  position_enu_m:Vec3f; // Desired local position in the ENU frame.
+  velocity_enu_m_s:Vec3f; // Desired local velocity in the ENU frame.
+  acceleration_or_force_enu:Vec3f; // Desired acceleration or force vector in ENU according to type_mask.
+  yaw_rad:float; // Desired yaw angle; zero east and positive counter-clockwise.
+  yaw_rate_rad_s:float; // Desired yaw rate; positive counter-clockwise.
+  type_mask:ushort; // Producer-defined bitmask indicating ignored fields and acceleration-vs-force semantics.
+  coordinate_frame:ubyte; // Producer-defined local-frame selector.
 }
 
+// Generic command with seven floating-point arguments.
 struct VehicleCommandData {
-  timestamp_us:ulong;
-  arg0:float;
-  arg1:float;
-  arg2:float;
-  arg3:float;
-  arg4:float;
-  arg5:float;
-  arg6:float;
-  command_id:ushort;
-  target_system:ubyte;
-  target_component:ubyte;
-  confirmation:ubyte;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  arg0:float; // Command-specific argument 0.
+  arg1:float; // Command-specific argument 1.
+  arg2:float; // Command-specific argument 2.
+  arg3:float; // Command-specific argument 3.
+  arg4:float; // Command-specific argument 4.
+  arg5:float; // Command-specific argument 5.
+  arg6:float; // Command-specific argument 6.
+  command_id:ushort; // Producer-defined command identifier.
+  target_system:ubyte; // Target system identifier, or zero for broadcast/default.
+  target_component:ubyte; // Target component identifier, or zero for broadcast/default.
+  confirmation:ubyte; // Command confirmation or retransmission counter.
 }
 
 // Geographic command form for preserving global-coordinate precision.
 struct GeoCommandData {
-  timestamp_us:ulong;
-  arg0:float;
-  arg1:float;
-  arg2:float;
-  arg3:float;
-  latitude_deg_e7:int;
-  longitude_deg_e7:int;
-  altitude_m:float;
-  command_id:ushort;
-  frame:ubyte;
-  target_system:ubyte;
-  target_component:ubyte;
-  current:ubyte;
-  autocontinue:ubyte;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  arg0:float; // Command-specific argument 0.
+  arg1:float; // Command-specific argument 1.
+  arg2:float; // Command-specific argument 2.
+  arg3:float; // Command-specific argument 3.
+  latitude_deg_e7:int; // Target latitude in WGS-84 degrees scaled by 1e7.
+  longitude_deg_e7:int; // Target longitude in WGS-84 degrees scaled by 1e7.
+  altitude_m:float; // Target altitude in meters using the frame selected by frame.
+  command_id:ushort; // Producer-defined command identifier.
+  frame:ubyte; // Producer-defined geographic altitude/reference frame selector.
+  target_system:ubyte; // Target system identifier, or zero for broadcast/default.
+  target_component:ubyte; // Target component identifier, or zero for broadcast/default.
+  current:ubyte; // Nonzero when this item should become current immediately.
+  autocontinue:ubyte; // Nonzero when navigation should automatically continue after this item.
 }
 
+// Result, progress, and routing information for command execution.
 struct CommandResultData {
-  timestamp_us:ulong;
-  result_detail:int;
-  command_id:ushort;
-  result_code:ubyte;
-  progress_pct:ubyte;
-  target_system:ubyte;
-  target_component:ubyte;
+  timestamp_us:ulong; // Result timestamp in monotonic boot time.
+  result_detail:int; // Producer-defined extended result or error detail.
+  command_id:ushort; // Command identifier this result refers to.
+  result_code:ubyte; // Producer-defined result code.
+  progress_pct:ubyte; // Completion progress from 0 to 100 when the command is in progress.
+  target_system:ubyte; // System identifier that produced or should receive the result.
+  target_component:ubyte; // Component identifier that produced or should receive the result.
 }
 
+// Normalized actuator command for up to sixteen logical actuator controls.
 struct ActuatorCommandData {
-  timestamp_us:ulong;
-  active_mask:uint;
-  control0:float;
-  control1:float;
-  control2:float;
-  control3:float;
-  control4:float;
-  control5:float;
-  control6:float;
-  control7:float;
-  control8:float;
-  control9:float;
-  control10:float;
-  control11:float;
-  control12:float;
-  control13:float;
-  control14:float;
-  control15:float;
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  active_mask:uint; // Bitmask indicating which control slots are valid.
+  control0:float; // Normalized actuator control slot 0.
+  control1:float; // Normalized actuator control slot 1.
+  control2:float; // Normalized actuator control slot 2.
+  control3:float; // Normalized actuator control slot 3.
+  control4:float; // Normalized actuator control slot 4.
+  control5:float; // Normalized actuator control slot 5.
+  control6:float; // Normalized actuator control slot 6.
+  control7:float; // Normalized actuator control slot 7.
+  control8:float; // Normalized actuator control slot 8.
+  control9:float; // Normalized actuator control slot 9.
+  control10:float; // Normalized actuator control slot 10.
+  control11:float; // Normalized actuator control slot 11.
+  control12:float; // Normalized actuator control slot 12.
+  control13:float; // Normalized actuator control slot 13.
+  control14:float; // Normalized actuator control slot 14.
+  control15:float; // Normalized actuator control slot 15.
 }
 
+// Normalized actuator feedback for up to thirty-two physical outputs.
 struct ActuatorFeedbackData {
-  timestamp_us:ulong;
-  active_mask:uint;
-  output0:float;
-  output1:float;
-  output2:float;
-  output3:float;
-  output4:float;
-  output5:float;
-  output6:float;
-  output7:float;
-  output8:float;
-  output9:float;
-  output10:float;
-  output11:float;
-  output12:float;
-  output13:float;
-  output14:float;
-  output15:float;
-  output16:float;
-  output17:float;
-  output18:float;
-  output19:float;
-  output20:float;
-  output21:float;
-  output22:float;
-  output23:float;
-  output24:float;
-  output25:float;
-  output26:float;
-  output27:float;
-  output28:float;
-  output29:float;
-  output30:float;
-  output31:float;
+  timestamp_us:ulong; // Feedback timestamp in monotonic boot time.
+  active_mask:uint; // Bitmask indicating which output slots are valid.
+  output0:float; // Normalized actuator output slot 0.
+  output1:float; // Normalized actuator output slot 1.
+  output2:float; // Normalized actuator output slot 2.
+  output3:float; // Normalized actuator output slot 3.
+  output4:float; // Normalized actuator output slot 4.
+  output5:float; // Normalized actuator output slot 5.
+  output6:float; // Normalized actuator output slot 6.
+  output7:float; // Normalized actuator output slot 7.
+  output8:float; // Normalized actuator output slot 8.
+  output9:float; // Normalized actuator output slot 9.
+  output10:float; // Normalized actuator output slot 10.
+  output11:float; // Normalized actuator output slot 11.
+  output12:float; // Normalized actuator output slot 12.
+  output13:float; // Normalized actuator output slot 13.
+  output14:float; // Normalized actuator output slot 14.
+  output15:float; // Normalized actuator output slot 15.
+  output16:float; // Normalized actuator output slot 16.
+  output17:float; // Normalized actuator output slot 17.
+  output18:float; // Normalized actuator output slot 18.
+  output19:float; // Normalized actuator output slot 19.
+  output20:float; // Normalized actuator output slot 20.
+  output21:float; // Normalized actuator output slot 21.
+  output22:float; // Normalized actuator output slot 22.
+  output23:float; // Normalized actuator output slot 23.
+  output24:float; // Normalized actuator output slot 24.
+  output25:float; // Normalized actuator output slot 25.
+  output26:float; // Normalized actuator output slot 26.
+  output27:float; // Normalized actuator output slot 27.
+  output28:float; // Normalized actuator output slot 28.
+  output29:float; // Normalized actuator output slot 29.
+  output30:float; // Normalized actuator output slot 30.
+  output31:float; // Normalized actuator output slot 31.
 }
 
+// Raw PWM pulse-width outputs for servo and ESC drivers.
 struct PwmSignalOutputsData {
-  timestamp_us:ulong;
-  active_mask:uint;
-  port:ubyte;
-  output0_us:ushort;
-  output1_us:ushort;
-  output2_us:ushort;
-  output3_us:ushort;
-  output4_us:ushort;
-  output5_us:ushort;
-  output6_us:ushort;
-  output7_us:ushort;
-  output8_us:ushort;
-  output9_us:ushort;
-  output10_us:ushort;
-  output11_us:ushort;
-  output12_us:ushort;
-  output13_us:ushort;
-  output14_us:ushort;
-  output15_us:ushort;
+  timestamp_us:ulong; // Output timestamp in monotonic boot time.
+  active_mask:uint; // Bitmask indicating which PWM outputs are valid.
+  port:ubyte; // Producer-defined output bank or timer port.
+  output0_us:ushort; // PWM output 0 pulse width.
+  output1_us:ushort; // PWM output 1 pulse width.
+  output2_us:ushort; // PWM output 2 pulse width.
+  output3_us:ushort; // PWM output 3 pulse width.
+  output4_us:ushort; // PWM output 4 pulse width.
+  output5_us:ushort; // PWM output 5 pulse width.
+  output6_us:ushort; // PWM output 6 pulse width.
+  output7_us:ushort; // PWM output 7 pulse width.
+  output8_us:ushort; // PWM output 8 pulse width.
+  output9_us:ushort; // PWM output 9 pulse width.
+  output10_us:ushort; // PWM output 10 pulse width.
+  output11_us:ushort; // PWM output 11 pulse width.
+  output12_us:ushort; // PWM output 12 pulse width.
+  output13_us:ushort; // PWM output 13 pulse width.
+  output14_us:ushort; // PWM output 14 pulse width.
+  output15_us:ushort; // PWM output 15 pulse width.
 }
 
+// Runtime metrics for a control loop or scheduler slice.
 struct ControlLoopMetricsData {
-  timestamp_us:ulong;
-  period_us:uint;
-  latency_us:uint;
-  overruns:uint;
-  load_dpermille:ushort;
+  timestamp_us:ulong; // Metrics timestamp in monotonic boot time.
+  period_us:uint; // Measured loop period.
+  latency_us:uint; // Time from scheduled release to completion or publication.
+  overruns:uint; // Cumulative count of missed deadlines.
+  load_dpermille:ushort; // Loop load as deci-percent, where 1000 means 100%.
 }
 
+// Four normalized motor output values for compact small-vehicle control.
 struct MotorValues4f {
-  m0:float;
-  m1:float;
-  m2:float;
-  m3:float;
+  m0:float; // Normalized motor output 0.
+  m1:float; // Normalized motor output 1.
+  m2:float; // Normalized motor output 2.
+  m3:float; // Normalized motor output 3.
 }
 
+// Four raw motor output values for compact small-vehicle control.
 struct MotorRaw4u16 {
-  m0:ushort;
-  m1:ushort;
-  m2:ushort;
-  m3:ushort;
+  m0:ushort; // Raw motor output 0 in producer-defined units.
+  m1:ushort; // Raw motor output 1 in producer-defined units.
+  m2:ushort; // Raw motor output 2 in producer-defined units.
+  m3:ushort; // Raw motor output 3 in producer-defined units.
 }
 
+// Compact four-motor output state for small multirotor controllers.
 struct MotorOutputData {
-  timestamp_us:ulong;
-  motors:MotorValues4f;
-  raw:MotorRaw4u16;
-  armed:bool;
-  test_mode:bool;
+  timestamp_us:ulong; // Output timestamp in monotonic boot time.
+  motors:MotorValues4f; // Normalized motor outputs.
+  raw:MotorRaw4u16; // Raw motor outputs in producer-defined units.
+  armed:bool; // True when the outputs are allowed to drive motors.
+  test_mode:bool; // True when outputs are being generated by a test path.
 }
 
+// FlatBuffers root wrapper for RadioControlData.
 table RadioControl {
-  data:RadioControlData;
+  data:RadioControlData; // Fixed-layout raw receiver payload.
 }
 
+// FlatBuffers root wrapper for ManualControlData.
 table ManualControlCommand {
-  data:ManualControlData;
+  data:ManualControlData; // Fixed-layout manual-control payload.
 }
 
+// FlatBuffers root wrapper for AttitudeCommandData.
 table AttitudeCommand {
-  data:AttitudeCommandData;
+  data:AttitudeCommandData; // Fixed-layout attitude-command payload.
 }
 
+// FlatBuffers root wrapper for RateCommandData.
 table RateCommand {
-  data:RateCommandData;
+  data:RateCommandData; // Fixed-layout rate-command payload.
 }
 
+// FlatBuffers root wrapper for LocalPositionCommandData.
 table LocalPositionCommand {
-  data:LocalPositionCommandData;
+  data:LocalPositionCommandData; // Fixed-layout local-position-command payload.
 }
 
+// FlatBuffers root wrapper for VehicleCommandData.
 table VehicleCommand {
-  data:VehicleCommandData;
+  data:VehicleCommandData; // Fixed-layout generic command payload.
 }
 
+// FlatBuffers root wrapper for GeoCommandData.
 table GeoCommand {
-  data:GeoCommandData;
+  data:GeoCommandData; // Fixed-layout geographic command payload.
 }
 
+// FlatBuffers root wrapper for CommandResultData.
 table CommandResult {
-  data:CommandResultData;
+  data:CommandResultData; // Fixed-layout command-result payload.
 }
 
+// FlatBuffers root wrapper for ActuatorCommandData.
 table ActuatorCommand {
-  data:ActuatorCommandData;
+  data:ActuatorCommandData; // Fixed-layout actuator-command payload.
 }
 
+// FlatBuffers root wrapper for ActuatorFeedbackData.
 table ActuatorFeedback {
-  data:ActuatorFeedbackData;
+  data:ActuatorFeedbackData; // Fixed-layout actuator-feedback payload.
 }
 
+// FlatBuffers root wrapper for PwmSignalOutputsData.
 table PwmSignalOutputs {
-  data:PwmSignalOutputsData;
+  data:PwmSignalOutputsData; // Fixed-layout PWM output payload.
 }
 
+// FlatBuffers root wrapper for ControlLoopMetricsData.
 table ControlLoopMetrics {
-  data:ControlLoopMetricsData;
+  data:ControlLoopMetricsData; // Fixed-layout control-loop metrics payload.
 }
 
+// FlatBuffers root wrapper for MotorOutputData.
 table MotorOutput {
-  data:MotorOutputData;
+  data:MotorOutputData; // Fixed-layout motor-output payload.
 }
