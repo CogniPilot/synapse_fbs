@@ -6,7 +6,7 @@ This repository is the schema source of truth for Synapse messages. It keeps the
 checked-in source small and uses CI to generate the language bindings and release
 artifacts from the pinned toolchain in `tools.lock`.
 
-Published schema documentation: <https://cognipilot.github.io/synapse_fbs/>
+Published Synapse FlatBuffers documentation: <https://cognipilot.github.io/synapse_fbs/>
 
 Synapse schemas use [ROS REP-0103](https://www.ros.org/reps/rep-0103.html)
 conventions by default: SI units where practical, ENU for local/world vectors,
@@ -25,6 +25,23 @@ and reliability matter.
 The schemas also need to be easy to consume outside embedded firmware. The
 published npm, Python, Rust, C, and C++ artifacts keep browser tools, cloud
 services, developer scripts, and vehicle software on the same schema source.
+
+## Zenoh
+
+Synapse is designed to work naturally with Zenoh. The normal pattern is to
+publish each topic's FlatBuffers root table directly on a stable Zenoh key
+expression and let the key expression identify the stream. That keeps messages
+small, avoids redundant envelope fields, and lets subscribers use native Zenoh
+selectors.
+
+The optional `Frame` envelope is mainly for serial or other raw byte-stream
+links that need an explicit Synapse container. Zenoh deployments should usually
+publish typed topic values directly and reserve `TopicId` for bridges, logs,
+serial frames, or compact routing tables.
+
+The release artifacts make this practical across platforms: Rust, Python, C,
+and C++ packages provide generated bindings, while the npm package ships schema
+assets and reflection schemas for browser tools, dashboards, and gateways.
 
 ## Schema Design Priorities
 
@@ -87,7 +104,7 @@ publishes generated C and C++ archives for downstream CMake consumers.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.1.6"
+synapse_fbs = "0.1.7"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -137,7 +154,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.6/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.7/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -169,7 +186,7 @@ Generate the static schema documentation locally:
 
 ```sh
 cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
-cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.6 --out-dir target/xtask/docs
+cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.7 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -183,7 +200,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`, `_ca`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.1.6` publishes:
+Pushing a tag like `v0.1.7` publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
@@ -203,6 +220,6 @@ using a versioned URL and `URL_HASH SHA256=...`.
 ## Schema Docs
 
 The docs workflow publishes versioned schema documentation to the `gh-pages`
-branch. Pushes to `main` update `/main/`; release tags like `v0.1.6` update
-`/0.1.6/`. The root docs page is regenerated from the published version
+branch. Pushes to `main` update `/main/`; release tags like `v0.1.7` update
+`/0.1.7/`. The root docs page is regenerated from the published version
 directories so older releases remain available: <https://cognipilot.github.io/synapse_fbs/>.

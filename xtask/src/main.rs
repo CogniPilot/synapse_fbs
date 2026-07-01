@@ -1470,8 +1470,8 @@ fn write_mdbook_source(
 fn render_book_toml(version: &str) -> String {
     format!(
         r#"[book]
-title = "synapse_fbs {version}"
-description = "Versioned FlatBuffers schema documentation for Synapse."
+title = "Synapse FlatBuffers {version}"
+description = "Versioned FlatBuffers message schema documentation for Synapse."
 src = "src"
 
 [output.html]
@@ -1513,7 +1513,7 @@ fn render_book_summary(docs: &SchemaDoc) -> String {
 fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) -> String {
     let mut md = String::new();
     md.push_str(&format!(
-        "# Schema Documentation `{}`\n\n",
+        "# Synapse FlatBuffers `{}`\n\n",
         markdown_text(version)
     ));
     md.push_str("<div data-synapse-version-picker></div>\n\n");
@@ -1527,6 +1527,14 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("## Transport Boundaries\n\n");
     md.push_str("Most deployments should publish typed topic payloads directly over transports such as Zenoh, UDP, or TCP and rely on those transports or links for framing, integrity checks, and optional security. The optional `Frame` envelope exists for links that need an explicit Synapse byte-stream container, especially serial-style transports where message delimiting, sequence tracking, and future opt-in integrity or authentication metadata belong at the frame boundary.\n\n");
     md.push_str("Checksums, authentication tags, or encryption should not be hardcoded into every topic payload. When needed, they should be transport-envelope features so fixed-layout payloads remain compact, inspectable, and reusable across shared memory, local middleware, native web tooling, and constrained radio links.\n\n");
+    md.push_str("## Zenoh Use\n\n");
+    md.push_str("Synapse is intended to be straightforward to use with Zenoh. In the normal Zenoh path, publish each topic's FlatBuffers root table directly on a stable key expression and let the key expression identify the stream. That keeps messages small, avoids redundant envelope fields, and lets subscribers express interest with Zenoh's native selectors.\n\n");
+    md.push_str("Several parts of the schema already support this model:\n\n");
+    md.push_str("- **Typed root tables:** every high-rate fixed-layout payload has a thin FlatBuffers root table, so Zenoh samples can carry one topic value without a multiplexing wrapper.\n");
+    md.push_str("- **Stable topic identifiers:** `TopicId` is available for bridges, logs, serial frames, or compact routing tables, but Zenoh deployments can use key expressions as the primary discriminator.\n");
+    md.push_str("- **No transport checksums in payloads:** Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.\n");
+    md.push_str("- **Schema assets in every release:** npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.\n\n");
+    md.push_str("Useful follow-on work is to standardize recommended Zenoh key expressions, provide small publish/subscribe examples in each supported language, and ship helper code that maps key expressions to topic root types and `TopicId` values without requiring applications to hand-maintain that table.\n\n");
     md.push_str("## Layout Rules\n\n");
     md.push_str("Telemetry, state, command, and control samples should use FlatBuffers `struct` definitions. Use `table`, `string`, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.\n\n");
     md.push_str("## Unit And Scale Rules\n\n");
@@ -1796,11 +1804,11 @@ fn write_docs_root_index(out_dir: &Path, current_version_dir: &str) -> Result<()
     let mut html = String::new();
     html.push_str("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
     html.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-    html.push_str("<title>synapse_fbs schema docs</title><style>");
+    html.push_str("<title>Synapse FlatBuffers docs</title><style>");
     html.push_str(ROOT_DOCS_CSS);
-    html.push_str("</style></head><body><main><section class=\"panel\"><p class=\"eyebrow\">synapse_fbs</p><h1>Schema Documentation</h1>");
+    html.push_str("</style></head><body><main><section class=\"panel\"><p class=\"eyebrow\">synapse_fbs</p><h1>Synapse FlatBuffers</h1>");
     html.push_str(
-        "<p>Versioned FlatBuffers schema documentation generated from the source schemas.</p>",
+        "<p>Versioned FlatBuffers message schema documentation generated from the source schemas.</p>",
     );
     html.push_str("<label class=\"version-picker\">Version <select id=\"version-select\">");
     for version in &versions {
