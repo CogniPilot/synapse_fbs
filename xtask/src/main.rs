@@ -1915,7 +1915,12 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
         }
 
         if let Some(rest) = code.strip_prefix("file_identifier ") {
-            file_identifier = Some(rest.trim_end_matches(';').trim().trim_matches('"').to_string());
+            file_identifier = Some(
+                rest.trim_end_matches(';')
+                    .trim()
+                    .trim_matches('"')
+                    .to_string(),
+            );
             pending_comments.clear();
             continue;
         }
@@ -2039,8 +2044,7 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
         let payload_entity = payload_type
             .as_ref()
             .and_then(|payload| find_schema_entity(docs, payload));
-        let payload_type_namespace =
-            payload_entity.map(|(_, entity)| entity.namespace.clone());
+        let payload_type_namespace = payload_entity.map(|(_, entity)| entity.namespace.clone());
         let fixed_layout =
             payload_entity.is_some_and(|(_, entity)| entity.kind == SchemaEntityKind::Struct);
         let payload_size = if fixed_layout {
