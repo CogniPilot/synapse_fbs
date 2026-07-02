@@ -1,6 +1,11 @@
 """Generated Synapse topic catalog helpers."""
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
+
+TOPIC_KEY_PREFIX = {{ key_prefix_literal }}
+CMD_KEY_PREFIX = {{ cmd_key_prefix_literal }}
+META_KEY_PREFIX = {{ meta_key_prefix_literal }}
+LIVELINESS_KEY_PREFIX = {{ liveliness_key_prefix_literal }}
 
 
 @dataclass(frozen=True)
@@ -11,9 +16,30 @@ class TopicInfo:
     key_suffix: str
     root_table: str
     payload_type: Optional[str]
+    payload_size: Optional[int]
     schema_file: str
     fixed_layout: bool
+    multi_instance: bool
+    scope: str
+    encoding: str
     description: str
+
+
+@dataclass(frozen=True)
+class CommandInfo:
+    id: int
+    name: str
+    key: str
+    request_type: str
+    reply_type: str
+    description: str
+
+
+@dataclass(frozen=True)
+class ParsedTopicKey:
+    namespace: str
+    topic: TopicInfo
+    instance: Optional[int]
 
 
 TOPICS = (
@@ -25,9 +51,26 @@ TOPICS = (
         key_suffix={{ topic.key_suffix_literal }},
         root_table={{ topic.root_table_literal }},
         payload_type={{ topic.payload_type_python }},
+        payload_size={{ topic.payload_size_python }},
         schema_file={{ topic.schema_file_literal }},
         fixed_layout={{ topic.fixed_layout_python }},
+        multi_instance={{ topic.multi_instance_python }},
+        scope={{ topic.scope_literal }},
+        encoding={{ topic.encoding_literal }},
         description={{ topic.description_literal }},
+    ),
+{%- endfor %}
+)
+
+COMMANDS = (
+{%- for command in commands %}
+    CommandInfo(
+        id={{ command.id }},
+        name={{ command.name_literal }},
+        key={{ command.key_literal }},
+        request_type={{ command.request_type_literal }},
+        reply_type={{ command.reply_type_literal }},
+        description={{ command.description_literal }},
     ),
 {%- endfor %}
 )
@@ -36,10 +79,22 @@ _TOPIC_BY_ID = {topic.id: topic for topic in TOPICS}
 _TOPIC_BY_NAME = {topic.name: topic for topic in TOPICS}
 _TOPIC_BY_KEY = {topic.key: topic for topic in TOPICS}
 _TOPIC_BY_SUFFIX = {topic.key_suffix: topic for topic in TOPICS}
+_COMMAND_BY_NAME = {command.name: command for command in COMMANDS}
 
 
 def _normalize_key(key: str) -> str:
-    return str(key).lstrip("/")
+    return str(key).strip("/")
+
+
+_INSTANCE_DIGITS = frozenset("0123456789")
+
+
+def _parse_instance(segment: str) -> Optional[int]:
+    """Instance segments are 1 to 9 ASCII digits; this grammar is identical
+    in the Rust, Python, JavaScript, and C catalog helpers."""
+    if not segment or len(segment) > 9 or not set(segment) <= _INSTANCE_DIGITS:
+        return None
+    return int(segment)
 
 
 def topic_by_id(topic_id: int) -> Optional[TopicInfo]:
@@ -50,15 +105,58 @@ def topic_by_name(name: str) -> Optional[TopicInfo]:
     return _TOPIC_BY_NAME.get(str(name))
 
 
+def parse_key(key: str) -> Optional[ParsedTopicKey]:
+    """Parse a possibly namespaced topic key expression.
+
+    Accepts keys such as ``cub1/synapse/v1/topic/inertial_sample/0`` and
+    returns the deployment namespace, the catalog topic, and the optional
+    sensor instance segment.
+    """
+    trimmed = _normalize_key(key)
+    anchored = TOPIC_KEY_PREFIX + "/"
+    if trimmed.startswith(anchored):
+        position = 0
+    else:
+        offset = trimmed.find("/" + anchored)
+        if offset < 0:
+            return None
+        position = offset + 1
+
+    namespace = trimmed[:position].rstrip("/")
+    rest = trimmed[position + len(anchored):]
+    segments = rest.split("/") if rest else []
+    if not segments or not segments[0]:
+        return None
+    topic = _TOPIC_BY_SUFFIX.get(segments[0])
+    if topic is None:
+        return None
+    instance: Optional[int] = None
+    if len(segments) > 1:
+        if len(segments) > 2:
+            return None
+        instance = _parse_instance(segments[1])
+        if instance is None:
+            return None
+    return ParsedTopicKey(namespace=namespace, topic=topic, instance=instance)
+
+
 def topic_by_key(key: str) -> Optional[TopicInfo]:
-    normalized = _normalize_key(key)
-    return _TOPIC_BY_KEY.get(normalized) or _TOPIC_BY_SUFFIX.get(normalized)
+    normalized = str(key).lstrip("/")
+    direct = _TOPIC_BY_KEY.get(normalized) or _TOPIC_BY_SUFFIX.get(normalized)
+    if direct is not None:
+        return direct
+    parsed = parse_key(normalized)
+    return None if parsed is None else parsed.topic
 
 
-def key_for_topic(topic) -> Optional[str]:
+def key_for_topic(topic: Union[int, str]) -> Optional[str]:
     info = (
         topic_by_id(topic)
         if isinstance(topic, int)
         else topic_by_name(topic) or topic_by_key(topic)
     )
     return None if info is None else info.key
+
+
+def command_by_name(name: str) -> Optional[CommandInfo]:
+    return _COMMAND_BY_NAME.get(str(name))

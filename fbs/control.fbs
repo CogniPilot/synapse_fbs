@@ -2,11 +2,67 @@ include "types.fbs";
 
 namespace synapse.topic;
 
-// Raw receiver channel sample before pilot-input normalization.
+// Axis-validity bits for ManualControlData.active_axes.
+enum ManualControlAxes:ushort (bit_flags) {
+  Pitch, // pitch_milli is meaningful.
+  Roll, // roll_milli is meaningful.
+  Throttle, // throttle_milli is meaningful.
+  Yaw, // yaw_milli is meaningful.
+  Aux0, // aux0_milli is meaningful.
+  Aux1, // aux1_milli is meaningful.
+  Aux2, // aux2_milli is meaningful.
+  Aux3, // aux3_milli is meaningful.
+  Aux4, // aux4_milli is meaningful.
+  Aux5, // aux5_milli is meaningful.
+}
+
+// Switch and validity bits for ManualControlData.flags.
+enum ManualControlFlags:ubyte (bit_flags) {
+  ArmSwitch, // The pilot arm switch is in the arm position.
+  KillSwitch, // The pilot kill switch requests immediate output inhibition.
+  Active, // Manual input is currently selected or influencing control.
+  Valid, // The manual input sample is fresh and passed validation.
+}
+
+// Ignore bits for AttitudeCommandData.type_mask.
+enum AttitudeCommandMask:ubyte (bit_flags) {
+  IgnoreAttitude, // Ignore the attitude quaternion.
+  IgnoreRateRoll, // Ignore the roll body-rate feed-forward.
+  IgnoreRatePitch, // Ignore the pitch body-rate feed-forward.
+  IgnoreRateYaw, // Ignore the yaw body-rate feed-forward.
+  IgnoreThrust, // Ignore the thrust field.
+}
+
+// Ignore bits for RateCommandData.type_mask.
+enum RateCommandMask:ubyte (bit_flags) {
+  IgnoreRateRoll, // Ignore the roll rate setpoint.
+  IgnoreRatePitch, // Ignore the pitch rate setpoint.
+  IgnoreRateYaw, // Ignore the yaw rate setpoint.
+  IgnoreThrust, // Ignore the thrust field.
+}
+
+// Ignore and interpretation bits for LocalPositionCommandData.type_mask.
+enum LocalPositionCommandMask:ushort (bit_flags) {
+  IgnorePositionX, // Ignore the X position setpoint.
+  IgnorePositionY, // Ignore the Y position setpoint.
+  IgnorePositionZ, // Ignore the Z position setpoint.
+  IgnoreVelocityX, // Ignore the X velocity setpoint.
+  IgnoreVelocityY, // Ignore the Y velocity setpoint.
+  IgnoreVelocityZ, // Ignore the Z velocity setpoint.
+  IgnoreAccelerationX, // Ignore the X acceleration setpoint.
+  IgnoreAccelerationY, // Ignore the Y acceleration setpoint.
+  IgnoreAccelerationZ, // Ignore the Z acceleration setpoint.
+  ForceSetpoint, // Interpret the acceleration fields as force instead of acceleration.
+  IgnoreYaw, // Ignore the yaw setpoint.
+  IgnoreYawRate, // Ignore the yaw-rate setpoint.
+}
+
+// Raw receiver channel sample before pilot-input normalization. This is a
+// raw-layer topic: channel values are the receiver's native pulse widths.
 struct RadioControlData {
   timestamp_us:ulong; // Sample timestamp in monotonic boot time.
   channel_count:ubyte; // Number of valid channels in this sample, starting at channel 0.
-  rssi:ubyte; // Receiver link strength or quality from 0 to 100 when available.
+  link_quality_pct:ubyte; // Receiver link quality from 0 to 100.
   chan0_raw_us:ushort; // Raw channel 0 pulse width.
   chan1_raw_us:ushort; // Raw channel 1 pulse width.
   chan2_raw_us:ushort; // Raw channel 2 pulse width.
@@ -27,60 +83,61 @@ struct RadioControlData {
   chan17_raw_us:ushort; // Raw channel 17 pulse width.
 }
 
-// Normalized pilot intent after receiver decoding, mapping, and validity checks.
+// Normalized pilot intent after receiver decoding, mapping, and validity
+// checks. Axis fields use the full range -1000 to 1000. Throttle semantics
+// are fixed by the schema: negative values command reverse thrust or descent;
+// unidirectional vehicles clamp negative throttle to zero. Axis validity is
+// carried only by active_axes; there are no sentinel values.
 struct ManualControlData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  buttons:uint; // Bitmask of active momentary buttons or switches.
-  active_axes:ubyte; // Bitmask indicating which normalized axes are meaningful.
-  pitch_milli:short; // Signed pitch command in milli-units; INT16_MAX means invalid.
-  roll_milli:short; // Signed roll command in milli-units; INT16_MAX means invalid.
-  throttle_milli:short; // Throttle command in milli-units; convention is producer-defined for reverse-capable vehicles.
-  yaw_milli:short; // Signed yaw command in milli-units; INT16_MAX means invalid.
-  aux0_milli:short; // Auxiliary axis 0 in milli-units; INT16_MAX means invalid.
-  aux1_milli:short; // Auxiliary axis 1 in milli-units; INT16_MAX means invalid.
-  aux2_milli:short; // Auxiliary axis 2 in milli-units; INT16_MAX means invalid.
-  aux3_milli:short; // Auxiliary axis 3 in milli-units; INT16_MAX means invalid.
-  aux4_milli:short; // Auxiliary axis 4 in milli-units; INT16_MAX means invalid.
-  aux5_milli:short; // Auxiliary axis 5 in milli-units; INT16_MAX means invalid.
+  buttons:uint; // Bitmask of active momentary buttons or switches, indexed from bit 0.
+  active_axes:ushort; // Bitmask of ManualControlAxes bits indicating meaningful axes.
+  pitch_milli:short; // Pitch command in milli-units over -1000 to 1000; positive pitches nose up.
+  roll_milli:short; // Roll command in milli-units over -1000 to 1000; positive rolls right.
+  throttle_milli:short; // Throttle command in milli-units over -1000 to 1000; negative means reverse or descend.
+  yaw_milli:short; // Yaw command in milli-units over -1000 to 1000; positive yaws counter-clockwise.
+  aux0_milli:short; // Auxiliary axis 0 in milli-units over -1000 to 1000.
+  aux1_milli:short; // Auxiliary axis 1 in milli-units over -1000 to 1000.
+  aux2_milli:short; // Auxiliary axis 2 in milli-units over -1000 to 1000.
+  aux3_milli:short; // Auxiliary axis 3 in milli-units over -1000 to 1000.
+  aux4_milli:short; // Auxiliary axis 4 in milli-units over -1000 to 1000.
+  aux5_milli:short; // Auxiliary axis 5 in milli-units over -1000 to 1000.
   flight_mode:ubyte; // Producer-defined requested flight mode.
-  arm_switch:bool; // True when the pilot arm switch is in the arm position.
-  kill_switch:bool; // True when the pilot kill switch requests immediate output inhibition.
-  active:bool; // True when manual input is currently selected or influencing control.
-  valid:bool; // True when the manual input sample is fresh and passes validation.
+  flags:ubyte; // Bitmask of ManualControlFlags bits.
 }
 
 // Attitude setpoint with optional angular-rate and thrust feed-forward.
 struct AttitudeCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  attitude:Quaternionf; // Desired vehicle attitude as a unit quaternion.
-  body_rate_flu_rad_s:RateTriplet; // Optional body-rate feed-forward in the FLU frame.
-  thrust:float; // Normalized collective thrust command when applicable.
-  thrust_body_flu:Vec3f; // Body-frame thrust vector for controllers that accept vector thrust.
-  type_mask:ubyte; // Producer-defined bitmask indicating ignored or feed-forward fields.
+  attitude:synapse.types.Quaternionf; // Desired orientation rotating body FLU vectors into the ENU world frame.
+  body_rate_flu_rad_s:synapse.types.RateTriplet; // Body-rate feed-forward in the FLU frame.
+  thrust:float; // Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.
+  type_mask:ubyte; // Bitmask of AttitudeCommandMask bits for ignored fields.
 }
 
 // Body-rate setpoint with optional thrust feed-forward.
 struct RateCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  body_rate_flu_rad_s:RateTriplet; // Desired body angular rates in the FLU frame.
-  thrust:float; // Normalized collective thrust command when applicable.
-  thrust_body_flu:Vec3f; // Body-frame thrust vector for controllers that accept vector thrust.
-  type_mask:ubyte; // Producer-defined bitmask indicating ignored or feed-forward fields.
+  body_rate_flu_rad_s:synapse.types.RateTriplet; // Desired body angular rates in the FLU frame.
+  thrust:float; // Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.
+  type_mask:ubyte; // Bitmask of RateCommandMask bits for ignored fields.
 }
 
 // Local-frame position, velocity, acceleration, and yaw setpoint.
 struct LocalPositionCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  position_enu_m:Vec3f; // Desired local position in the ENU frame.
-  velocity_enu_m_s:Vec3f; // Desired local velocity in the ENU frame.
-  acceleration_or_force_enu:Vec3f; // Desired acceleration or force vector in ENU according to type_mask.
+  position_enu_m:synapse.types.Vec3f; // Desired local position in the ENU frame.
+  velocity_enu_m_s:synapse.types.Vec3f; // Desired local velocity in the ENU frame.
+  acceleration_or_force_enu:synapse.types.Vec3f; // Desired ENU acceleration in m/s^2, or force in newtons when ForceSetpoint is set.
   yaw_rad:float; // Desired yaw angle; zero east and positive counter-clockwise.
   yaw_rate_rad_s:float; // Desired yaw rate; positive counter-clockwise.
-  type_mask:ushort; // Producer-defined bitmask indicating ignored fields and acceleration-vs-force semantics.
-  coordinate_frame:ubyte; // Producer-defined local-frame selector.
+  type_mask:ushort; // Bitmask of LocalPositionCommandMask bits.
+  coordinate_frame:synapse.types.LocalFrame; // Frame in which the setpoint is expressed.
 }
 
-// Generic command with seven floating-point arguments.
+// Generic command with seven floating-point arguments. Commands travel as
+// Zenoh queryable requests on the cmd key space; the reply payload is
+// CommandResultData. The transport provides correlation, retry, and timeout.
 struct VehicleCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
   arg0:float; // Command-specific argument 0.
@@ -93,10 +150,10 @@ struct VehicleCommandData {
   command_id:ushort; // Producer-defined command identifier.
   target_system:ubyte; // Target system identifier, or zero for broadcast/default.
   target_component:ubyte; // Target component identifier, or zero for broadcast/default.
-  confirmation:ubyte; // Command confirmation or retransmission counter.
 }
 
-// Geographic command form for preserving global-coordinate precision.
+// Geographic command form preserving global-coordinate precision. Also used
+// as the mission-item payload for mission transfer.
 struct GeoCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
   arg0:float; // Command-specific argument 0.
@@ -105,22 +162,24 @@ struct GeoCommandData {
   arg3:float; // Command-specific argument 3.
   latitude_deg_e7:int; // Target latitude in WGS-84 degrees scaled by 1e7.
   longitude_deg_e7:int; // Target longitude in WGS-84 degrees scaled by 1e7.
-  altitude_m:float; // Target altitude in meters using the frame selected by frame.
+  altitude_m:float; // Target altitude in meters in the frame selected by frame.
   command_id:ushort; // Producer-defined command identifier.
-  frame:ubyte; // Producer-defined geographic altitude/reference frame selector.
+  frame:synapse.types.GeoAltitudeFrame; // Altitude reference frame for altitude_m.
   target_system:ubyte; // Target system identifier, or zero for broadcast/default.
   target_component:ubyte; // Target component identifier, or zero for broadcast/default.
-  current:ubyte; // Nonzero when this item should become current immediately.
-  autocontinue:ubyte; // Nonzero when navigation should automatically continue after this item.
+  current:bool; // True when this item should become current immediately.
+  autocontinue:bool; // True when navigation should automatically continue after this item.
 }
 
-// Result, progress, and routing information for command execution.
+// Result, progress, and routing information for command execution. Sent as
+// the queryable reply for command requests; InProgress replies may stream
+// until a terminal result is reached.
 struct CommandResultData {
   timestamp_us:ulong; // Result timestamp in monotonic boot time.
   result_detail:int; // Producer-defined extended result or error detail.
   command_id:ushort; // Command identifier this result refers to.
-  result_code:ubyte; // Producer-defined result code.
-  progress_pct:ubyte; // Completion progress from 0 to 100 when the command is in progress.
+  result:synapse.types.CommandResultCode; // Command execution result.
+  progress_pct:ubyte; // Completion progress from 0 to 100 while InProgress.
   target_system:ubyte; // System identifier that produced or should receive the result.
   target_component:ubyte; // Component identifier that produced or should receive the result.
 }
@@ -128,7 +187,7 @@ struct CommandResultData {
 // Normalized actuator command for up to sixteen logical actuator controls.
 struct ActuatorCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  active_mask:uint; // Bitmask indicating which control slots are valid.
+  active_mask:uint; // Bitmask indicating which control slots are valid, indexed from bit 0.
   control0:float; // Normalized actuator control slot 0.
   control1:float; // Normalized actuator control slot 1.
   control2:float; // Normalized actuator control slot 2.
@@ -147,10 +206,12 @@ struct ActuatorCommandData {
   control15:float; // Normalized actuator control slot 15.
 }
 
-// Normalized actuator feedback for up to thirty-two physical outputs.
+// Normalized actuator feedback for up to thirty-two physical outputs. The
+// command message carries sixteen logical controls while feedback covers
+// thirty-two physical outputs after mixing and allocation.
 struct ActuatorFeedbackData {
   timestamp_us:ulong; // Feedback timestamp in monotonic boot time.
-  active_mask:uint; // Bitmask indicating which output slots are valid.
+  active_mask:uint; // Bitmask indicating which output slots are valid, indexed from bit 0.
   output0:float; // Normalized actuator output slot 0.
   output1:float; // Normalized actuator output slot 1.
   output2:float; // Normalized actuator output slot 2.
@@ -188,7 +249,7 @@ struct ActuatorFeedbackData {
 // Raw PWM pulse-width outputs for servo and ESC drivers.
 struct PwmSignalOutputsData {
   timestamp_us:ulong; // Output timestamp in monotonic boot time.
-  active_mask:uint; // Bitmask indicating which PWM outputs are valid.
+  active_mask:uint; // Bitmask indicating which PWM outputs are valid, indexed from bit 0.
   port:ubyte; // Producer-defined output bank or timer port.
   output0_us:ushort; // PWM output 0 pulse width.
   output1_us:ushort; // PWM output 1 pulse width.
@@ -213,33 +274,8 @@ struct ControlLoopMetricsData {
   timestamp_us:ulong; // Metrics timestamp in monotonic boot time.
   period_us:uint; // Measured loop period.
   latency_us:uint; // Time from scheduled release to completion or publication.
-  overruns:uint; // Cumulative count of missed deadlines.
+  overrun_count:uint; // Cumulative count of missed deadlines.
   load_dpermille:ushort; // Loop load as deci-percent, where 1000 means 100%.
-}
-
-// Four normalized motor output values for compact small-vehicle control.
-struct MotorValues4f {
-  m0:float; // Normalized motor output 0.
-  m1:float; // Normalized motor output 1.
-  m2:float; // Normalized motor output 2.
-  m3:float; // Normalized motor output 3.
-}
-
-// Four raw motor output values for compact small-vehicle control.
-struct MotorRaw4u16 {
-  m0:ushort; // Raw motor output 0 in producer-defined units.
-  m1:ushort; // Raw motor output 1 in producer-defined units.
-  m2:ushort; // Raw motor output 2 in producer-defined units.
-  m3:ushort; // Raw motor output 3 in producer-defined units.
-}
-
-// Compact four-motor output state for small multirotor controllers.
-struct MotorOutputData {
-  timestamp_us:ulong; // Output timestamp in monotonic boot time.
-  motors:MotorValues4f; // Normalized motor outputs.
-  raw:MotorRaw4u16; // Raw motor outputs in producer-defined units.
-  armed:bool; // True when the outputs are allowed to drive motors.
-  test_mode:bool; // True when outputs are being generated by a test path.
 }
 
 // FlatBuffers root wrapper for RadioControlData.
@@ -300,9 +336,4 @@ table PwmSignalOutputs {
 // FlatBuffers root wrapper for ControlLoopMetricsData.
 table ControlLoopMetrics {
   data:ControlLoopMetricsData; // Fixed-layout control-loop metrics payload.
-}
-
-// FlatBuffers root wrapper for MotorOutputData.
-table MotorOutput {
-  data:MotorOutputData; // Fixed-layout motor-output payload.
 }

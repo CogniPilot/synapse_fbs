@@ -1,6 +1,11 @@
 {
   "version": {{ version }},
-  "key_prefix": {{ key_prefix|tojson }},
+  "key_prefixes": {
+    "topic": {{ key_prefix|tojson }},
+    "cmd": {{ cmd_key_prefix|tojson }},
+    "meta": {{ meta_key_prefix|tojson }},
+    "liveliness": {{ liveliness_key_prefix|tojson }}
+  },
   "topics": [
 {%- for topic in topics %}
     {
@@ -10,9 +15,25 @@
       "key_suffix": {{ topic.key_suffix|tojson }},
       "root_table": {{ topic.root_table|tojson }},
       "payload_type": {{ topic.payload_type|tojson }},
+      "payload_size": {{ topic.payload_size|tojson }},
       "schema_file": {{ topic.schema_file|tojson }},
       "fixed_layout": {{ topic.fixed_layout|tojson }},
+      "multi_instance": {{ topic.multi_instance|tojson }},
+      "scope": {{ topic.scope|tojson }},
+      "encoding": {{ topic.encoding|tojson }},
       "description": {{ topic.description|tojson }}
+    }{% if not loop.last %},{% endif %}
+{%- endfor %}
+  ],
+  "commands": [
+{%- for command in commands %}
+    {
+      "id": {{ command.id }},
+      "name": {{ command.name|tojson }},
+      "key": {{ command.key|tojson }},
+      "request_type": {{ command.request_type|tojson }},
+      "reply_type": {{ command.reply_type|tojson }},
+      "description": {{ command.description|tojson }}
     }{% if not loop.last %},{% endif %}
 {%- endfor %}
   ]

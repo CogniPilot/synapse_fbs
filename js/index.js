@@ -22,17 +22,18 @@ export const schemaFiles = Object.freeze([
   'sensors.fbs',
   'state.fbs',
   'control.fbs',
-  'transport.fbs',
   'optical_flow.fbs',
   'mocap.fbs',
-  'log.fbs',
+  'telemetry.fbs',
+  'transport.fbs',
+  'transfer.fbs',
   'sil.fbs',
   'all.fbs'
 ]);
 
 /**
  * Resolve the absolute path to a shipped `.fbs` schema file.
- * @param {string} name Schema file name, e.g. `log.fbs`.
+ * @param {string} name Schema file name, e.g. `transport.fbs`.
  * @returns {string} Absolute filesystem path.
  */
 export function schemaPath(name) {

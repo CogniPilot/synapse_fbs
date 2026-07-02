@@ -5,7 +5,8 @@ under `bfbs/`. The archive also ships `topics.json` and
 `include/synapse/topic_catalog.h` for canonical Zenoh keys, `TopicId`, root
 table names, and payload types.
 
-Add `include/` to the compiler include path.
+Add the archive with CMake `FetchContent` and link `synapse_fbs::cpp`, or add
+`include/` to the compiler include path directly.
 
 ```cpp
 #include <synapse/topic_catalog.h>

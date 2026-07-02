@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.20)
+project(synapse_fbs_cpp LANGUAGES CXX)
+
+add_library(synapse_fbs_cpp INTERFACE)
+add_library(synapse_fbs::cpp ALIAS synapse_fbs_cpp)
+
+target_include_directories(synapse_fbs_cpp INTERFACE
+  "${CMAKE_CURRENT_LIST_DIR}/include"
+)

@@ -5,15 +5,15 @@ namespace synapse.topic;
 // Fixed-layout position sample for a labeled or unlabeled mocap marker.
 struct MocapMarkerSample {
   id:int; // Marker identifier assigned by the mocap source; negative values may indicate unlabeled markers.
-  position_enu_m:Vec3f; // Marker position in the mocap ENU frame.
+  position_enu_m:synapse.types.Vec3f; // Marker position in the mocap ENU frame.
   residual:float; // Producer-defined fit residual or reprojection error.
 }
 
 // Fixed-layout pose sample for a tracked mocap rigid body.
 struct MocapRigidBodySample {
   id:int; // Rigid-body identifier assigned by the mocap source.
-  position_enu_m:Vec3f; // Rigid-body position in the mocap ENU frame.
-  attitude:Quaternionf; // Rigid-body orientation in the mocap ENU frame.
+  position_enu_m:synapse.types.Vec3f; // Rigid-body position in the mocap ENU frame.
+  attitude:synapse.types.Quaternionf; // Rigid-body orientation rotating body FLU vectors into the mocap ENU frame.
   residual:float; // Producer-defined solve residual or tracking error.
   tracking_valid:bool; // True when the rigid body is actively tracked in this frame.
 }
@@ -22,8 +22,8 @@ struct MocapRigidBodySample {
 struct MocapSegmentSample {
   skeleton_id:int; // Skeleton identifier assigned by the mocap source.
   segment_id:int; // Segment identifier within the skeleton.
-  position_enu_m:Vec3f; // Segment position in the mocap ENU frame.
-  attitude:Quaternionf; // Segment orientation in the mocap ENU frame.
+  position_enu_m:synapse.types.Vec3f; // Segment position in the mocap ENU frame.
+  attitude:synapse.types.Quaternionf; // Segment orientation rotating segment FLU vectors into the mocap ENU frame.
   tracking_valid:bool; // True when the segment is actively tracked in this frame.
 }
 
@@ -48,7 +48,8 @@ table MocapSegmentDefinition {
   segment_name:string; // Human-readable segment name.
 }
 
-// Variable-size mocap metadata packet describing tracked objects.
+// Variable-size mocap metadata packet describing tracked objects. This is a
+// cached definition record and an intentional table boundary.
 table MocapDefinition {
   source:string; // Mocap system or producer name.
   frame_id:string; // Frame name for the mocap ENU coordinate system.

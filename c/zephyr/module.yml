@@ -1,0 +1,6 @@
+# Zephyr module manifest so the C release archive can be consumed directly
+# from a west manifest project. The archive's CMakeLists defines the
+# synapse_fbs::c interface target (header-only readers) and the optional
+# synapse_fbs::flatcc_runtime static library for builders and verifiers.
+build:
+  cmake: .

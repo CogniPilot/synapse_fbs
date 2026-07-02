@@ -16,12 +16,81 @@ const SCHEMAS: &[&str] = &[
     "fbs/sensors.fbs",
     "fbs/state.fbs",
     "fbs/control.fbs",
-    "fbs/transport.fbs",
     "fbs/optical_flow.fbs",
     "fbs/mocap.fbs",
-    "fbs/log.fbs",
+    "fbs/telemetry.fbs",
+    "fbs/transport.fbs",
+    "fbs/transfer.fbs",
     "fbs/sil.fbs",
     "fbs/all.fbs",
+];
+
+const TOPIC_KEY_PREFIX: &str = "synapse/v1/topic";
+const CMD_KEY_PREFIX: &str = "synapse/v1/cmd";
+const META_KEY_PREFIX: &str = "synapse/v1/meta";
+const LIVELINESS_KEY_PREFIX: &str = "synapse/v1/live";
+
+/// Queryable command and transfer services on the cmd key space. Ids mirror
+/// the CmdId enum in fbs/transfer.fbs so non-Zenoh request/reply transports
+/// can select a service numerically. Type names are fully qualified.
+/// (id, name, request type, reply type, description)
+const COMMANDS: &[(u16, &str, &str, &str, &str)] = &[
+    (
+        1,
+        "vehicle_command",
+        "synapse.topic.VehicleCommandData",
+        "synapse.topic.CommandResultData",
+        "Generic command with floating-point arguments.",
+    ),
+    (
+        2,
+        "geo_command",
+        "synapse.topic.GeoCommandData",
+        "synapse.topic.CommandResultData",
+        "Geographic command with scaled latitude/longitude precision.",
+    ),
+    (
+        3,
+        "param_get",
+        "synapse.cmd.ParamGetRequest",
+        "synapse.cmd.ParamGetReply",
+        "Fetch one parameter by name, or all parameters.",
+    ),
+    (
+        4,
+        "param_set",
+        "synapse.cmd.ParamSetRequest",
+        "synapse.cmd.ParamSetReply",
+        "Set one parameter.",
+    ),
+    (
+        5,
+        "mission_get",
+        "synapse.cmd.MissionGetRequest",
+        "synapse.cmd.MissionGetReply",
+        "Fetch the mission plan.",
+    ),
+    (
+        6,
+        "mission_set",
+        "synapse.cmd.MissionSetRequest",
+        "synapse.cmd.MissionSetReply",
+        "Replace the mission plan.",
+    ),
+];
+
+/// Topics that never leave the vehicle network segment. Everything else is
+/// scope "any" and may be bridged over the air subject to rate policy.
+const VEHICLE_SCOPE_TOPICS: &[&str] = &[
+    "RadioControl",
+    "InertialSample",
+    "AirData",
+    "OpticalFlow",
+    "OpticalFlowVelocity",
+    "ActuatorCommand",
+    "ActuatorFeedback",
+    "PwmSignalOutputs",
+    "ControlLoopMetrics",
 ];
 
 const LEGACY_DOC_DIRS: &[&str] = &["0.1.6"];
@@ -52,14 +121,74 @@ fn main() -> Result<()> {
         "ci" => ci(&root, &options),
         "js" => js(&root),
         "docs" => docs(&root, &options),
+        "check" => check(&root),
         _ => fail(format!(
-            "unknown command '{command}'. expected: ci, js, or docs"
+            "unknown command '{command}'. expected: ci, js, docs, or check"
         )),
     }
 }
 
+fn check(root: &Path) -> Result<()> {
+    let docs = parse_schema_docs(root)?;
+    validate_schema_docs(&docs)?;
+    validate_protocol(&docs)?;
+    let topics = topic_entries(&docs)?;
+
+    let templates = Templates::new(root)?;
+    let check_dir = root.join("target/xtask/check");
+    reset_dir(&check_dir)?;
+    let context = topic_catalog_context(&topics);
+    for (template, output) in [
+        ("xtask/topic_catalog/topics.json.jinja", "topics.json"),
+        (
+            "xtask/topic_catalog/topic_catalog.js.jinja",
+            "topic_catalog.js",
+        ),
+        (
+            "xtask/topic_catalog/topic_catalog.d.ts.jinja",
+            "topic_catalog.d.ts",
+        ),
+        (
+            "xtask/topic_catalog/topic_catalog.py.jinja",
+            "topic_catalog.py",
+        ),
+        (
+            "xtask/topic_catalog/topic_catalog.rs.jinja",
+            "topic_catalog.rs",
+        ),
+        (
+            "xtask/topic_catalog/topic_catalog.h.jinja",
+            "topic_catalog.h",
+        ),
+    ] {
+        templates.render_to_file(template, context.clone(), &check_dir.join(output))?;
+    }
+    smoke_catalog_helpers(&check_dir)?;
+
+    println!("schema checks passed for {} topics", topics.len());
+    println!(
+        "{:<24} {:>4} {:>6}  {:<8} payload",
+        "topic", "id", "bytes", "scope"
+    );
+    for topic in &topics {
+        println!(
+            "{:<24} {:>4} {:>6}  {:<8} {}",
+            topic.name,
+            topic.id,
+            topic
+                .payload_size
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "-".to_string()),
+            topic.scope,
+            topic.payload_type.as_deref().unwrap_or("-"),
+        );
+    }
+    Ok(())
+}
+
 fn ci(root: &Path, options: &Options) -> Result<()> {
     let tools = read_tools(root)?;
+    check_release_version(&tools, &options.release_name)?;
     let templates = Templates::new(root)?;
 
     let packages = stage_packages(root, &templates, &tools)?;
@@ -192,6 +321,194 @@ fn required_value(values: &BTreeMap<String, String>, key: &str) -> Result<String
         .get(key)
         .cloned()
         .ok_or_else(|| io::Error::other(format!("missing {key} in tools.lock")).into())
+}
+
+/// Exercise the rendered catalog helpers with whichever toolchains are
+/// available locally; each check is skipped when its tool is missing.
+fn smoke_catalog_helpers(check_dir: &Path) -> Result<()> {
+    if command_succeeds(Command::new("node").arg("--version")) {
+        let script = r#"import { parseKey, keyForTopic, topicByKey, commandByName } from './topic_catalog.js';
+const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+if (!parsed || parsed.namespace !== 'cub1' || parsed.topic.name !== 'InertialSample' || parsed.instance !== 0) throw new Error('bad parseKey');
+if (parseKey('synapse/v1/topic/vehicle_health')?.namespace !== '') throw new Error('bad empty namespace');
+if (parseKey('cub1/synapse/v1/topic/nope') !== undefined) throw new Error('unknown suffix should fail');
+if (parseKey('synapse/v1/topic/vehicle_health/')?.topic.name !== 'VehicleHealth') throw new Error('trailing slash should parse');
+if (parseKey('synapse/v1/topic/inertial_sample/+1') !== undefined) throw new Error('signed instance should fail');
+if (parseKey('synapse/v1/topic/inertial_sample/4294967296') !== undefined) throw new Error('oversized instance should fail');
+if (keyForTopic('VehicleHealth') !== 'synapse/v1/topic/vehicle_health') throw new Error('bad key helper');
+if (topicByKey('/synapse/v1/topic/gnss_fix')?.name !== 'GnssFix') throw new Error('bad topicByKey');
+if (commandByName('mission_set')?.key !== 'synapse/v1/cmd/mission_set') throw new Error('bad command helper');
+if (commandByName('param_get')?.requestType !== 'synapse.cmd.ParamGetRequest') throw new Error('bad command type');
+console.log('catalog js helpers ok');
+"#;
+        run(Command::new("node")
+            .current_dir(check_dir)
+            .arg("--input-type=module")
+            .arg("-e")
+            .arg(script))?;
+    }
+
+    if let Ok(python) = python_bin() {
+        let code = r#"import sys
+sys.path.insert(0, ".")
+import topic_catalog as tc
+parsed = tc.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
+assert parsed is not None and parsed.namespace == "cub1"
+assert parsed.topic.name == "InertialSample" and parsed.instance == 0
+assert tc.parse_key("synapse/v1/topic/vehicle_health").namespace == ""
+assert tc.parse_key("cub1/synapse/v1/topic/nope") is None
+assert tc.parse_key("synapse/v1/topic/vehicle_health/").topic.name == "VehicleHealth"
+assert tc.parse_key("synapse/v1/topic/inertial_sample/+1") is None
+assert tc.parse_key("synapse/v1/topic/inertial_sample/4294967296") is None
+assert tc.parse_key("synapse/v1/topic/inertial_sample/٢") is None
+assert tc.key_for_topic("VehicleHealth") == "synapse/v1/topic/vehicle_health"
+assert tc.topic_by_key("/synapse/v1/topic/gnss_fix").name == "GnssFix"
+assert tc.command_by_name("mission_set").key == "synapse/v1/cmd/mission_set"
+assert tc.command_by_name("param_get").request_type == "synapse.cmd.ParamGetRequest"
+print("catalog python helpers ok")
+"#;
+        run(Command::new(&python)
+            .current_dir(check_dir)
+            .arg("-c")
+            .arg(code))?;
+    }
+
+    if command_succeeds(Command::new("cc").arg("--version")) {
+        write_file(&check_dir.join("catalog_test.c"), C_CATALOG_TEST)?;
+        run(Command::new("cc")
+            .current_dir(check_dir)
+            .arg("-std=c11")
+            .arg("-Wall")
+            .arg("-Wextra")
+            .arg("-Werror")
+            .arg("catalog_test.c")
+            .arg("-o")
+            .arg("catalog_test_c"))?;
+        run(&mut Command::new(check_dir.join("catalog_test_c")))?;
+        println!("catalog c helpers ok");
+    }
+
+    if command_succeeds(Command::new("rustc").arg("--version")) {
+        write_file(&check_dir.join("catalog_test.rs"), RUST_CATALOG_TEST)?;
+        run(Command::new("rustc")
+            .current_dir(check_dir)
+            .arg("--edition")
+            .arg("2021")
+            .arg("catalog_test.rs")
+            .arg("-o")
+            .arg("catalog_test_rs"))?;
+        run(&mut Command::new(check_dir.join("catalog_test_rs")))?;
+        println!("catalog rust helpers ok");
+    }
+
+    Ok(())
+}
+
+/// Runtime assertions for the C catalog helpers, exercising the shared
+/// parse-key grammar (identical cases to the other language smokes).
+const C_CATALOG_TEST: &str = r#"#include "topic_catalog.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main(void) {
+    const char *ns = NULL;
+    size_t ns_len = 0;
+    int32_t instance = -2;
+
+    const synapse_topic_info_t *topic = synapse_topic_parse_key(
+        "cub1/synapse/v1/topic/inertial_sample/0", &ns, &ns_len, &instance);
+    assert(topic != NULL && strcmp(topic->name, "InertialSample") == 0);
+    assert(ns_len == 4 && strncmp(ns, "cub1", ns_len) == 0);
+    assert(instance == 0);
+
+    topic = synapse_topic_parse_key(
+        "/cub1/synapse/v1/topic/gnss_fix", &ns, &ns_len, &instance);
+    assert(topic != NULL && strcmp(topic->name, "GnssFix") == 0);
+    assert(ns_len == 4 && strncmp(ns, "cub1", ns_len) == 0);
+    assert(instance == -1);
+
+    topic = synapse_topic_parse_key(
+        "synapse/v1/topic/vehicle_health/", NULL, NULL, NULL);
+    assert(topic != NULL && strcmp(topic->name, "VehicleHealth") == 0);
+
+    topic = synapse_topic_parse_key(
+        "synapse/v1/topic/vehicle_health", &ns, &ns_len, &instance);
+    assert(topic != NULL && ns_len == 0 && instance == -1);
+
+    assert(synapse_topic_parse_key(
+        "synapse/v1/topic/inertial_sample/+1", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key(
+        "synapse/v1/topic/inertial_sample/4294967296", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key(
+        "cub1/synapse/v1/topic/nope", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key(
+        "synapse/v1/topic/inertial_sample/0/extra", NULL, NULL, NULL) == NULL);
+
+    const synapse_topic_info_t *by_key =
+        synapse_topic_by_key("cub1/synapse/v1/topic/vehicle_health");
+    assert(by_key != NULL && by_key->id == 1);
+
+    const synapse_command_info_t *command = synapse_command_by_name("param_get");
+    assert(command != NULL && command->id == 3 &&
+           strcmp(command->request_type, "synapse.cmd.ParamGetRequest") == 0);
+
+    printf("catalog c helpers ok\n");
+    return 0;
+}
+"#;
+
+/// Runtime assertions for the Rust catalog helpers, exercising the shared
+/// parse-key grammar (identical cases to the other language smokes).
+const RUST_CATALOG_TEST: &str = r#"include!("topic_catalog.rs");
+
+fn main() {
+    let parsed = parse_key("cub1/synapse/v1/topic/inertial_sample/0").unwrap();
+    assert_eq!(parsed.namespace, "cub1");
+    assert_eq!(parsed.topic.name, "InertialSample");
+    assert_eq!(parsed.instance, Some(0));
+
+    let parsed = parse_key("/cub1/synapse/v1/topic/gnss_fix").unwrap();
+    assert_eq!(parsed.namespace, "cub1");
+    assert_eq!(parsed.instance, None);
+
+    assert_eq!(
+        parse_key("synapse/v1/topic/vehicle_health/").unwrap().topic.name,
+        "VehicleHealth"
+    );
+    assert_eq!(parse_key("synapse/v1/topic/vehicle_health").unwrap().namespace, "");
+    assert!(parse_key("synapse/v1/topic/inertial_sample/+1").is_none());
+    assert!(parse_key("synapse/v1/topic/inertial_sample/4294967296").is_none());
+    assert!(parse_key("cub1/synapse/v1/topic/nope").is_none());
+    assert!(parse_key("synapse/v1/topic/inertial_sample/0/extra").is_none());
+
+    assert_eq!(topic_by_key("cub1/synapse/v1/topic/vehicle_health").unwrap().id, 1);
+    let command = command_by_name("param_get").unwrap();
+    assert_eq!(command.id, 3);
+    assert_eq!(command.request_type, "synapse.cmd.ParamGetRequest");
+
+    println!("catalog rust helpers ok");
+}
+"#;
+
+fn check_release_version(tools: &Tools, release_name: &str) -> Result<()> {
+    // Only enforce for tag builds: GITHUB_REF_NAME is the branch name on
+    // branch pushes, and branches may legitimately be named v2-wip etc.
+    if env::var("GITHUB_REF_TYPE").as_deref() != Ok("tag") {
+        return Ok(());
+    }
+    let Some(version) = release_name.strip_prefix('v') else {
+        return Ok(());
+    };
+    if !version.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+        return Ok(());
+    }
+    if version != tools.package_version {
+        return fail(format!(
+            "release tag '{release_name}' does not match PACKAGE_VERSION={} in tools.lock",
+            tools.package_version
+        ));
+    }
+    Ok(())
 }
 
 fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {
@@ -442,6 +759,7 @@ fn generate_bindings(
 
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
+    validate_protocol(&docs)?;
     let topics = topic_entries(&docs)?;
     write_package_topic_catalogs(templates, packages, &topics)?;
 
@@ -526,8 +844,15 @@ fn write_c_topic_catalogs(
 
 fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
     Value::from_serialize(TopicCatalogContext {
-        version: 1,
-        key_prefix: "synapse/topic",
+        version: 2,
+        key_prefix: TOPIC_KEY_PREFIX,
+        cmd_key_prefix: CMD_KEY_PREFIX,
+        meta_key_prefix: META_KEY_PREFIX,
+        liveliness_key_prefix: LIVELINESS_KEY_PREFIX,
+        key_prefix_literal: source_string_literal(TOPIC_KEY_PREFIX),
+        cmd_key_prefix_literal: source_string_literal(CMD_KEY_PREFIX),
+        meta_key_prefix_literal: source_string_literal(META_KEY_PREFIX),
+        liveliness_key_prefix_literal: source_string_literal(LIVELINESS_KEY_PREFIX),
         topics: topics
             .iter()
             .map(|topic| {
@@ -546,6 +871,18 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
                     .as_deref()
                     .map(|value| format!("Some({})", source_string_literal(value)))
                     .unwrap_or_else(|| "None".to_string());
+                let payload_size_c = topic
+                    .payload_size
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "0".to_string());
+                let payload_size_python = topic
+                    .payload_size
+                    .map(|value| value.to_string())
+                    .unwrap_or_else(|| "None".to_string());
+                let payload_size_rust = topic
+                    .payload_size
+                    .map(|value| format!("Some({value})"))
+                    .unwrap_or_else(|| "None".to_string());
 
                 TopicTemplateEntry {
                     id: topic.id,
@@ -554,8 +891,12 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
                     key_suffix: topic.key_suffix.clone(),
                     root_table: topic.root_table.clone(),
                     payload_type: topic.payload_type.clone(),
+                    payload_size: topic.payload_size,
                     schema_file: topic.schema_file.clone(),
                     fixed_layout: topic.fixed_layout,
+                    multi_instance: topic.multi_instance,
+                    scope: topic.scope,
+                    encoding: topic.encoding,
                     description: topic.description.clone(),
                     name_literal: source_string_literal(&topic.name),
                     key_literal: source_string_literal(&topic.key),
@@ -564,10 +905,44 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
                     payload_type_c,
                     payload_type_python,
                     payload_type_rust,
+                    payload_size_c,
+                    payload_size_python,
+                    payload_size_rust,
                     schema_file_literal: source_string_literal(&topic.schema_file),
                     fixed_layout_python: if topic.fixed_layout { "True" } else { "False" },
                     fixed_layout_c: if topic.fixed_layout { "true" } else { "false" },
+                    multi_instance_python: if topic.multi_instance {
+                        "True"
+                    } else {
+                        "False"
+                    },
+                    multi_instance_c: if topic.multi_instance {
+                        "true"
+                    } else {
+                        "false"
+                    },
+                    scope_literal: source_string_literal(topic.scope),
+                    encoding_literal: source_string_literal(topic.encoding),
                     description_literal: source_string_literal(&topic.description),
+                }
+            })
+            .collect(),
+        commands: COMMANDS
+            .iter()
+            .map(|(id, name, request_type, reply_type, description)| {
+                let key = format!("{CMD_KEY_PREFIX}/{name}");
+                CommandTemplateEntry {
+                    id: *id,
+                    name: (*name).to_string(),
+                    key: key.clone(),
+                    request_type: (*request_type).to_string(),
+                    reply_type: (*reply_type).to_string(),
+                    description: (*description).to_string(),
+                    name_literal: source_string_literal(name),
+                    key_literal: source_string_literal(&key),
+                    request_type_literal: source_string_literal(request_type),
+                    reply_type_literal: source_string_literal(reply_type),
+                    description_literal: source_string_literal(description),
                 }
             })
             .collect(),
@@ -706,12 +1081,19 @@ fn smoke_python_package(
     let code = format!(
         r#"import importlib.metadata as metadata
 from synapse import topic_catalog
-from synapse.topic.Vec3f import Vec3f
-from synapse.log.LogRecord import LogRecord
+from synapse.types.Vec3f import Vec3f
+from synapse.topic.GnssFixData import GnssFixData
+from synapse.cmd.ParamValue import ParamValue
 assert metadata.version("flatbuffers") == "{}"
-assert Vec3f is not None and LogRecord is not None
-assert topic_catalog.key_for_topic("VehicleHealth") == "synapse/topic/vehicle_health"
+assert Vec3f is not None and GnssFixData is not None and ParamValue is not None
+assert topic_catalog.key_for_topic("VehicleHealth") == "synapse/v1/topic/vehicle_health"
 assert topic_catalog.topic_by_id(1).payload_type == "VehicleHealthData"
+parsed = topic_catalog.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
+assert parsed is not None and parsed.namespace == "cub1"
+assert parsed.topic.name == "InertialSample" and parsed.instance == 0
+assert topic_catalog.topic_by_key("cub1/synapse/v1/topic/vehicle_health").id == 1
+assert topic_catalog.command_by_name("param_get").key == "synapse/v1/cmd/param_get"
+assert topic_catalog.topic_by_name("GnssFix").payload_size is not None
 "#,
         tools.flatbuffers_version
     );
@@ -734,6 +1116,7 @@ fn build_js_package(
     generate_reflection_schemas(root, flatc, &package_root.join("bfbs"))?;
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
+    validate_protocol(&docs)?;
     write_js_topic_catalogs(templates, package_root, &topic_entries(&docs)?)?;
     write_schema_hashes(root, &package_root.join("schema.sha256"))?;
     write_bfbs_hashes(package_root, &package_root.join("bfbs.sha256"))?;
@@ -747,17 +1130,21 @@ fn smoke_js_package(package_root: &Path) -> Result<()> {
     println!("smoke-testing JavaScript package");
 
     let node = node_bin()?;
-    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath, keyForTopic, topicById } from './index.js';
+    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath, keyForTopic, topicById, topicByKey, parseKey, commandByName } from './index.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 for (const name of schemaFiles) {
   if (!existsSync(schemaPath(name))) throw new Error('missing schema ' + name);
 }
-if (!existsSync(join(fbsDir, 'log.fbs'))) throw new Error('missing fbsDir');
-if (!existsSync(join(bfbsDir, 'log.bfbs'))) throw new Error('missing reflection schema');
+if (!existsSync(join(fbsDir, 'transport.fbs'))) throw new Error('missing fbsDir');
+if (!existsSync(join(bfbsDir, 'transport.bfbs'))) throw new Error('missing reflection schema');
 if (!existsSync(join(fbsDir, '..', 'topics.json'))) throw new Error('missing topic catalog');
-if (keyForTopic('VehicleHealth') !== 'synapse/topic/vehicle_health') throw new Error('bad topic key helper');
+if (keyForTopic('VehicleHealth') !== 'synapse/v1/topic/vehicle_health') throw new Error('bad topic key helper');
 if (topicById(1)?.payloadType !== 'VehicleHealthData') throw new Error('bad topic id helper');
+const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+if (!parsed || parsed.namespace !== 'cub1' || parsed.topic.name !== 'InertialSample' || parsed.instance !== 0) throw new Error('bad parseKey helper');
+if (topicByKey('cub1/synapse/v1/topic/vehicle_health')?.id !== 1) throw new Error('bad namespaced key lookup');
+if (commandByName('param_get')?.key !== 'synapse/v1/cmd/param_get') throw new Error('bad command helper');
 console.log('synapse-fbs js package ok');
 "#;
 
@@ -809,6 +1196,7 @@ fn build_archives(
     let templates = Templates::new(root)?;
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
+    validate_protocol(&docs)?;
     let topics = topic_entries(&docs)?;
 
     let flatbuffers_source = workdir.join("flatbuffers");
@@ -1047,6 +1435,7 @@ struct SchemaFileDoc {
 struct SchemaEntityDoc {
     kind: SchemaEntityKind,
     name: String,
+    namespace: String,
     value_type: Option<String>,
     comments: Vec<String>,
     members: Vec<SchemaMemberDoc>,
@@ -1072,8 +1461,12 @@ struct TopicEntry {
     key_suffix: String,
     root_table: String,
     payload_type: Option<String>,
+    payload_size: Option<usize>,
     schema_file: String,
     fixed_layout: bool,
+    multi_instance: bool,
+    scope: &'static str,
+    encoding: &'static str,
     description: String,
 }
 
@@ -1081,7 +1474,15 @@ struct TopicEntry {
 struct TopicCatalogContext {
     version: u8,
     key_prefix: &'static str,
+    cmd_key_prefix: &'static str,
+    meta_key_prefix: &'static str,
+    liveliness_key_prefix: &'static str,
+    key_prefix_literal: String,
+    cmd_key_prefix_literal: String,
+    meta_key_prefix_literal: String,
+    liveliness_key_prefix_literal: String,
     topics: Vec<TopicTemplateEntry>,
+    commands: Vec<CommandTemplateEntry>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1092,8 +1493,12 @@ struct TopicTemplateEntry {
     key_suffix: String,
     root_table: String,
     payload_type: Option<String>,
+    payload_size: Option<usize>,
     schema_file: String,
     fixed_layout: bool,
+    multi_instance: bool,
+    scope: &'static str,
+    encoding: &'static str,
     description: String,
     name_literal: String,
     key_literal: String,
@@ -1102,9 +1507,31 @@ struct TopicTemplateEntry {
     payload_type_c: String,
     payload_type_python: String,
     payload_type_rust: String,
+    payload_size_c: String,
+    payload_size_python: String,
+    payload_size_rust: String,
     schema_file_literal: String,
     fixed_layout_python: &'static str,
     fixed_layout_c: &'static str,
+    multi_instance_python: &'static str,
+    multi_instance_c: &'static str,
+    scope_literal: String,
+    encoding_literal: String,
+    description_literal: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct CommandTemplateEntry {
+    id: u16,
+    name: String,
+    key: String,
+    request_type: String,
+    reply_type: String,
+    description: String,
+    name_literal: String,
+    key_literal: String,
+    request_type_literal: String,
+    reply_type_literal: String,
     description_literal: String,
 }
 
@@ -1153,6 +1580,7 @@ fn generate_docs_site(root: &Path, tools: &Tools, version: &str, out_dir: &Path)
     ensure_mdbook(&tools.mdbook_version)?;
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
+    validate_protocol(&docs)?;
 
     fs::create_dir_all(out_dir)?;
     remove_legacy_docs(out_dir)?;
@@ -1224,10 +1652,10 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
                 continue;
             }
 
-            if let Some(comment) = trailing_comment {
-                if !comment.is_empty() {
-                    pending_comments.push(comment);
-                }
+            if let Some(comment) = trailing_comment
+                && !comment.is_empty()
+            {
+                pending_comments.push(comment);
             }
             if let Some(member) = parse_schema_member(entity.kind, code, &mut pending_comments) {
                 entity.members.push(member);
@@ -1258,6 +1686,7 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
             current = Some(SchemaEntityDoc {
                 kind,
                 name: entity_name,
+                namespace: namespace.clone(),
                 value_type,
                 comments: take_comments(&mut pending_comments),
                 members: Vec::new(),
@@ -1332,6 +1761,7 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
         .ok_or_else(|| io::Error::other("TopicId enum not found"))?;
 
     let mut topics = Vec::new();
+    let mut layouts = BTreeMap::new();
     for member in &topic_enum.members {
         let Some(value) = &member.value else {
             return fail(format!(
@@ -1366,25 +1796,349 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
         }
 
         let payload_type = thin_root_wrapper_payload(root_table).map(type_lookup_name);
-        let fixed_layout = payload_type
+        let payload_entity = payload_type
             .as_ref()
-            .and_then(|payload| find_schema_entity(docs, payload))
-            .is_some_and(|(_, entity)| entity.kind == SchemaEntityKind::Struct);
+            .and_then(|payload| find_schema_entity(docs, payload));
+        let fixed_layout =
+            payload_entity.is_some_and(|(_, entity)| entity.kind == SchemaEntityKind::Struct);
+        let payload_size = if fixed_layout {
+            let payload = payload_type.as_deref().expect("payload type exists");
+            let mut visiting = BTreeSet::new();
+            Some(struct_layout(docs, payload, &mut layouts, &mut visiting)?.0)
+        } else {
+            None
+        };
+        let multi_instance = fixed_layout
+            && payload_entity
+                .is_some_and(|(_, entity)| entity.members.iter().any(|member| member.name == "id"));
+        let scope = if VEHICLE_SCOPE_TOPICS.contains(&member.name.as_str()) {
+            "vehicle"
+        } else {
+            "any"
+        };
+        let encoding = if fixed_layout { "struct" } else { "table" };
         let key_suffix = snake_case(&member.name);
         topics.push(TopicEntry {
             id,
             name: member.name.clone(),
-            key: format!("synapse/topic/{key_suffix}"),
+            key: format!("{TOPIC_KEY_PREFIX}/{key_suffix}"),
             key_suffix,
             root_table: root_table.name.clone(),
             payload_type,
+            payload_size,
             schema_file: schema_file.name.clone(),
             fixed_layout,
+            multi_instance,
+            scope,
+            encoding,
             description: comments_text(&member.comments),
         });
     }
 
     Ok(topics)
+}
+
+fn round_up(value: usize, align: usize) -> usize {
+    value.div_ceil(align) * align
+}
+
+fn scalar_layout(type_name: &str) -> Option<(usize, usize)> {
+    let size = match type_name {
+        "bool" | "byte" | "int8" | "ubyte" | "uint8" => 1,
+        "short" | "int16" | "ushort" | "uint16" => 2,
+        "int" | "int32" | "uint" | "uint32" | "float" | "float32" => 4,
+        "long" | "int64" | "ulong" | "uint64" | "double" | "float64" => 8,
+        _ => return None,
+    };
+    Some((size, size))
+}
+
+fn enum_base_type(value_type: &str) -> &str {
+    value_type.split_whitespace().next().unwrap_or(value_type)
+}
+
+/// Size and alignment of a schema struct or enum per FlatBuffers layout
+/// rules: fields in declaration order, each aligned to its natural
+/// alignment, total size padded to the struct alignment.
+fn struct_layout(
+    docs: &SchemaDoc,
+    name: &str,
+    layouts: &mut BTreeMap<String, (usize, usize)>,
+    visiting: &mut BTreeSet<String>,
+) -> Result<(usize, usize)> {
+    let lookup = type_lookup_name(name);
+    if let Some(layout) = layouts.get(&lookup) {
+        return Ok(*layout);
+    }
+    if let Some(layout) = scalar_layout(&lookup) {
+        return Ok(layout);
+    }
+    if !visiting.insert(lookup.clone()) {
+        return fail(format!("cyclic struct definition involving {lookup}"));
+    }
+
+    let Some((_, entity)) = find_schema_entity(docs, &lookup) else {
+        visiting.remove(&lookup);
+        return fail(format!(
+            "cannot compute layout for unknown fixed-layout type {lookup}"
+        ));
+    };
+    let layout = match entity.kind {
+        SchemaEntityKind::Enum => {
+            let base = entity
+                .value_type
+                .as_deref()
+                .map(enum_base_type)
+                .unwrap_or_default();
+            match scalar_layout(base) {
+                Some(layout) => layout,
+                None => {
+                    visiting.remove(&lookup);
+                    return fail(format!("enum {lookup} has unsupported base type '{base}'"));
+                }
+            }
+        }
+        SchemaEntityKind::Struct => {
+            let mut offset = 0usize;
+            let mut align = 1usize;
+            for member in &entity.members {
+                let Some(type_name) = member.type_name.as_deref() else {
+                    visiting.remove(&lookup);
+                    return fail(format!(
+                        "struct {lookup} member {} is missing a type",
+                        member.name
+                    ));
+                };
+                let (size, member_align) = struct_layout(docs, type_name, layouts, visiting)?;
+                offset = round_up(offset, member_align) + size;
+                align = align.max(member_align);
+            }
+            (round_up(offset, align), align)
+        }
+        _ => {
+            visiting.remove(&lookup);
+            return fail(format!(
+                "{lookup} is a {}, not a fixed-layout struct or enum",
+                entity.kind.as_str()
+            ));
+        }
+    };
+
+    visiting.remove(&lookup);
+    layouts.insert(lookup, layout);
+    Ok(layout)
+}
+
+/// Protocol-level consistency checks beyond per-entity documentation:
+/// TopicId contiguity, TopicId/union agreement, command type resolution, and
+/// the unit-suffix lint for quantitative fields.
+fn validate_protocol(docs: &SchemaDoc) -> Result<()> {
+    let mut problems = Vec::new();
+
+    let topic_enum = docs
+        .files
+        .iter()
+        .flat_map(|file| &file.entities)
+        .find(|entity| entity.kind == SchemaEntityKind::Enum && entity.name == "TopicId")
+        .ok_or_else(|| io::Error::other("TopicId enum not found"))?;
+    let topic_names = topic_enum
+        .members
+        .iter()
+        .filter(|member| member.name != "Unknown")
+        .map(|member| member.name.as_str())
+        .collect::<Vec<_>>();
+
+    for (index, member) in topic_enum
+        .members
+        .iter()
+        .filter(|member| member.name != "Unknown")
+        .enumerate()
+    {
+        let expected = (index + 1).to_string();
+        if member.value.as_deref() != Some(expected.as_str()) {
+            problems.push(format!(
+                "TopicId {} has value {}, expected contiguous value {expected}",
+                member.name,
+                member.value.as_deref().unwrap_or("<none>")
+            ));
+        }
+    }
+
+    match docs
+        .files
+        .iter()
+        .flat_map(|file| &file.entities)
+        .find(|entity| entity.kind == SchemaEntityKind::Union && entity.name == "SynapseMessage")
+    {
+        Some(union_entity) => {
+            let union_names = union_entity
+                .members
+                .iter()
+                .map(|member| member.name.as_str())
+                .collect::<Vec<_>>();
+            if union_names != topic_names {
+                problems.push(format!(
+                    "SynapseMessage union does not mirror TopicId.\n  TopicId: {}\n  union:   {}",
+                    topic_names.join(", "),
+                    union_names.join(", ")
+                ));
+            }
+        }
+        None => problems.push("SynapseMessage union not found".to_string()),
+    }
+
+    for (_, name, request_type, reply_type, _) in COMMANDS {
+        for type_name in [request_type, reply_type] {
+            if find_schema_entity(docs, type_name).is_none() {
+                problems.push(format!(
+                    "command {name} references unknown type {type_name}"
+                ));
+            }
+        }
+    }
+
+    // CmdId in fbs/transfer.fbs must mirror the COMMANDS table.
+    match docs
+        .files
+        .iter()
+        .flat_map(|file| &file.entities)
+        .find(|entity| entity.kind == SchemaEntityKind::Enum && entity.name == "CmdId")
+    {
+        Some(cmd_enum) => {
+            let enum_entries = cmd_enum
+                .members
+                .iter()
+                .filter(|member| member.name != "Unknown")
+                .map(|member| {
+                    (
+                        member.value.clone().unwrap_or_default(),
+                        snake_case(&member.name),
+                    )
+                })
+                .collect::<Vec<_>>();
+            let command_entries = COMMANDS
+                .iter()
+                .map(|(id, name, _, _, _)| (id.to_string(), (*name).to_string()))
+                .collect::<Vec<_>>();
+            if enum_entries != command_entries {
+                problems.push(format!(
+                    "CmdId enum does not mirror the xtask COMMANDS table.\n  CmdId:    {enum_entries:?}\n  COMMANDS: {command_entries:?}"
+                ));
+            }
+        }
+        None => problems.push("CmdId enum not found in fbs/transfer.fbs".to_string()),
+    }
+
+    let mut enum_names = BTreeSet::new();
+    for file in &docs.files {
+        for entity in &file.entities {
+            if entity.kind == SchemaEntityKind::Enum {
+                enum_names.insert(entity.name.clone());
+            }
+        }
+    }
+
+    for file in &docs.files {
+        for entity in &file.entities {
+            if entity.namespace == "synapse.types" {
+                continue;
+            }
+            if !matches!(
+                entity.kind,
+                SchemaEntityKind::Struct | SchemaEntityKind::Table
+            ) {
+                continue;
+            }
+            for member in &entity.members {
+                let Some(type_name) = member.type_name.as_deref() else {
+                    continue;
+                };
+                if type_name == "bool" {
+                    continue;
+                }
+                let lookup = type_lookup_name(type_name);
+                if scalar_layout(&lookup).is_none() || enum_names.contains(&lookup) {
+                    continue;
+                }
+                if unit_scale_note(&member.name).is_some() || lint_allowlisted(&member.name) {
+                    continue;
+                }
+                problems.push(format!(
+                    "{}: {} {}.{} has no unit suffix; add one or extend the lint allowlist",
+                    file.name,
+                    entity.kind.as_str(),
+                    entity.name,
+                    member.name
+                ));
+            }
+        }
+    }
+
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(format!(
+            "protocol validation failed:\n{}",
+            problems.join("\n")
+        ))
+    }
+}
+
+/// Quantitative-looking field names that intentionally carry no unit suffix.
+fn lint_allowlisted(name: &str) -> bool {
+    const EXACT: &[&str] = &[
+        "id",
+        "buttons",
+        "total",
+        "residual",
+        "color",
+        "thrust",
+        "flight_mode",
+        "vehicle_type",
+        "system_state",
+        "mission_mode",
+        "source",
+        "port",
+        "estimator_type",
+        "float_value",
+        "int_value",
+        "errors_comm",
+        "active_axes",
+        "satellites_used",
+        "satellites_visible",
+        "result_detail",
+        "target_system",
+        "target_component",
+        "seq",
+        "sequence",
+        "sensors_present",
+        "sensors_enabled",
+        "sensors_health",
+        "sensors_present_ext",
+        "sensors_enabled_ext",
+        "sensors_health_ext",
+    ];
+    if EXACT.contains(&name) {
+        return true;
+    }
+    if name.ends_with("_id")
+        || name.ends_with("_count")
+        || name.ends_with("_counter")
+        || name.ends_with("_seq")
+        || name.ends_with("_number")
+        || name.ends_with("_version")
+    {
+        return true;
+    }
+    for prefix in ["arg", "control", "output"] {
+        if let Some(rest) = name.strip_prefix(prefix)
+            && !rest.is_empty()
+            && rest.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn find_schema_entity<'a>(
@@ -1551,12 +2305,20 @@ fn unit_scale_note(name: &str) -> Option<String> {
         "millimeters"
     } else if lower.ends_with("_mv") {
         "millivolts"
+    } else if lower.ends_with("_cv") {
+        "centi-volts; volts = value / 100"
     } else if lower.ends_with("_ca") {
         "centi-amps; amps = value / 100"
+    } else if lower.ends_with("_da") {
+        "deci-amps; amps = value / 10"
+    } else if lower.ends_with("_dam") {
+        "decameters; meters = value * 10"
     } else if lower.ends_with("_mah") {
         "milliamp-hours"
     } else if lower.ends_with("_hj") {
         "hecto-joules; joules = value * 100"
+    } else if lower.ends_with("_ratio") {
+        "dimensionless ratio"
     } else if lower.ends_with("_pct") {
         "percent"
     } else if lower.ends_with("_hpa") {
@@ -1565,6 +2327,8 @@ fn unit_scale_note(name: &str) -> Option<String> {
         "tesla"
     } else if lower.ends_with("_deg") {
         "degrees"
+    } else if lower.ends_with("_c") {
+        "degrees Celsius"
     } else if lower.ends_with("_m") {
         "meters"
     } else if lower.ends_with("_s") {
@@ -1654,10 +2418,11 @@ fn docs_versions(out_dir: &Path, current_version_dir: &str) -> Result<Vec<DocVer
     if out_dir.is_dir() {
         for entry in fs::read_dir(out_dir)? {
             let path = entry?.path();
-            if path.is_dir() && path.join("index.html").is_file() {
-                if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
-                    dirs.insert(name.to_string());
-                }
+            if path.is_dir()
+                && path.join("index.html").is_file()
+                && let Some(name) = path.file_name().and_then(|name| name.to_str())
+            {
+                dirs.insert(name.to_string());
             }
         }
     }
@@ -1830,14 +2595,14 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("Most deployments should publish typed topic payloads directly over transports such as Zenoh, UDP, or TCP and rely on those transports or links for framing, integrity checks, and optional security. The optional `Frame` envelope exists for links that need an explicit Synapse byte-stream container, especially serial-style transports where message delimiting, sequence tracking, and future opt-in integrity or authentication metadata belong at the frame boundary.\n\n");
     md.push_str("Checksums, authentication tags, or encryption should not be hardcoded into every topic payload. When needed, they should be transport-envelope features so fixed-layout payloads remain compact, inspectable, and reusable across shared memory, local middleware, native web tooling, and constrained radio links.\n\n");
     md.push_str("## Zenoh Use\n\n");
-    md.push_str("Synapse is intended to be straightforward to use with Zenoh. In the normal Zenoh path, publish each topic's FlatBuffers root table directly on a stable key expression and let the key expression identify the stream. That keeps messages small, avoids redundant envelope fields, and lets subscribers express interest with Zenoh's native selectors.\n\n");
-    md.push_str("Several parts of the schema already support this model:\n\n");
-    md.push_str("- **Typed root tables:** every high-rate fixed-layout payload has a thin FlatBuffers root table, so Zenoh samples can carry one topic value without a multiplexing wrapper.\n");
-    md.push_str("- **Generated topic catalog:** release artifacts include `TopicId`, canonical Zenoh key, root table, payload struct, schema file, and helper lookups so applications do not hand-maintain routing tables.\n");
+    md.push_str("Synapse is intended to be straightforward to use with Zenoh. The canonical encoding publishes each fixed-layout topic's bare payload struct bytes on a stable key expression: the key identifies the stream and the type, so the same bytes serve shared memory, Zenoh values, radio frames, and log messages with zero re-serialization. Little-endian byte order is a protocol requirement. Variable-size topics and generic bridges use the thin FlatBuffers root tables instead; the catalog `encoding` field records which applies.\n\n");
+    md.push_str("Several parts of the schema support this model:\n\n");
+    md.push_str("- **Fixed-layout payload structs:** every runtime topic payload is a struct with a documented byte size, so consumers can decode by overlay without FlatBuffers machinery.\n");
+    md.push_str("- **Generated topic catalog:** release artifacts include `TopicId`, canonical Zenoh key, root table, payload struct and size, scope, encoding, and helper lookups so applications do not hand-maintain routing tables.\n");
     md.push_str("- **Stable topic identifiers:** `TopicId` is available for bridges, logs, serial frames, or compact routing tables, while Zenoh deployments can use key expressions as the primary discriminator.\n");
     md.push_str("- **No transport checksums in payloads:** Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.\n");
     md.push_str("- **Schema assets in every release:** npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.\n\n");
-    md.push_str("Canonical keys use `synapse/topic/<topic_name>`; deployments can prepend vehicle or site namespaces outside the catalog. The package helpers can look up a topic by `TopicId`, root table name, full key, or key suffix.\n\n");
+    md.push_str("Canonical keys use `synapse/v1/topic/<topic_name>[/<instance>]`; the `v1` segment is the schema-major compatibility signal, and multi-instance sensor topics append an instance segment so subscribers can select one sensor without decoding payloads. Deployments prepend vehicle, swarm, or site namespaces (for example `cub1/synapse/v1/topic/gnss_fix`); namespace prefixes come from deployment configuration and are never hardcoded in firmware. The package helpers parse namespaced keys and look up topics by `TopicId`, name, key, or key suffix. Commands and transfers are Zenoh queryables under `synapse/v1/cmd/...`; `synapse/v1/meta/...` and `synapse/v1/live/...` are reserved for schema metadata and liveliness.\n\n");
     md.push_str("## Topic Catalog\n\n");
     md.push_str("The generated topic catalog is included as `topics.json` in schema-asset archives and as language helpers where the package has a public API. It records `TopicId`, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.\n\n");
     md.push_str("Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.\n\n");
@@ -1847,7 +2612,7 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("## Layout Rules\n\n");
     md.push_str("Telemetry, state, command, and control samples should use FlatBuffers `struct` definitions. Use `table`, `string`, or vector fields only for thin root wrappers, transport unions, log records, metadata, text, or naturally variable-size data.\n\n");
     md.push_str("## Unit And Scale Rules\n\n");
-    md.push_str("Fields encode units and frames in their names. Local/world vectors use `_enu_`; body vectors use `_flu_`. Global coordinates use `_deg_e7`, altitudes use `_mm`, speeds commonly use `_cm_s` or `_mm_s`, temperatures use `_cdeg`, currents use `_ca`, magnetic field uses `_tesla`, and normalized manual-control axes use `_milli`. The scale column in each entity page is generated from those suffixes.\n\n");
+    md.push_str("Fields encode units and frames in their names. Local/world vectors use `_enu_`; body vectors use `_flu_`. Global coordinates use `_deg_e7`, altitudes use `_mm`, speeds commonly use `_cm_s` or `_mm_s`, temperatures use `_cdeg` or `_c`, currents use `_da`, pack voltages use `_cv`, magnetic field uses `_tesla`, and normalized manual-control axes use `_milli`. The scale column in each entity page is generated from those suffixes, and schema validation fails when a quantitative field has no recognized suffix.\n\n");
     md.push_str("## Schema Files\n\n");
     for file in &docs.files {
         md.push_str(&format!(
@@ -1856,7 +2621,7 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
             schema_file_slug(file)
         ));
     }
-    md.push_str("\n");
+    md.push('\n');
     md.push_str(&format!(
         "Version path: `{}`. Generated by `cargo run --locked --manifest-path xtask/Cargo.toml -- docs`.\n",
         markdown_text(version_dir_name)
@@ -1942,15 +2707,15 @@ fn render_entity_page(
             "**Payload:** {}\n\n",
             render_type_ref(payload, entity_links, &current_page)
         ));
-    } else if let Some(wrappers) = root_wrappers.get(&entity.name) {
-        if !wrappers.is_empty() {
-            let links = wrappers
-                .iter()
-                .map(|wrapper| code_span(wrapper))
-                .collect::<Vec<_>>()
-                .join(", ");
-            md.push_str(&format!("**FlatBuffers root table:** {links}\n\n"));
-        }
+    } else if let Some(wrappers) = root_wrappers.get(&entity.name)
+        && !wrappers.is_empty()
+    {
+        let links = wrappers
+            .iter()
+            .map(|wrapper| code_span(wrapper))
+            .collect::<Vec<_>>()
+            .join(", ");
+        md.push_str(&format!("**FlatBuffers root table:** {links}\n\n"));
     }
     render_member_table_md(&mut md, entity, entity_links, &current_page);
     md
@@ -2378,7 +3143,13 @@ fn write_docs_version_redirect_aliases(out_dir: &Path, current_version_dir: &str
             }
             let href = format!("../../{}/", target.dir);
             let html = render_redirect_page(&href);
-            write_file(&out_dir.join(&source.dir).join(&target.dir).join("index.html"), &html)?;
+            write_file(
+                &out_dir
+                    .join(&source.dir)
+                    .join(&target.dir)
+                    .join("index.html"),
+                &html,
+            )?;
         }
     }
     Ok(())

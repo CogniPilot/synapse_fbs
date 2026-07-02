@@ -1,0 +1,90 @@
+include "types.fbs";
+include "control.fbs";
+
+namespace synapse.cmd;
+
+// Stable numeric identifiers for command and transfer services. Zenoh
+// deployments select services by key (synapse/v1/cmd/<name>); non-Zenoh
+// request/reply transports such as framed serial links use these ids as the
+// service discriminator. Values mirror the generated command catalog.
+enum CmdId:ushort {
+  Unknown = 0, // Reserved value for invalid or unassigned services.
+  VehicleCommand = 1, // Generic command with floating-point arguments.
+  GeoCommand = 2, // Geographic command with scaled latitude/longitude precision.
+  ParamGet = 3, // Fetch one parameter by name, or all parameters.
+  ParamSet = 4, // Set one parameter.
+  MissionGet = 5, // Fetch the mission plan.
+  MissionSet = 6, // Replace the mission plan.
+}
+
+// Value type carried by a ParamValue record.
+enum ParamKind:ubyte {
+  Float = 0, // float_value carries the parameter.
+  Int = 1, // int_value carries the parameter.
+  Bool = 2, // int_value carries the parameter as zero or one.
+  Text = 3, // text_value carries the parameter.
+}
+
+// One named parameter value. Tables are appropriate here: parameter transfer
+// is a cached request/reply flow, never a control-loop payload.
+table ParamValue {
+  name:string; // Parameter name unique within the producer.
+  kind:ParamKind; // Which value field carries the parameter.
+  float_value:double; // Floating-point value when kind is Float.
+  int_value:long; // Integer or boolean value when kind is Int or Bool.
+  text_value:string; // Text value when kind is Text.
+}
+
+// Request one parameter by name, or all parameters when name is absent.
+// Served as a Zenoh queryable on the cmd key space.
+table ParamGetRequest {
+  name:string; // Parameter name to fetch; absent or empty requests all parameters.
+}
+
+// Reply to ParamGetRequest.
+table ParamGetReply {
+  result:synapse.types.CommandResultCode; // Request outcome.
+  values:[ParamValue]; // Returned parameter values.
+  total:uint; // Total number of parameters held by the producer.
+}
+
+// Request to set one parameter. Served as a Zenoh queryable.
+table ParamSetRequest {
+  value:ParamValue; // Parameter name and new value.
+}
+
+// Reply to ParamSetRequest.
+table ParamSetReply {
+  result:synapse.types.CommandResultCode; // Request outcome.
+  value:ParamValue; // Parameter value in effect after the request.
+}
+
+// One mission item: a sequenced geographic command.
+table MissionItem {
+  seq:uint; // Item sequence number starting at zero.
+  item:synapse.topic.GeoCommandData; // Fixed-layout geographic command payload.
+}
+
+// Request the mission plan. Served as a Zenoh queryable.
+table MissionGetRequest {
+  mission_id:uint; // Mission identifier to fetch, or zero for the current plan.
+}
+
+// Reply to MissionGetRequest.
+table MissionGetReply {
+  result:synapse.types.CommandResultCode; // Request outcome.
+  mission_id:uint; // Identifier of the returned plan; matches MissionProgressData.mission_id.
+  items:[MissionItem]; // Mission items in sequence order.
+}
+
+// Request to replace the mission plan. Served as a Zenoh queryable.
+table MissionSetRequest {
+  mission_id:uint; // Identifier the producer should report for this plan.
+  items:[MissionItem]; // Mission items in sequence order.
+}
+
+// Reply to MissionSetRequest.
+table MissionSetReply {
+  result:synapse.types.CommandResultCode; // Request outcome.
+  mission_id:uint; // Identifier of the plan now active in the producer.
+}

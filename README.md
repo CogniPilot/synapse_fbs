@@ -2,66 +2,130 @@
 
 FlatBuffers schemas and generated language bindings for Synapse.
 
-This repository is the schema source of truth for Synapse messages. It keeps the
-checked-in source small and uses CI to generate the language bindings and release
-artifacts from the pinned toolchain in `tools.lock`.
+This repository is the schema source of truth for Synapse messages. It keeps
+the checked-in source small and uses CI to generate the language bindings and
+release artifacts from the pinned toolchain in `tools.lock`.
 
-Published Synapse FlatBuffers documentation: <https://cognipilot.github.io/synapse_fbs/>
+Published Synapse FlatBuffers documentation:
+<https://cognipilot.github.io/synapse_fbs/>
 
-Synapse schemas use [ROS REP-0103](https://www.ros.org/reps/rep-0103.html)
-conventions by default: SI units where practical, ENU for local/world vectors,
-and FLU for body-frame vectors. Compact integer fields use explicit unit
-suffixes when a scaled representation is chosen for precision or wire
-efficiency.
+Design decisions and the phased plan are recorded in [ROADMAP.md](ROADMAP.md);
+the analysis behind them is in [REVIEW.md](REVIEW.md).
 
 ## Motivation
 
 Synapse messages are designed for vehicles that exchange state, sensor, and
-control data in real time. Fixed-layout payloads support shared-memory message
-passing between chips, while scaled integer fields preserve required precision
-without wasting bytes on high-rate or over-the-air links where latency, range,
-and reliability matter.
+control data in real time across three transport regimes:
+
+- **On chip:** message passing between processors over shared memory
+  (Zephyr RTOS or similar).
+- **Off chip:** IPC between an onboard computer and embedded flight control.
+- **Over the air:** long-distance ground-control links where latency, range,
+  and reliability matter.
+
+One semantic message set serves all three. Every runtime payload is a
+fixed-layout FlatBuffers `struct`, so the same bytes work as a shared-memory
+ABI, a Zenoh value, a radio frame payload, and a log record with zero
+re-serialization. Scaled integer fields preserve required precision without
+wasting bytes: 0.1–1 mm-class position precision is the practical ceiling, so
+fields are sized to that and no further, and nothing is packed below byte
+alignment. Little-endian byte order is a protocol requirement.
 
 The schemas also need to be easy to consume outside embedded firmware. The
 published npm, Python, Rust, C, and C++ artifacts keep browser tools, cloud
 services, developer scripts, and vehicle software on the same schema source.
 
+## Conventions
+
+Frame conventions are layered:
+
+- **Raw sensor topics** carry the sensor's native conventions, documented per
+  field. For example `GnssFix` course over ground and receiver yaw are
+  clockwise from true north, exactly as receivers report them, so logs stay
+  faithful to the hardware.
+- **Estimate and command topics** follow
+  [ROS REP-0103](https://www.ros.org/reps/rep-0103.html): ENU for local/world
+  vectors (x east, y north, z up), FLU for body vectors (x forward, y left,
+  z up), SI units, angles zero-east positive counter-clockwise. The estimator
+  converts once; consumers never mix conventions within a layer.
+- **Operator displays** format however pilots expect (compass headings);
+  display formatting is never a wire concern.
+
+Quaternions are Hamilton convention, component order `w x y z`, and rotate
+body-frame FLU vectors into the world ENU frame. The quaternion is the only
+attitude representation on the wire; Euler angles are derived by consumers.
+
+Field validity uses one schema-defined flags bitmask per message — no sentinel
+values. Core semantics (GNSS fix type, text severity, command result codes,
+battery charge states, validity bits, command type masks) are FlatBuffers
+enums in the schema; only genuinely vehicle-specific taxonomies (flight
+modes, vehicle types) remain producer-defined.
+
 ## Zenoh
 
-Synapse is designed to work naturally with Zenoh. The normal pattern is to
-publish each topic's FlatBuffers root table directly on a stable Zenoh key
-expression and let the key expression identify the stream. That keeps messages
-small, avoids redundant envelope fields, and lets subscribers use native Zenoh
-selectors.
+Synapse is designed to work naturally with Zenoh.
 
-Release artifacts include a generated topic catalog with canonical key
-expressions under `synapse/topic/<topic_name>`, plus helper functions for
-looking up a topic by `TopicId`, root table name, or key. Deployments can prefix
-those keys with a vehicle, swarm, or site namespace without changing the
-message payload.
+**Keys.** Canonical key expressions are:
 
-The optional `Frame` envelope is mainly for serial or other raw byte-stream
-links that need an explicit Synapse container. Zenoh deployments should usually
-publish typed topic values directly and reserve `TopicId` for bridges, logs,
-serial frames, or compact routing tables.
+```
+synapse/v1/topic/<topic_name>[/<instance>]   # pub/sub topics
+synapse/v1/cmd/<command_name>                # queryable commands/transfers
+synapse/v1/meta/...                          # reserved: schema metadata
+synapse/v1/live/...                          # reserved: liveliness tokens
+```
 
-The release artifacts make this practical across platforms: Rust, Python, C,
-and C++ packages provide generated bindings, while the npm package ships schema
-assets and reflection schemas for browser tools, dashboards, and gateways.
+The `v1` segment is the schema-major compatibility signal — bare-struct
+consumers have no other version indicator, and future breaking revisions run
+side by side as `v2`. Multi-instance sensor topics (`inertial_sample`,
+`gnss_fix`, `power_status`) append an instance segment so subscribers can
+select one sensor without decoding payloads.
+
+**Multi-vehicle deployments** prepend a namespace from configuration (never
+hardcoded in firmware):
+
+```
+cub1/synapse/v1/topic/vehicle_health
+cub2/synapse/v1/topic/inertial_sample/0
+```
+
+A ground station subscribes to `*/synapse/v1/topic/vehicle_health` for every
+vehicle at one namespace level, or `**/...` for arbitrary nesting, and learns
+which vehicle a sample came from by the key it arrived on — the namespace
+replaces per-message system identifiers. The catalog helpers in every language
+parse namespaced keys back into namespace, topic, and instance.
+
+**Encoding.** The canonical value for a fixed-layout topic is the bare payload
+struct bytes; the key identifies the type and the catalog records the exact
+byte size. Variable-size topics (`TextStatus`, mocap) and generic bridges use
+the thin FlatBuffers root tables; the catalog `encoding` field says which
+applies per topic.
+
+**Commands are queryables, not topics.** A GCS issues
+`get("cub1/synapse/v1/cmd/vehicle_command", payload)` and receives
+`CommandResultData` replies (streaming `InProgress` until terminal). The
+transport provides correlation, timeout, and retry, so command messages carry
+no confirmation counters. Mission and parameter transfer use the same pattern
+with the request/reply tables in `fbs/transfer.fbs`. Streaming setpoints
+(`AttitudeCommand`, `RateCommand`, `LocalPositionCommand`) remain pub/sub
+topics.
 
 ## Topic Catalog
 
 The generated catalog is the source of truth for bridge and routing metadata:
-`TopicId`, canonical Zenoh key, FlatBuffers root table, fixed-layout payload
-struct, schema file, and a short description.
+`TopicId`, canonical key, root table, fixed-layout payload type and byte size,
+`scope` (`vehicle` topics never leave the vehicle network; `any` topics may be
+bridged subject to rate policy), `encoding`, `multi_instance`, and the command
+key space. It ships as `topics.json` plus language helpers.
 
 JavaScript:
 
 ```js
-import { keyForTopic, topicById } from '@cognipilot/synapse-fbs';
+import { keyForTopic, topicById, parseKey } from '@cognipilot/synapse-fbs';
 
 const key = keyForTopic('VehicleHealth');
-const payloadType = topicById(1)?.payloadType;
+const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+// parsed.namespace === 'cub1', parsed.topic.name === 'InertialSample',
+// parsed.instance === 0
 ```
 
 Python:
@@ -70,14 +134,14 @@ Python:
 from synapse import topic_catalog
 
 key = topic_catalog.key_for_topic("VehicleHealth")
-payload_type = topic_catalog.topic_by_id(1).payload_type
+parsed = topic_catalog.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
 ```
 
 Rust:
 
 ```rust
 let key = synapse_fbs::topic_catalog::key_for_topic("VehicleHealth");
-let topic = synapse_fbs::topic_catalog::topic_by_id(1);
+let parsed = synapse_fbs::topic_catalog::parse_key("cub1/synapse/v1/topic/inertial_sample/0");
 ```
 
 C and C++ archives include `topics.json` and `include/synapse/topic_catalog.h`:
@@ -85,65 +149,115 @@ C and C++ archives include `topics.json` and `include/synapse/topic_catalog.h`:
 ```c
 #include <synapse/topic_catalog.h>
 
-const synapse_topic_info_t *topic = synapse_topic_by_key("vehicle_health");
+size_t namespace_len;
+int32_t instance;
+const synapse_topic_info_t *topic =
+    synapse_topic_parse_key("cub1/synapse/v1/topic/gnss_fix", &namespace_len, &instance);
 ```
+
+## Serial Links
+
+Constrained raw byte-stream links should frame bare payload structs directly:
+
+```
+[sync][len:u16][topic_id:u16][seq:u8][flags:u8][bare payload struct][crc16]
+```
+
+roughly 8 bytes of overhead per message. Two framing rules replace what the
+Zenoh transport otherwise provides:
+
+- **Retransmissions reuse the original `seq`** so receivers deduplicate
+  retried frames (important for non-idempotent commands when a reply frame is
+  lost).
+- **Command/transfer request-reply**: frames with the request or reply flags
+  bit set carry a `synapse.cmd.CmdId` value in the `topic_id` field instead
+  of a `TopicId`, with `seq` correlating a reply to its request. The payload
+  is the same request/reply message the Zenoh queryable would carry, so
+  mission and parameter transfer work identically over serial.
+
+Link-specific delimiting, integrity, authentication, or encryption belong to
+the framing layer, never inside topic payloads. The FlatBuffers `Frame`
+envelope in `fbs/transport.fbs` (`file_identifier "SYFR"`) remains for generic
+bridges and consumers that need a self-contained FlatBuffers container.
+
+## Telemetry Aggregate
+
+`fbs/telemetry.fbs` defines `GcsStatus`, a 40-byte display-oriented status
+aggregate (position, yaw, speeds, battery, mode, link, fix) for LoRa or
+satellite-class links at 0.2–1 Hz. It is never used for control. On
+SiK-class radios (~57.6 kbps) the normal topic set fits without it: a typical
+downlink (attitude and global position at 4 Hz, health, power, GNSS, and
+navigation at 1 Hz) is under 5 kbps in bare structs.
+
+## Logging
+
+Synapse logs use [MCAP](https://mcap.dev) as the container: schema records
+carry the generated `.bfbs` reflection schemas (`flatbuffer` schema encoding),
+channel topics are the canonical Zenoh keys, and messages are the
+table-wrapped topic payloads so Foxglove, PlotJuggler, and the `mcap` CLI
+decode them directly. Flight controllers stream index-less MCAP and files are
+recovered/reindexed post-flight. Release archives include `bfbs/*.bfbs` and
+`bfbs.sha256` manifests for exactly this use.
 
 ## ROS And FlatROS
 
-ROS messages are local integration types, not the Synapse over-the-air format.
-They are intentionally more general and can be too bulky for constrained radio
-links. Synapse should remain the compact FlatBuffers protocol for vehicles,
+ROS messages are local integration types, not the Synapse wire format. The
+common ROS message definitions are dynamically sized (string frame ids,
+`float64[36]` covariances), which makes them bulky on constrained links and
+ineligible for zero-copy loans, while CDR buffers cannot be overlaid as native
+structs. Synapse remains the compact fixed-layout protocol for vehicles,
 shared memory, Zenoh, logs, and serial frames.
 
-ROS 2 integration should happen at the edge through bridge nodes that translate
+ROS 2 integration happens at the edge through bridge nodes that translate
 selected Synapse topics into ROS concepts for visualization, autonomy stacks,
-simulation, rosbag tooling, and operator workflows. The generated topic catalog
-gives those bridges stable keys and type metadata without hand-maintained lookup
-tables.
-
-The planned flatros2 path is to provide a ROS workspace/release archive that
-depends on `flatros2`, consumes the Synapse FlatBuffers schemas and catalog, and
-offers adapter nodes for selected topics. That archive should preserve Synapse
-payloads as FlatBuffers at the protocol boundary and only translate into ROS
-message views where ROS tooling needs them.
+simulation, and operator workflows. The planned flatros2 path generates a
+`synapse_msgs` package of fixed-size ROS mirrors from these schemas, uses
+`rclcpp::TypeAdapter` so nodes work on the generated structs directly, and
+drives a data-driven bridge from `topics.json` plus the `.bfbs` reflection
+schemas. ROS 2's Zenoh RMW derives its keys from topic and type names, so
+Synapse keys and the ROS graph share one router without collisions.
 
 ## Schema Design Priorities
 
 Fixed memory layout is the default for protocol payloads. Runtime telemetry,
-state, command, and control samples should use FlatBuffers `struct` definitions
-so adapters can share predictable native layouts and avoid allocation where the
-target language/runtime allows it.
-
-This is especially important for chip-to-chip communication over shared memory:
-the fixed struct payload should be usable as the shared ABI, while serialized
-FlatBuffers tables remain available for transports and languages that need root
-objects.
+state, command, and control samples use FlatBuffers `struct` definitions so
+adapters share predictable native layouts and avoid allocation where the
+target language allows it. The fixed struct payload is the shared ABI for
+chip-to-chip communication and the wire encoding for Zenoh and radio links;
+serialized FlatBuffers tables remain available for transports and consumers
+that need root objects.
 
 Use FlatBuffers `table`, `string`, or vector fields only when the data is
-naturally variable-size, optional, or needs FlatBuffers root/union behavior.
-Common exceptions are thin root wrappers around fixed structs, transport
-envelopes, log records, text status, schema metadata, and definition records
-that consumers cache instead of processing in the control loop.
+naturally variable-size, optional, or needs FlatBuffers root/union behavior:
+thin root wrappers around fixed structs, transport envelopes, text status,
+cached definition records (mocap), and request/reply transfer messages.
+
+Schema validation is enforced by `xtask`: every entity and field must be
+documented, quantitative fields must carry a recognized unit suffix, `TopicId`
+must be contiguous and mirror the `SynapseMessage` union, and payload struct
+sizes are computed and checked on every build.
 
 ## Contents
 
-- `fbs/types.fbs`: shared fixed structs, topic IDs, units, and frame conventions.
-- `fbs/sensors.fbs`: GNSS, inertial, air data, and power telemetry.
-- `fbs/state.fbs`: vehicle health, estimates, mission progress, and navigation status.
-- `fbs/control.fbs`: manual input, setpoints, commands, actuators, and loop metrics.
+- `fbs/types.fbs`: shared math structs (`synapse.types`), core protocol
+  enums, and topic identifiers.
+- `fbs/sensors.fbs`: GNSS, inertial, air data, and power telemetry (raw
+  layer).
+- `fbs/state.fbs`: vehicle health, estimates, mission progress, and
+  navigation status (estimate layer).
+- `fbs/control.fbs`: manual input, setpoints, commands, actuators, and loop
+  metrics.
+- `fbs/telemetry.fbs`: compact ground-control status aggregate.
 - `fbs/transport.fbs`: optional multiplexed frame and message union.
-- `fbs/{mocap,optical_flow,log,sil}.fbs`: focused support schemas.
+- `fbs/transfer.fbs`: mission and parameter queryable request/reply messages.
+- `fbs/{mocap,optical_flow,sil}.fbs`: focused support schemas.
 - `fbs/all.fbs`: aggregate include used by package generation.
-- `topics.json` / topic catalog helpers: generated topic IDs, canonical keys,
-  root tables, and fixed-layout payload metadata in release artifacts.
+- `topics.json` / topic catalog helpers: topic IDs, canonical keys, payload
+  sizes, scopes, encodings, and command metadata in release artifacts.
 - `bfbs/*.bfbs`: generated FlatBuffers reflection schemas included in C/C++
-  release archives.
-- `rust/`: Rust package skeleton, published as the `synapse_fbs` crate.
-- `python/`: Python package skeleton, published as the `synapse-fbs` package.
-- `js/`: JavaScript/TypeScript schema-assets package skeleton, published as the
-  `@cognipilot/synapse-fbs` npm package.
-- `c/`: C release archive skeleton, published as `synapse_fbs-c.tar.gz`.
-- `cpp/`: C++ release archive skeleton, published as `synapse_fbs-cpp.tar.gz`.
+  release archives and the npm package.
+- `rust/`, `python/`, `js/`, `c/`, `cpp/`: package skeletons for the published
+  artifacts.
 - `xtask/`: reproducible local and CI build driver.
 - `tools.lock`: pinned package, generator, and runtime versions.
 
@@ -161,13 +275,15 @@ compiler reports `flatc version 25.12.19`. The Rust package depends on
 `flatbuffers==25.12.19` so generated code and runtimes stay in lockstep. CI
 also builds pinned FlatCC, uses pinned `mdbook` for schema documentation, and
 publishes generated C and C++ archives for downstream CMake consumers.
+Release tags must match `PACKAGE_VERSION` in `tools.lock`; the build fails
+otherwise.
 
 ## Rust
 
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.1.8"
+synapse_fbs = "0.2.0"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -202,9 +318,9 @@ Unlike the Rust and Python packages, the npm package ships schema assets
 (`fbs/*.fbs` plus generated `bfbs/*.bfbs` reflection schemas) rather than
 generated bindings, and has no `flatbuffers` runtime dependency. The npm
 `flatbuffers` release cadence does not track the pinned `flatc` version, so JS
-consumers generate their own bindings from the shipped schemas or decode via the
-reflection schemas. After a local `xtask` build, the staged package lives under
-`target/xtask/packages/js`.
+consumers generate their own bindings from the shipped schemas or decode via
+the reflection schemas. After a local `xtask` build, the staged package lives
+under `target/xtask/packages/js`.
 
 ## C and C++ Archives
 
@@ -217,7 +333,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.1.8/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.2.0/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -226,55 +342,67 @@ FetchContent_MakeAvailable(synapse_fbs)
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
 
-For Zephyr, put the same `FetchContent_Declare` before linking your application
-target, then link `synapse_fbs::c` into `app`. Link
-`synapse_fbs::flatcc_runtime` only when using generated builders, verifiers, or
-JSON helpers. Reader accessors are header-only.
+The C archive also carries `zephyr/module.yml`, so west manifest projects can
+add it as a Zephyr module. Link `synapse_fbs::flatcc_runtime` only when using
+generated builders, verifiers, or JSON helpers — reader accessors are
+header-only. The C++ archive provides the analogous `synapse_fbs::cpp`
+interface target.
 
 ## Local Build
 
-Run the same Rust task that CI runs:
+Fast schema validation (parse, doc-comment enforcement, unit-suffix lint,
+TopicId/union consistency, payload sizes, catalog helper smoke tests):
+
+```sh
+cargo run --locked --manifest-path xtask/Cargo.toml -- check
+```
+
+Run the same full task that CI runs:
 
 ```sh
 cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 ```
 
-The task builds pinned `flatc` and FlatCC, stages Rust/Python/JavaScript packages under
-`target/xtask/packages/`, creates the C/C++ tarballs under
-`target/xtask/artifacts/`, includes pinned `bfbs/*.bfbs` reflection schemas and
-`bfbs.sha256` manifests in those archives, and smoke-tests the C archive through
-CMake `FetchContent`.
+The `ci` task builds pinned `flatc` and FlatCC, stages Rust/Python/JavaScript
+packages under `target/xtask/packages/`, creates the C/C++ tarballs under
+`target/xtask/artifacts/`, includes pinned `bfbs/*.bfbs` reflection schemas
+and `bfbs.sha256` manifests in those archives, and smoke-tests the C archive
+through CMake `FetchContent`.
 
 Generate the static schema documentation locally:
 
 ```sh
 cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
-cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.1.8 --out-dir target/xtask/docs
+cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.2.0 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
 navigation, search, selectable themes, and version selection. The generated
 site copies the source schemas alongside the HTML and infers unit/scale notes
-from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`, `_ca`,
-`_cdeg`, `_dpermille`, and `_milli`.
+from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
+`_da`, `_cv`, `_cdeg`, `_dpermille`, and `_milli`.
 
 ## Releases
 
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.1.8` publishes:
+Pushing a tag like `v0.2.0` (which must match `PACKAGE_VERSION` in
+`tools.lock`) publishes:
 
-- staged `target/xtask/packages/rust/` to crates.io using `CARGO_REGISTRY_TOKEN`
+- staged `target/xtask/packages/rust/` to crates.io using
+  `CARGO_REGISTRY_TOKEN`
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
-- staged `target/xtask/packages/js/` to npm using `NPM_TOKEN`
+  (the `synapse-fbs` PyPI project must have this repository's
+  `release.yml` workflow registered as a trusted publisher before tagging)
+- staged `target/xtask/packages/js/` to npm using `NPM_TOKEN` with provenance
 - GitHub Release assets:
   - Python wheel and sdist
   - Rust `.crate` source package
   - C++ generated header tarball with matching FlatBuffers C++ runtime headers
     plus `bfbs/*.bfbs` reflection schemas
   - C generated header tarball with matching FlatCC headers, runtime sources,
-    and `bfbs/*.bfbs` reflection schemas
+    `zephyr/module.yml`, and `bfbs/*.bfbs` reflection schemas
 
 The generated C archive is intentionally generic. Downstream firmware projects
 that need it should fetch the release tarball directly from their own CMake
@@ -283,7 +411,7 @@ using a versioned URL and `URL_HASH SHA256=...`.
 ## Schema Docs
 
 The docs workflow publishes versioned schema documentation to the `gh-pages`
-branch. Pushes to `main` update `/main/`; release tags like `v0.1.8` update
-`/0.1.8/`. The root docs URL redirects to `/main/`, and the mdBook version
+branch. Pushes to `main` update `/main/`; release tags like `v0.2.0` update
+`/0.2.0/`. The root docs URL redirects to `/main/`, and the mdBook version
 selector links to published release docs:
 <https://cognipilot.github.io/synapse_fbs/>.

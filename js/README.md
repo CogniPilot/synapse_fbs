@@ -24,8 +24,9 @@ cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 Runtime protocol payloads prioritize fixed memory layout. Telemetry, state,
 command, and control samples are modeled as FlatBuffers structs where possible
 so chip-to-chip shared-memory transports can use the payload layout directly.
-Tables, strings, and vectors are reserved for root wrappers, metadata, logs, or
-naturally variable-size data.
+Tables, strings, and vectors are reserved for root wrappers, transfer
+request/reply messages, cached definitions, or naturally variable-size data.
+Logging uses MCAP with the shipped `.bfbs` reflection schemas.
 
 Unlike the Rust and Python packages, this package does **not** ship generated
 language bindings and does **not** depend on the `flatbuffers` runtime. The npm
@@ -40,8 +41,8 @@ the shipped reflection schemas.
 import { fbsDir, bfbsDir, schemaFiles, schemaPath } from '@cognipilot/synapse-fbs';
 import { readFileSync } from 'node:fs';
 
-// Resolve and read the canonical Synapse log schema.
-const logSchema = readFileSync(schemaPath('log.fbs'), 'utf8');
+// Resolve and read the canonical Synapse transport schema.
+const transportSchema = readFileSync(schemaPath('transport.fbs'), 'utf8');
 
 // Or point a code generator at the shipped schema directory.
 // flatc --ts -I <fbsDir> <fbsDir>/all.fbs
@@ -50,14 +51,15 @@ const logSchema = readFileSync(schemaPath('log.fbs'), 'utf8');
 Topic helpers avoid hand-maintained bridge and routing tables:
 
 ```js
-import { keyForTopic, topicById } from '@cognipilot/synapse-fbs';
+import { keyForTopic, topicById, parseKey } from '@cognipilot/synapse-fbs';
 
 const key = keyForTopic('VehicleHealth');
 const payloadType = topicById(1)?.payloadType;
+const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
 ```
 
 Individual assets are also directly importable via subpath exports:
 
 ```js
-import logSchemaUrl from '@cognipilot/synapse-fbs/fbs/log.fbs';
+import transportSchemaUrl from '@cognipilot/synapse-fbs/fbs/transport.fbs';
 ```

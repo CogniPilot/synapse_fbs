@@ -5,14 +5,41 @@ export interface TopicInfo {
   readonly keySuffix: string;
   readonly rootTable: string;
   readonly payloadType: string | null;
+  readonly payloadSize: number | null;
   readonly schemaFile: string;
   readonly fixedLayout: boolean;
+  readonly multiInstance: boolean;
+  readonly scope: string;
+  readonly encoding: string;
   readonly description: string;
 }
 
+export interface CommandInfo {
+  readonly id: number;
+  readonly name: string;
+  readonly key: string;
+  readonly requestType: string;
+  readonly replyType: string;
+  readonly description: string;
+}
+
+export interface ParsedTopicKey {
+  readonly namespace: string;
+  readonly topic: TopicInfo;
+  readonly instance: number | null;
+}
+
+export const topicKeyPrefix: string;
+export const cmdKeyPrefix: string;
+export const metaKeyPrefix: string;
+export const livelinessKeyPrefix: string;
+
 export const topicCatalog: readonly TopicInfo[];
+export const commandCatalog: readonly CommandInfo[];
 
 export function topicById(id: number): TopicInfo | undefined;
 export function topicByName(name: string): TopicInfo | undefined;
 export function topicByKey(key: string): TopicInfo | undefined;
+export function parseKey(key: string): ParsedTopicKey | undefined;
 export function keyForTopic(topic: number | string): string | undefined;
+export function commandByName(name: string): CommandInfo | undefined;

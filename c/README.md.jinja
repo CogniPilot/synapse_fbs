@@ -5,8 +5,10 @@ flatc {{ flatbuffers_version }} are included under `bfbs/`. The archive also
 ships `topics.json` and `include/synapse/topic_catalog.h` for canonical Zenoh
 keys, `TopicId`, root table names, and payload types.
 
-This archive is a generic CMake dependency, not a Zephyr module. Add it with
-CMake `FetchContent` and link `synapse_fbs::c` for reader-only accessors.
+This archive is a generic CMake dependency and also carries a
+`zephyr/module.yml`, so it can be added either with CMake `FetchContent` or as
+a Zephyr module from a west manifest. Link `synapse_fbs::c` for reader-only
+accessors.
 
 ```cmake
 include(FetchContent)

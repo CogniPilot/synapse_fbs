@@ -7,12 +7,16 @@
 #[allow(warnings)]
 pub mod generated;
 
+pub mod types {
+    pub use crate::generated::synapse::types::*;
+}
+
 pub mod topic {
     pub use crate::generated::synapse::topic::*;
 }
 
-pub mod log {
-    pub use crate::generated::synapse::log::*;
+pub mod cmd {
+    pub use crate::generated::synapse::cmd::*;
 }
 
 pub mod sil {

@@ -1,49 +1,26 @@
-// Default coordinate frames follow ROS REP-0103:
-// world/local vectors use ENU (x east, y north, z up);
-// body vectors use FLU (x forward, y left, z up).
+// Synapse shared types, core protocol enums, and topic identifiers.
+//
+// Frame conventions are layered:
+// - Raw sensor topics carry the sensor's native conventions, documented per
+//   field (for example GNSS course over ground is clockwise from true north).
+// - Estimate and command topics follow ROS REP-0103: world/local vectors use
+//   ENU (x east, y north, z up), body vectors use FLU (x forward, y left,
+//   z up), SI units unless an explicit scaled-integer suffix says otherwise.
+// - Operator displays may format values however pilots expect (for example
+//   compass headings); display formatting is never a wire-format concern.
+//
 // Fixed memory layout is a protocol priority. Runtime telemetry, state,
-// command, and control payloads should be structs so shared-memory transports
-// between chips can use the payload layout directly. Use tables, strings, and
-// vectors only for FlatBuffers roots, unions, metadata, logs, or naturally
-// variable-size data.
-// Fixed-layout payload structs use explicit units in field names when the raw
-// representation is scaled. This keeps adapters predictable and avoids losing
-// precision in global coordinates or raw I/O.
+// command, and control payloads are structs so that shared memory, Zenoh
+// values, radio frames, and log messages all carry identical bytes. Little
+// endian byte order is a protocol requirement. Use tables only for
+// FlatBuffers roots, unions, cached definition records, request/reply
+// payloads, or naturally variable-size data.
+//
+// Field validity uses one schema-defined flags bitmask per message. Sentinel
+// values are never used; zero-means-unavailable is allowed only where zero is
+// physically impossible. Scaled integer fields use explicit unit suffixes.
 
-namespace synapse.topic;
-
-// Stable numeric identifiers for well-known Synapse topics.
-enum TopicId:ushort {
-  Unknown = 0, // Reserved value for invalid, unassigned, or externally named topics.
-  VehicleHealth = 1, // Vehicle-level arming, failsafe, mode, link, and health summary.
-  TimeReference = 2, // Correlates boot-relative time with an absolute Unix time reference.
-  RadioControl = 3, // Raw receiver channel input and link quality.
-  ManualControlCommand = 4, // Normalized manual pilot intent after input mapping.
-  InertialSample = 5, // IMU, magnetometer, pressure, and temperature sample.
-  AirData = 6, // Barometric and aerodynamic measurements used by fixed-wing control.
-  PowerStatus = 7, // Battery, current, energy, and power-source state.
-  GnssFix = 8, // Global navigation fix, accuracy, velocity, and heading information.
-  AttitudeEstimate = 9, // Vehicle attitude estimate and angular velocity.
-  LocalPositionEstimate = 10, // Local ENU position, velocity, acceleration, and yaw estimate.
-  GlobalPositionEstimate = 11, // Global latitude/longitude/altitude estimate with ENU velocity.
-  OdometryEstimate = 12, // Combined pose, twist, covariance, and estimator quality sample.
-  EstimatorHealth = 13, // Estimator consistency metrics and accuracy estimates.
-  MissionProgress = 14, // Mission item progress and mission database identifiers.
-  NavigationTarget = 15, // Current navigation target and tracking-error summary.
-  HomeReference = 16, // Home geodetic origin and corresponding local-frame reference.
-  AttitudeCommand = 17, // Attitude setpoint with optional body-rate and thrust feed-forward.
-  RateCommand = 18, // Body-rate setpoint with thrust feed-forward.
-  LocalPositionCommand = 19, // Local ENU position/velocity/acceleration/yaw setpoint.
-  VehicleCommand = 20, // Generic command with floating-point arguments.
-  GeoCommand = 21, // Geographic command with scaled latitude/longitude precision.
-  CommandResult = 22, // Result and progress for a previously issued command.
-  ActuatorCommand = 23, // Normalized actuator control request.
-  ActuatorFeedback = 24, // Normalized actuator output feedback.
-  PwmSignalOutputs = 25, // Raw PWM output pulse widths.
-  ControlLoopMetrics = 26, // Control-loop timing, overrun, and load telemetry.
-  MotorOutput = 27, // Compact four-motor output state for small multirotor controllers.
-  TextStatus = 28, // Human-readable status or diagnostic text.
-}
+namespace synapse.types;
 
 // Two-component float vector used for planar rates, flow, and image motion.
 struct Vec2f {
@@ -58,7 +35,9 @@ struct Vec3f {
   z:float; // Z component; up in both ENU and FLU fields.
 }
 
-// Quaternion order is w, x, y, z. A zero rotation is 1, 0, 0, 0.
+// Unit quaternion in Hamilton convention, component order w, x, y, z.
+// It rotates body-frame FLU vectors into the world ENU frame:
+// v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.
 struct Quaternionf {
   w:float; // Scalar component.
   x:float; // Vector X component.
@@ -66,21 +45,15 @@ struct Quaternionf {
   z:float; // Vector Z component.
 }
 
-// Roll, pitch, and yaw rates or setpoints in the frame named by the field.
+// Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.
 struct RateTriplet {
-  roll:float; // Rotation about the body X axis.
-  pitch:float; // Rotation about the body Y axis.
-  yaw:float; // Rotation about the body Z axis.
-}
-
-// Roll, pitch, and yaw Euler angles in radians unless the containing field name says otherwise.
-struct AttitudeEuler {
-  roll:float; // Rotation about the body X axis.
-  pitch:float; // Rotation about the body Y axis.
-  yaw:float; // Heading/yaw angle following the frame convention of the containing message.
+  roll:float; // Rotation rate about the body X (forward) axis.
+  pitch:float; // Rotation rate about the body Y (left) axis.
+  yaw:float; // Rotation rate about the body Z (up) axis.
 }
 
 // Upper-triangular 6x6 covariance matrix stored row-major as 21 float values.
+// State order is x, y, z translation followed by rotation about x, y, z.
 struct CovarianceUpperTriangle21f {
   c0:float; // Matrix element (0,0).
   c1:float; // Matrix element (0,1).
@@ -103,4 +76,141 @@ struct CovarianceUpperTriangle21f {
   c18:float; // Matrix element (4,4).
   c19:float; // Matrix element (4,5).
   c20:float; // Matrix element (5,5).
+}
+
+// Text and diagnostic severity levels following RFC 5424 syslog numbering.
+enum Severity:ubyte {
+  Emergency = 0, // System is unusable; immediate operator action required.
+  Alert = 1, // Action must be taken immediately.
+  Critical = 2, // Critical condition affecting flight safety.
+  Error = 3, // Error condition; a function is not working.
+  Warning = 4, // Warning condition; degraded but functional.
+  Notice = 5, // Normal but significant event.
+  Informational = 6, // Informational message.
+  Debug = 7, // Developer diagnostic message.
+}
+
+// Result of command or transfer request execution.
+enum CommandResultCode:ubyte {
+  Accepted = 0, // Command was accepted and executed or scheduled.
+  TemporarilyRejected = 1, // Valid command rejected in the current state; retry may succeed.
+  Denied = 2, // Command is valid but permanently refused in this configuration.
+  Unsupported = 3, // Command is unknown or not implemented by this producer.
+  Failed = 4, // Command was attempted and failed during execution.
+  InProgress = 5, // Command accepted; execution continues and progress updates follow.
+  Cancelled = 6, // Command execution was cancelled before completion.
+}
+
+// GNSS receiver fix quality.
+enum GnssFixType:ubyte {
+  NoFix = 0, // No position solution.
+  TimeOnly = 1, // Time-only solution without position.
+  Fix2d = 2, // Two-dimensional position fix.
+  Fix3d = 3, // Three-dimensional position fix.
+  Dgnss = 4, // Differentially corrected fix.
+  RtkFloat = 5, // RTK solution with float ambiguities.
+  RtkFixed = 6, // RTK solution with fixed ambiguities.
+  DeadReckoning = 7, // Dead-reckoning or combined solution without full GNSS observability.
+}
+
+// Battery or power-source charging state.
+enum BatteryChargeState:ubyte {
+  Unknown = 0, // Charge state is not reported.
+  Ok = 1, // Normal operation.
+  Low = 2, // Low charge; operator attention advised.
+  Critical = 3, // Critical charge; land or recover soon.
+  Emergency = 4, // Emergency charge level; immediate action required.
+  Failed = 5, // Battery failure detected.
+  Unhealthy = 6, // Battery is degraded or operating outside limits.
+  Charging = 7, // Battery is charging.
+}
+
+// Role a battery or power source plays on the vehicle.
+enum BatteryFunction:ubyte {
+  Unknown = 0, // Function is not reported.
+  Propulsion = 1, // Powers motors and propulsion.
+  Avionics = 2, // Powers flight controllers and avionics.
+  Payload = 3, // Powers a payload or auxiliary system.
+}
+
+// Battery chemistry or power-source type.
+enum BatteryType:ubyte {
+  Unknown = 0, // Chemistry is not reported.
+  LiPo = 1, // Lithium polymer.
+  LiIon = 2, // Lithium ion.
+  LiFe = 3, // Lithium iron phosphate.
+  NiMh = 4, // Nickel metal hydride.
+  Pb = 5, // Lead acid.
+}
+
+// Mission execution state.
+enum MissionState:ubyte {
+  Unknown = 0, // Mission state is not reported.
+  Idle = 1, // No mission is executing.
+  Active = 2, // Mission is executing.
+  Paused = 3, // Mission is paused and can resume.
+  Complete = 4, // Mission finished all items.
+}
+
+// Altitude reference frame for geographic commands and mission items.
+enum GeoAltitudeFrame:ubyte {
+  Msl = 0, // Altitude above mean sea level.
+  Ellipsoid = 1, // Altitude above the WGS-84 ellipsoid.
+  RelativeHome = 2, // Altitude relative to the home reference.
+  Terrain = 3, // Altitude above terrain.
+}
+
+// Local coordinate frame selector for local-frame commands.
+enum LocalFrame:ubyte {
+  LocalEnu = 0, // Local ENU frame anchored at the active local origin.
+  BodyFlu = 1, // Vehicle body FLU frame.
+}
+
+// Reference frame identifiers for odometry and pose products.
+enum ReferenceFrame:ubyte {
+  Unknown = 0, // Frame is not reported.
+  LocalEnu = 1, // Local ENU frame anchored at the active local origin.
+  BodyFlu = 2, // Vehicle body FLU frame.
+  MapEnu = 3, // Persistent map ENU frame.
+  MocapEnu = 4, // Motion-capture system ENU frame.
+}
+
+namespace synapse.topic;
+
+// Stable numeric identifiers for well-known Synapse topics. Values are
+// contiguous and mirror the SynapseMessage union order in transport.fbs.
+enum TopicId:ushort {
+  Unknown = 0, // Reserved value for invalid, unassigned, or externally named topics.
+  VehicleHealth = 1, // Vehicle-level arming, failsafe, mode, link, and health summary.
+  TimeReference = 2, // Correlates boot-relative time with an absolute Unix time reference.
+  RadioControl = 3, // Raw receiver channel input and link quality.
+  ManualControlCommand = 4, // Normalized manual pilot intent after input mapping.
+  InertialSample = 5, // IMU, magnetometer, static pressure, and temperature sample.
+  AirData = 6, // Barometric and aerodynamic measurements used by fixed-wing control.
+  PowerStatus = 7, // Battery, current, energy, and power-source state.
+  GnssFix = 8, // Global navigation fix, accuracy, velocity, and heading information.
+  OpticalFlow = 9, // Integrated optical-flow sample from an image sensor or flow module.
+  OpticalFlowVelocity = 10, // Velocity estimate derived from optical flow.
+  AttitudeEstimate = 11, // Vehicle attitude estimate and angular velocity.
+  LocalPositionEstimate = 12, // Local ENU position, velocity, acceleration, and yaw estimate.
+  GlobalPositionEstimate = 13, // Global latitude/longitude/altitude estimate with ENU velocity.
+  OdometryEstimate = 14, // Combined pose, twist, covariance, and estimator quality sample.
+  EstimatorHealth = 15, // Estimator consistency metrics and accuracy estimates.
+  MissionProgress = 16, // Mission item progress and mission database identifiers.
+  NavigationTarget = 17, // Current navigation target and tracking-error summary.
+  HomeReference = 18, // Home geodetic origin and corresponding local-frame reference.
+  AttitudeCommand = 19, // Attitude setpoint with optional body-rate and thrust feed-forward.
+  RateCommand = 20, // Body-rate setpoint with thrust feed-forward.
+  LocalPositionCommand = 21, // Local ENU position/velocity/acceleration/yaw setpoint.
+  VehicleCommand = 22, // Generic command with floating-point arguments.
+  GeoCommand = 23, // Geographic command with scaled latitude/longitude precision.
+  CommandResult = 24, // Result and progress for a previously issued command or request.
+  ActuatorCommand = 25, // Normalized actuator control request.
+  ActuatorFeedback = 26, // Normalized actuator output feedback.
+  PwmSignalOutputs = 27, // Raw PWM output pulse widths.
+  ControlLoopMetrics = 28, // Control-loop timing, overrun, and load telemetry.
+  TextStatus = 29, // Human-readable status or diagnostic text.
+  GcsStatus = 30, // Compact vehicle status aggregate for low-rate ground-control links.
+  MocapFrame = 31, // Motion-capture samples for one capture timestamp.
+  MocapDefinition = 32, // Cached motion-capture object definitions.
 }

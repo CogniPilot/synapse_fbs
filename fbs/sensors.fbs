@@ -2,18 +2,60 @@ include "types.fbs";
 
 namespace synapse.topic;
 
-// Time-correlated inertial and environmental sample from an IMU-class sensor.
+// Field-validity bits for InertialSampleData.flags.
+enum InertialFieldFlags:ubyte (bit_flags) {
+  Accel, // Accelerometer fields were updated in this sample.
+  Gyro, // Gyroscope fields were updated in this sample.
+  Mag, // Magnetometer fields were updated in this sample.
+  Pressure, // Static pressure field was updated in this sample.
+  Temperature, // Temperature field was updated in this sample.
+}
+
+// Field-validity bits for AirDataData.flags.
+enum AirDataFlags:ubyte (bit_flags) {
+  AbsolutePressure, // Static pressure is valid.
+  DifferentialPressure, // Differential pressure is valid.
+  PressureAltitude, // Pressure altitude is valid.
+  IndicatedAirspeed, // Indicated airspeed is valid.
+  TrueAirspeed, // True airspeed is valid.
+  AngleOfAttack, // Angle of attack is valid.
+  Sideslip, // Sideslip angle is valid.
+  Temperature, // Temperature fields are valid.
+}
+
+// Field-validity bits for GnssFixData.flags.
+enum GnssFixFlags:ubyte (bit_flags) {
+  TimeValid, // time_unix_us carries a valid receiver time.
+  CourseValid, // course_over_ground_cdeg is valid.
+  YawValid, // yaw_cdeg carries a valid receiver yaw.
+  VelocityUpValid, // velocity_up_cm_s is valid.
+}
+
+// Fault bits for PowerStatusData.fault_flags.
+enum PowerFaultFlags:ushort (bit_flags) {
+  DeepDischarge, // Pack was discharged below its safe minimum.
+  VoltageSpikes, // Abnormal voltage transients were detected.
+  CellFail, // One or more cells failed.
+  OverCurrent, // Discharge current exceeded limits.
+  OverTemperature, // Pack temperature exceeded limits.
+  UnderTemperature, // Pack temperature is below operating limits.
+  IncompatibleVoltage, // Pack voltage is incompatible with this vehicle.
+  HardwareFailure, // Monitor or pack hardware failure.
+}
+
+// Raw inertial and environmental sample from an IMU-class sensor. This is a
+// raw-layer topic: values are sensor-native measurements in the body FLU
+// mounting frame after driver axis alignment; no estimator products belong
+// here. Sensors updating at different rates set the matching flags bits.
 struct InertialSampleData {
   timestamp_us:ulong; // Sample timestamp in monotonic boot time.
-  accel_flu_m_s2:Vec3f; // Linear acceleration in the body FLU frame.
-  gyro_flu_rad_s:Vec3f; // Angular rate in the body FLU frame.
-  mag_flu_tesla:Vec3f; // Magnetic field measurement in the body FLU frame.
+  accel_flu_m_s2:synapse.types.Vec3f; // Linear acceleration in the body FLU frame.
+  gyro_flu_rad_s:synapse.types.Vec3f; // Angular rate in the body FLU frame.
+  mag_flu_tesla:synapse.types.Vec3f; // Raw magnetic field in the body FLU frame, not declination corrected.
   absolute_pressure_hpa:float; // Static pressure from the sensor barometer.
-  differential_pressure_hpa:float; // Differential pressure from a pitot/static sensor when available.
-  pressure_altitude_m:float; // Altitude estimate derived from pressure using the producer's atmosphere model.
   temperature_c:float; // Sensor temperature in degrees Celsius.
-  fields_updated:ushort; // Producer-defined bitmask indicating which fields changed in this sample.
-  id:ubyte; // Sensor instance identifier assigned by the producer.
+  flags:ubyte; // Bitmask of InertialFieldFlags bits updated in this sample.
+  id:ubyte; // Sensor instance identifier; also the instance segment of the Zenoh key.
 }
 
 // Air-data sample used by fixed-wing estimators and controllers.
@@ -21,72 +63,82 @@ struct AirDataData {
   timestamp_us:ulong; // Sample timestamp in monotonic boot time.
   absolute_pressure_hpa:float; // Static pressure used for altitude and air-density calculations.
   differential_pressure_hpa:float; // Pitot/static differential pressure used for airspeed.
-  pressure_altitude_m:float; // Pressure-derived altitude in meters.
+  pressure_altitude_m:float; // Pressure-derived altitude using the producer's atmosphere model.
   indicated_airspeed_m_s:float; // Indicated airspeed before density correction.
   true_airspeed_m_s:float; // True airspeed after density correction when available.
   angle_of_attack_rad:float; // Angle between body X axis and relative wind in the pitch plane.
   sideslip_rad:float; // Angle between body X axis and relative wind in the yaw plane.
   temperature_cdeg:short; // Static-air temperature in centi-degrees Celsius.
   differential_pressure_temperature_cdeg:short; // Differential-pressure sensor temperature in centi-degrees Celsius.
-  valid_flags:uint; // Producer-defined bitmask describing valid air-data fields and health.
+  flags:ubyte; // Bitmask of AirDataFlags bits valid in this sample.
 }
 
-// Per-cell battery voltages for packs with up to fourteen monitored cells.
-struct BatteryCellVoltages14 {
-  cell0_mv:ushort; // Cell 0 voltage, or zero when unavailable.
-  cell1_mv:ushort; // Cell 1 voltage, or zero when unavailable.
-  cell2_mv:ushort; // Cell 2 voltage, or zero when unavailable.
-  cell3_mv:ushort; // Cell 3 voltage, or zero when unavailable.
-  cell4_mv:ushort; // Cell 4 voltage, or zero when unavailable.
-  cell5_mv:ushort; // Cell 5 voltage, or zero when unavailable.
-  cell6_mv:ushort; // Cell 6 voltage, or zero when unavailable.
-  cell7_mv:ushort; // Cell 7 voltage, or zero when unavailable.
-  cell8_mv:ushort; // Cell 8 voltage, or zero when unavailable.
-  cell9_mv:ushort; // Cell 9 voltage, or zero when unavailable.
-  cell10_mv:ushort; // Cell 10 voltage, or zero when unavailable.
-  cell11_mv:ushort; // Cell 11 voltage, or zero when unavailable.
-  cell12_mv:ushort; // Cell 12 voltage, or zero when unavailable.
-  cell13_mv:ushort; // Cell 13 voltage, or zero when unavailable.
+// Per-cell battery voltages for packs with up to sixteen monitored cells.
+// Unmonitored cell slots are zero; zero is physically impossible for a
+// connected, monitored cell.
+struct BatteryCellVoltages16 {
+  cell0_mv:ushort; // Cell 0 voltage, or zero when unmonitored.
+  cell1_mv:ushort; // Cell 1 voltage, or zero when unmonitored.
+  cell2_mv:ushort; // Cell 2 voltage, or zero when unmonitored.
+  cell3_mv:ushort; // Cell 3 voltage, or zero when unmonitored.
+  cell4_mv:ushort; // Cell 4 voltage, or zero when unmonitored.
+  cell5_mv:ushort; // Cell 5 voltage, or zero when unmonitored.
+  cell6_mv:ushort; // Cell 6 voltage, or zero when unmonitored.
+  cell7_mv:ushort; // Cell 7 voltage, or zero when unmonitored.
+  cell8_mv:ushort; // Cell 8 voltage, or zero when unmonitored.
+  cell9_mv:ushort; // Cell 9 voltage, or zero when unmonitored.
+  cell10_mv:ushort; // Cell 10 voltage, or zero when unmonitored.
+  cell11_mv:ushort; // Cell 11 voltage, or zero when unmonitored.
+  cell12_mv:ushort; // Cell 12 voltage, or zero when unmonitored.
+  cell13_mv:ushort; // Cell 13 voltage, or zero when unmonitored.
+  cell14_mv:ushort; // Cell 14 voltage, or zero when unmonitored.
+  cell15_mv:ushort; // Cell 15 voltage, or zero when unmonitored.
 }
 
 // Battery or power-source state used for monitoring and failsafe decisions.
 struct PowerStatusData {
   timestamp_us:ulong; // Sample timestamp in monotonic boot time.
-  voltages:BatteryCellVoltages14; // Per-cell voltages for the monitored pack.
+  voltages:BatteryCellVoltages16; // Per-cell voltages for the monitored pack.
   current_consumed_mah:int; // Integrated discharged capacity since the producer's reset point.
   energy_consumed_hj:int; // Integrated discharged energy since the producer's reset point.
   time_remaining_s:int; // Estimated remaining runtime, or a negative value when unknown.
-  fault_flags:uint; // Producer-defined bitmask of battery or power faults.
-  current_battery_ca:short; // Signed battery current; positive means discharge.
+  fault_flags:ushort; // Bitmask of PowerFaultFlags bits.
+  current_battery_da:short; // Battery current in deci-amps; positive means discharge.
   temperature_cdeg:short; // Battery or power-module temperature in centi-degrees Celsius.
   remaining_pct:byte; // Remaining state of charge, or negative when unknown.
-  id:ubyte; // Battery or power-source instance identifier.
-  battery_function:ubyte; // Producer-defined role such as propulsion, avionics, or payload.
-  battery_type:ubyte; // Producer-defined chemistry or power-source type.
-  charge_state:ubyte; // Producer-defined charging/discharging state.
-  mode:ubyte; // Producer-defined battery operating mode.
+  id:ubyte; // Battery instance identifier; also the instance segment of the Zenoh key.
+  battery_function:synapse.types.BatteryFunction; // Role of this power source on the vehicle.
+  battery_type:synapse.types.BatteryType; // Battery chemistry or power-source type.
+  charge_state:synapse.types.BatteryChargeState; // Charging or discharge health state.
   connected:bool; // True when the power source is physically present and reporting.
 }
 
-// Global navigation satellite receiver fix and motion estimate.
+// Global navigation satellite receiver fix and motion estimate. This is a
+// raw-layer topic: angles keep the receiver's native convention (clockwise
+// from true north) so logs stay faithful to the hardware; the estimator
+// converts to REP-0103 conventions for estimate-layer topics.
 struct GnssFixData {
   timestamp_us:ulong; // Fix timestamp in monotonic boot time.
+  time_unix_us:ulong; // Receiver-reported Unix time of the fix; valid when GnssFixFlags.TimeValid is set.
   latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
   longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
   altitude_msl_mm:int; // Height above mean sea level.
   altitude_ellipsoid_mm:int; // Height above the WGS-84 ellipsoid.
-  horizontal_accuracy_mm:uint; // One-sigma horizontal position accuracy estimate.
-  vertical_accuracy_mm:uint; // One-sigma vertical position accuracy estimate.
-  velocity_accuracy_mm_s:uint; // One-sigma ground velocity accuracy estimate.
-  yaw_accuracy_deg_e5:uint; // One-sigma yaw accuracy estimate when receiver yaw is available.
+  horizontal_accuracy_mm:ushort; // One-sigma horizontal accuracy; producers must saturate at 65535, never truncation-cast (65535 means at or above 65.535 m, unusable).
+  vertical_accuracy_mm:ushort; // One-sigma vertical accuracy; producers must saturate at 65535, never truncation-cast.
+  velocity_accuracy_mm_s:ushort; // One-sigma velocity accuracy; producers must saturate at 65535, never truncation-cast.
+  yaw_accuracy_cdeg:ushort; // One-sigma yaw accuracy when receiver yaw is available.
   hdop_centi:ushort; // Horizontal dilution of precision scaled by 100.
   vdop_centi:ushort; // Vertical dilution of precision scaled by 100.
   ground_speed_cm_s:ushort; // Horizontal ground speed magnitude.
-  course_over_ground_cdeg:ushort; // Course over ground; zero east and positive counter-clockwise per ROS REP-0103 yaw.
-  yaw_cdeg:ushort; // Vehicle yaw from the receiver when available; zero east and positive counter-clockwise.
-  fix_type:ubyte; // Producer-defined fix quality such as no fix, 2D, 3D, RTK float, or RTK fixed.
-  satellites_visible:ubyte; // Number of satellites used or visible according to the receiver.
-  id:ubyte; // GNSS receiver instance identifier.
+  course_over_ground_cdeg:ushort; // Course over ground, receiver native: zero at true north, positive clockwise; valid when CourseValid is set.
+  yaw_cdeg:ushort; // Receiver-reported vehicle yaw, zero at true north, positive clockwise; valid when YawValid is set.
+  velocity_up_cm_s:short; // Vertical velocity, positive up; valid when VelocityUpValid is set.
+  flags:ubyte; // Bitmask of GnssFixFlags bits.
+  fix_type:synapse.types.GnssFixType; // Receiver fix quality.
+  satellites_used:ubyte; // Number of satellites used in the solution.
+  satellites_visible:ubyte; // Number of satellites tracked or visible.
+  id:ubyte; // GNSS receiver instance identifier; also the instance segment of the Zenoh key.
 }
 
 // FlatBuffers root wrapper for InertialSampleData.
