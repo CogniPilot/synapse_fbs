@@ -2,7 +2,11 @@
 //!
 //! The schema source of truth lives in `fbs/`. Release CI stages this crate
 //! under `target/xtask/packages/rust`, generates bindings there with
-//! `flatc --rust --rust-module-root-file`, then publishes it to crates.io.
+//! `flatc --rust --rust-module-root-file`, embeds the schema sources and
+//! compiled binary schemas (`fbs/`, `bfbs/`), then publishes it to crates.io.
+
+/// Version of the synapse_fbs release this crate was generated from.
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[allow(warnings)]
 pub mod generated;
@@ -23,6 +27,8 @@ pub mod sil {
     pub use crate::generated::synapse::sil::*;
 }
 
+pub mod schemas;
 pub mod topic_catalog;
+pub mod topic_decode;
 
 pub use generated::synapse;

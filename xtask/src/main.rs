@@ -170,6 +170,16 @@ fn check(root: &Path) -> Result<()> {
         &check_dir.join("synapse/topic_print.h"),
         &check_dir.join("topic_print.c"),
     )?;
+    templates.render_to_file(
+        "xtask/topic_catalog/schemas.rs.jinja",
+        embedded_schemas_context(&docs)?,
+        &check_dir.join("schemas.rs"),
+    )?;
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_decode.rs.jinja",
+        context.clone(),
+        &check_dir.join("topic_decode.rs"),
+    )?;
     smoke_catalog_helpers(&check_dir)?;
 
     println!("schema checks passed for {} topics", topics.len());
@@ -854,6 +864,14 @@ fn generate_bindings(
     let topics = topic_entries(&docs)?;
     write_package_topic_catalogs(templates, packages, &topics)?;
 
+    // The Rust crate ships the wire contract itself: schema sources, compiled
+    // binary schemas, and a generated debug decoder, so downstream tools do
+    // not vendor schema copies that can drift from the pinned release.
+    copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
+    generate_reflection_schemas(root, flatc, &packages.rust.join("bfbs"))?;
+    write_rust_embedded_schemas(templates, &docs, &packages.rust)?;
+    write_rust_topic_decode(templates, &topics, &packages.rust)?;
+
     Ok(())
 }
 
@@ -974,6 +992,26 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
                     .payload_size
                     .map(|value| format!("Some({value})"))
                     .unwrap_or_else(|| "None".to_string());
+                let root_table_rust_path =
+                    rust_module_path(&topic.root_table_namespace, &topic.root_table);
+                let payload_type_rust_path = topic
+                    .payload_type
+                    .as_deref()
+                    .zip(topic.payload_type_namespace.as_deref())
+                    .map(|(payload, namespace)| rust_module_path(namespace, payload))
+                    .unwrap_or_default();
+                let root_table_qualified_literal = source_string_literal(&qualified_name(
+                    &topic.root_table_namespace,
+                    &topic.root_table,
+                ));
+                let payload_type_qualified_literal = topic
+                    .payload_type
+                    .as_deref()
+                    .zip(topic.payload_type_namespace.as_deref())
+                    .map(|(payload, namespace)| {
+                        source_string_literal(&qualified_name(namespace, payload))
+                    })
+                    .unwrap_or_default();
 
                 TopicTemplateEntry {
                     id: topic.id,
@@ -999,6 +1037,10 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
                     payload_size_c,
                     payload_size_python,
                     payload_size_rust,
+                    root_table_rust_path,
+                    payload_type_rust_path,
+                    root_table_qualified_literal,
+                    payload_type_qualified_literal,
                     schema_file_literal: source_string_literal(&topic.schema_file),
                     fixed_layout_python: if topic.fixed_layout { "True" } else { "False" },
                     fixed_layout_c: if topic.fixed_layout { "true" } else { "false" },
@@ -1038,6 +1080,77 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
             })
             .collect(),
     })
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct EmbeddedSchemaEntry {
+    name_literal: String,
+    file_literal: String,
+    fbs_include_literal: String,
+    bfbs_include_literal: String,
+    root_type_rust: String,
+    file_identifier_rust: String,
+}
+
+/// Context for the embedded-schemas module: one entry per file in SCHEMAS,
+/// pairing the schema source and its compiled binary schema so the staged
+/// crate can ship the wire contract instead of consumers vendoring copies.
+fn embedded_schemas_context(docs: &SchemaDoc) -> Result<Value> {
+    let mut schemas = Vec::new();
+    for schema in SCHEMAS {
+        let file = docs
+            .files
+            .iter()
+            .find(|file| file.name == *schema)
+            .ok_or_else(|| {
+                io::Error::other(format!("schema {schema} is not part of the parsed docs"))
+            })?;
+        let stem = Path::new(schema)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| io::Error::other(format!("schema path has no file stem: {schema}")))?;
+        schemas.push(EmbeddedSchemaEntry {
+            name_literal: source_string_literal(stem),
+            file_literal: source_string_literal(schema),
+            fbs_include_literal: source_string_literal(&format!("../{schema}")),
+            bfbs_include_literal: source_string_literal(&format!("../bfbs/{stem}.bfbs")),
+            root_type_rust: file
+                .root_type
+                .as_deref()
+                .map(|value| format!("Some({})", source_string_literal(value)))
+                .unwrap_or_else(|| "None".to_string()),
+            file_identifier_rust: file
+                .file_identifier
+                .as_deref()
+                .map(|value| format!("Some({})", source_string_literal(value)))
+                .unwrap_or_else(|| "None".to_string()),
+        });
+    }
+    Ok(Value::from_serialize(context! { schemas => schemas }))
+}
+
+fn write_rust_embedded_schemas(
+    templates: &Templates,
+    docs: &SchemaDoc,
+    package_root: &Path,
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/schemas.rs.jinja",
+        embedded_schemas_context(docs)?,
+        &package_root.join("src/schemas.rs"),
+    )
+}
+
+fn write_rust_topic_decode(
+    templates: &Templates,
+    topics: &[TopicEntry],
+    package_root: &Path,
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_decode.rs.jinja",
+        topic_catalog_context(topics),
+        &package_root.join("src/topic_decode.rs"),
+    )
 }
 
 fn check_rust_package(package_root: &Path) -> Result<()> {
@@ -1527,6 +1640,8 @@ struct SchemaFileDoc {
     namespace: String,
     includes: Vec<String>,
     entities: Vec<SchemaEntityDoc>,
+    root_type: Option<String>,
+    file_identifier: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1558,7 +1673,9 @@ struct TopicEntry {
     key: String,
     key_suffix: String,
     root_table: String,
+    root_table_namespace: String,
     payload_type: Option<String>,
+    payload_type_namespace: Option<String>,
     payload_size: Option<usize>,
     schema_file: String,
     fixed_layout: bool,
@@ -1608,6 +1725,10 @@ struct TopicTemplateEntry {
     payload_size_c: String,
     payload_size_python: String,
     payload_size_rust: String,
+    root_table_rust_path: String,
+    payload_type_rust_path: String,
+    root_table_qualified_literal: String,
+    payload_type_qualified_literal: String,
     schema_file_literal: String,
     fixed_layout_python: &'static str,
     fixed_layout_c: &'static str,
@@ -1725,6 +1846,8 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
     let mut namespace = String::new();
     let mut includes = Vec::new();
     let mut entities = Vec::new();
+    let mut root_type = None;
+    let mut file_identifier = None;
     let mut current: Option<SchemaEntityDoc> = None;
     let mut pending_comments = Vec::new();
 
@@ -1780,6 +1903,23 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
             continue;
         }
 
+        if let Some(rest) = code.strip_prefix("root_type ") {
+            let declared = rest.trim_end_matches(';').trim();
+            root_type = Some(if declared.contains('.') || namespace.is_empty() {
+                declared.to_string()
+            } else {
+                format!("{namespace}.{declared}")
+            });
+            pending_comments.clear();
+            continue;
+        }
+
+        if let Some(rest) = code.strip_prefix("file_identifier ") {
+            file_identifier = Some(rest.trim_end_matches(';').trim().trim_matches('"').to_string());
+            pending_comments.clear();
+            continue;
+        }
+
         if let Some((kind, entity_name, value_type)) = parse_schema_entity_start(code) {
             current = Some(SchemaEntityDoc {
                 kind,
@@ -1809,6 +1949,8 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
         namespace,
         includes,
         entities,
+        root_type,
+        file_identifier,
     })
 }
 
@@ -1897,6 +2039,8 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
         let payload_entity = payload_type
             .as_ref()
             .and_then(|payload| find_schema_entity(docs, payload));
+        let payload_type_namespace =
+            payload_entity.map(|(_, entity)| entity.namespace.clone());
         let fixed_layout =
             payload_entity.is_some_and(|(_, entity)| entity.kind == SchemaEntityKind::Struct);
         let payload_size = if fixed_layout {
@@ -1922,7 +2066,9 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
             key: format!("{TOPIC_KEY_PREFIX}/{key_suffix}"),
             key_suffix,
             root_table: root_table.name.clone(),
+            root_table_namespace: root_table.namespace.clone(),
             payload_type,
+            payload_type_namespace,
             payload_size,
             schema_file: schema_file.name.clone(),
             fixed_layout,
@@ -3199,6 +3345,25 @@ fn type_link_target<'a>(type_name: &str, entity_links: &'a EntityLinkMap) -> Opt
     entity_links
         .get(type_name)
         .or_else(|| entity_links.get(&type_lookup_name(type_name)))
+}
+
+/// Path of a schema entity inside the flatc-generated Rust module tree, for
+/// example ("synapse.topic", "VehicleHealthData") -> "synapse::topic::VehicleHealthData".
+fn rust_module_path(namespace: &str, name: &str) -> String {
+    if namespace.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}::{name}", namespace.replace('.', "::"))
+    }
+}
+
+/// Fully qualified FlatBuffers name, for example "synapse.topic.VehicleHealthData".
+fn qualified_name(namespace: &str, name: &str) -> String {
+    if namespace.is_empty() {
+        name.to_string()
+    } else {
+        format!("{namespace}.{name}")
+    }
 }
 
 fn type_lookup_name(type_name: &str) -> String {
