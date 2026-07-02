@@ -163,6 +163,13 @@ fn check(root: &Path) -> Result<()> {
     ] {
         templates.render_to_file(template, context.clone(), &check_dir.join(output))?;
     }
+    write_c_topic_print(
+        &templates,
+        &docs,
+        &topics,
+        &check_dir.join("synapse/topic_print.h"),
+        &check_dir.join("topic_print.c"),
+    )?;
     smoke_catalog_helpers(&check_dir)?;
 
     println!("schema checks passed for {} topics", topics.len());
@@ -386,6 +393,22 @@ print("catalog python helpers ok")
             .arg("catalog_test_c"))?;
         run(&mut Command::new(check_dir.join("catalog_test_c")))?;
         println!("catalog c helpers ok");
+
+        write_file(&check_dir.join("print_test.c"), C_PRINT_TEST)?;
+        run(Command::new("cc")
+            .current_dir(check_dir)
+            .arg("-std=c11")
+            .arg("-Wall")
+            .arg("-Wextra")
+            .arg("-Werror")
+            .arg("-I")
+            .arg(".")
+            .arg("print_test.c")
+            .arg("topic_print.c")
+            .arg("-o")
+            .arg("print_test_c"))?;
+        run(&mut Command::new(check_dir.join("print_test_c")))?;
+        println!("topic print c helpers ok");
     }
 
     if command_succeeds(Command::new("rustc").arg("--version")) {
@@ -453,6 +476,74 @@ int main(void) {
            strcmp(command->request_type, "synapse.cmd.ParamGetRequest") == 0);
 
     printf("catalog c helpers ok\n");
+    return 0;
+}
+"#;
+
+/// Runtime assertions for the generated C field-descriptor printer:
+/// descriptor lookup, dotted nested-struct names, rendering, and the
+/// failure paths for table topics and payload size mismatches.
+const C_PRINT_TEST: &str = r#"#include "topic_catalog.h"
+#include <synapse/topic_print.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const synapse_topic_info_t *health = synapse_topic_by_name("VehicleHealth");
+    assert(health != NULL && health->fixed_layout);
+
+    const synapse_topic_fields_t *fields = synapse_topic_fields_by_id(health->id);
+    assert(fields != NULL);
+    assert(fields->payload_size == health->payload_size);
+    assert(fields->field_count > 0);
+
+    unsigned char payload[256] = {0};
+    assert(fields->payload_size <= sizeof(payload));
+
+    const synapse_field_desc_t *flight_mode = NULL;
+    for (uint16_t i = 0; i < fields->field_count; ++i) {
+        if (strcmp(fields->fields[i].name, "flight_mode") == 0) {
+            flight_mode = &fields->fields[i];
+        }
+    }
+    assert(flight_mode != NULL && flight_mode->kind == SYNAPSE_FIELD_U8);
+    payload[flight_mode->offset] = 7;
+
+    char line[512];
+    int written = synapse_topic_snprint(line, sizeof(line), health->id, payload,
+                                        fields->payload_size);
+    assert(written > 0 && (size_t)written == strlen(line));
+    assert(strstr(line, "flight_mode=7") != NULL);
+    assert(strstr(line, "timestamp_us=0") != NULL);
+
+    const synapse_topic_info_t *attitude = synapse_topic_by_name("AttitudeEstimate");
+    assert(attitude != NULL);
+    const synapse_topic_fields_t *attitude_fields =
+        synapse_topic_fields_by_id(attitude->id);
+    assert(attitude_fields != NULL);
+    bool found_quat_w = false;
+    for (uint16_t i = 0; i < attitude_fields->field_count; ++i) {
+        if (strcmp(attitude_fields->fields[i].name, "attitude.w") == 0) {
+            found_quat_w = true;
+            assert(attitude_fields->fields[i].kind == SYNAPSE_FIELD_F32);
+        }
+    }
+    assert(found_quat_w);
+
+    const synapse_topic_info_t *mocap = synapse_topic_by_name("MocapFrame");
+    assert(mocap != NULL && !mocap->fixed_layout);
+    assert(synapse_topic_fields_by_id(mocap->id) == NULL);
+    assert(synapse_topic_snprint(line, sizeof(line), health->id, payload,
+                                 fields->payload_size + 1) < 0);
+
+    char tiny[8];
+    int full = synapse_topic_snprint(tiny, sizeof(tiny), health->id, payload,
+                                     fields->payload_size);
+    assert(full == written);
+    assert(strlen(tiny) < sizeof(tiny));
+
+    printf("topic print c helpers ok\n");
     return 0;
 }
 "#;
@@ -1297,6 +1388,13 @@ fn build_archives(
     )?;
     copy_common_archive_files(root, &c_root)?;
     write_c_topic_catalogs(&templates, &c_root, &topics)?;
+    write_c_topic_print(
+        &templates,
+        &docs,
+        &topics,
+        &c_root.join("include/synapse/topic_print.h"),
+        &c_root.join("src/topic_print.c"),
+    )?;
     write_schema_hashes(root, &c_root.join("schema.sha256"))?;
     write_bfbs_hashes(&c_root, &c_root.join("bfbs.sha256"))?;
     let runtime_source_paths = runtime_source_names(&c_root.join("src/flatcc-runtime"))?
@@ -1927,6 +2025,167 @@ fn struct_layout(
     visiting.remove(&lookup);
     layouts.insert(lookup, layout);
     Ok(layout)
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct FieldDescTemplateEntry {
+    name_literal: String,
+    offset: usize,
+    kind: &'static str,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct TopicFieldsTemplateEntry {
+    payload_type: String,
+    topic_id: u16,
+    payload_size: usize,
+    field_count: usize,
+    fields: Vec<FieldDescTemplateEntry>,
+}
+
+fn scalar_field_kind(type_name: &str) -> Option<&'static str> {
+    Some(match type_name {
+        "bool" => "SYNAPSE_FIELD_BOOL",
+        "byte" | "int8" => "SYNAPSE_FIELD_I8",
+        "ubyte" | "uint8" => "SYNAPSE_FIELD_U8",
+        "short" | "int16" => "SYNAPSE_FIELD_I16",
+        "ushort" | "uint16" => "SYNAPSE_FIELD_U16",
+        "int" | "int32" => "SYNAPSE_FIELD_I32",
+        "uint" | "uint32" => "SYNAPSE_FIELD_U32",
+        "long" | "int64" => "SYNAPSE_FIELD_I64",
+        "ulong" | "uint64" => "SYNAPSE_FIELD_U64",
+        "float" | "float32" => "SYNAPSE_FIELD_F32",
+        "double" | "float64" => "SYNAPSE_FIELD_F64",
+        _ => return None,
+    })
+}
+
+/// Flatten a fixed-layout payload into scalar field descriptors. Nested
+/// struct members become dotted names ("attitude.w"); enum members use
+/// their base scalar kind. Offsets follow the same FlatBuffers layout
+/// rules as struct_layout.
+fn collect_field_descs(
+    docs: &SchemaDoc,
+    type_name: &str,
+    prefix: &str,
+    base_offset: usize,
+    layouts: &mut BTreeMap<String, (usize, usize)>,
+    out: &mut Vec<FieldDescTemplateEntry>,
+) -> Result<()> {
+    let lookup = type_lookup_name(type_name);
+    if let Some(kind) = scalar_field_kind(&lookup) {
+        out.push(FieldDescTemplateEntry {
+            name_literal: source_string_literal(prefix),
+            offset: base_offset,
+            kind,
+        });
+        return Ok(());
+    }
+
+    let Some((_, entity)) = find_schema_entity(docs, &lookup) else {
+        return fail(format!(
+            "cannot collect field descriptors for unknown type {lookup}"
+        ));
+    };
+    match entity.kind {
+        SchemaEntityKind::Enum => {
+            let base = entity
+                .value_type
+                .as_deref()
+                .map(enum_base_type)
+                .unwrap_or_default();
+            let Some(kind) = scalar_field_kind(base) else {
+                return fail(format!("enum {lookup} has unsupported base type '{base}'"));
+            };
+            out.push(FieldDescTemplateEntry {
+                name_literal: source_string_literal(prefix),
+                offset: base_offset,
+                kind,
+            });
+        }
+        SchemaEntityKind::Struct => {
+            let mut member_offset = 0usize;
+            for member in &entity.members {
+                let Some(member_type) = member.type_name.as_deref() else {
+                    return fail(format!(
+                        "struct {lookup} member {} is missing a type",
+                        member.name
+                    ));
+                };
+                let mut visiting = BTreeSet::new();
+                let (size, align) = struct_layout(docs, member_type, layouts, &mut visiting)?;
+                member_offset = round_up(member_offset, align);
+                let name = if prefix.is_empty() {
+                    member.name.clone()
+                } else {
+                    format!("{prefix}.{}", member.name)
+                };
+                collect_field_descs(
+                    docs,
+                    member_type,
+                    &name,
+                    base_offset + member_offset,
+                    layouts,
+                    out,
+                )?;
+                member_offset += size;
+            }
+        }
+        _ => {
+            return fail(format!(
+                "{lookup} is a {}, not a fixed-layout struct or enum",
+                entity.kind.as_str()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn topic_print_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Value> {
+    let mut layouts = BTreeMap::new();
+    let mut structs = Vec::new();
+    for topic in topics {
+        if !topic.fixed_layout {
+            continue;
+        }
+        let payload = topic
+            .payload_type
+            .as_deref()
+            .expect("fixed-layout topic has a payload type");
+        let payload_size = topic
+            .payload_size
+            .expect("fixed-layout topic has a payload size");
+        let mut fields = Vec::new();
+        collect_field_descs(docs, payload, "", 0, &mut layouts, &mut fields)?;
+        structs.push(TopicFieldsTemplateEntry {
+            payload_type: type_lookup_name(payload),
+            topic_id: topic.id,
+            payload_size,
+            field_count: fields.len(),
+            fields,
+        });
+    }
+    Ok(context! { structs => structs })
+}
+
+fn write_c_topic_print(
+    templates: &Templates,
+    docs: &SchemaDoc,
+    topics: &[TopicEntry],
+    header_path: &Path,
+    source_path: &Path,
+) -> Result<()> {
+    let context = topic_print_context(docs, topics)?;
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_print.h.jinja",
+        context.clone(),
+        header_path,
+    )?;
+    templates.render_to_file(
+        "xtask/topic_catalog/topic_print.c.jinja",
+        context,
+        source_path,
+    )
 }
 
 /// Protocol-level consistency checks beyond per-entity documentation:

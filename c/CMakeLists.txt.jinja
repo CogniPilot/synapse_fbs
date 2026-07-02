@@ -14,3 +14,10 @@ add_library(synapse_fbs_flatcc_runtime STATIC EXCLUDE_FROM_ALL
 add_library(synapse_fbs::flatcc_runtime ALIAS synapse_fbs_flatcc_runtime)
 
 target_link_libraries(synapse_fbs_flatcc_runtime PUBLIC synapse_fbs_c)
+
+add_library(synapse_fbs_print STATIC EXCLUDE_FROM_ALL
+  "${CMAKE_CURRENT_LIST_DIR}/src/topic_print.c"
+)
+add_library(synapse_fbs::print ALIAS synapse_fbs_print)
+
+target_link_libraries(synapse_fbs_print PUBLIC synapse_fbs_c)
