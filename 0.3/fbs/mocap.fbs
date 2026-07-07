@@ -1,0 +1,69 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Fixed-layout position sample for a labeled or unlabeled mocap marker.
+struct MocapMarkerSample {
+  id:int; // Marker identifier assigned by the mocap source; negative values may indicate unlabeled markers.
+  position_enu_m:synapse.types.Vec3f; // Marker position in the mocap ENU frame.
+  residual:float; // Producer-defined fit residual or reprojection error.
+}
+
+// Fixed-layout pose sample for a tracked mocap rigid body.
+struct MocapRigidBodySample {
+  id:int; // Rigid-body identifier assigned by the mocap source.
+  position_enu_m:synapse.types.Vec3f; // Rigid-body position in the mocap ENU frame.
+  attitude:synapse.types.Quaternionf; // Rigid-body orientation rotating body FLU vectors into the mocap ENU frame.
+  residual:float; // Producer-defined solve residual or tracking error.
+  tracking_valid:bool; // True when the rigid body is actively tracked in this frame.
+}
+
+// Fixed-layout pose sample for a tracked skeleton segment.
+struct MocapSegmentSample {
+  skeleton_id:int; // Skeleton identifier assigned by the mocap source.
+  segment_id:int; // Segment identifier within the skeleton.
+  position_enu_m:synapse.types.Vec3f; // Segment position in the mocap ENU frame.
+  attitude:synapse.types.Quaternionf; // Segment orientation rotating segment FLU vectors into the mocap ENU frame.
+  tracking_valid:bool; // True when the segment is actively tracked in this frame.
+}
+
+// Static metadata for a mocap marker that consumers can cache.
+table MocapMarkerDefinition {
+  id:int; // Marker identifier used by MocapMarkerSample.
+  name:string; // Human-readable marker name.
+  color:uint; // Producer-defined display color encoded as an integer.
+}
+
+// Static metadata for a mocap rigid body that consumers can cache.
+table MocapRigidBodyDefinition {
+  id:int; // Rigid-body identifier used by MocapRigidBodySample.
+  name:string; // Human-readable rigid-body name.
+}
+
+// Static metadata for a mocap skeleton segment that consumers can cache.
+table MocapSegmentDefinition {
+  skeleton_id:int; // Skeleton identifier used by MocapSegmentSample.
+  skeleton_name:string; // Human-readable skeleton name.
+  segment_id:int; // Segment identifier within the skeleton.
+  segment_name:string; // Human-readable segment name.
+}
+
+// Variable-size mocap metadata packet describing tracked objects. This is a
+// cached definition record and an intentional table boundary.
+table MocapDefinition {
+  source:string; // Mocap system or producer name.
+  frame_id:string; // Frame name for the mocap ENU coordinate system.
+  labeled_markers:[MocapMarkerDefinition]; // Marker definitions indexed by marker id.
+  rigid_bodies:[MocapRigidBodyDefinition]; // Rigid-body definitions indexed by rigid-body id.
+  skeleton_segments:[MocapSegmentDefinition]; // Skeleton segment definitions indexed by skeleton and segment id.
+}
+
+// Variable-size mocap frame containing all tracked samples for one timestamp.
+table MocapFrame {
+  timestamp_us:ulong; // Frame timestamp in monotonic boot time.
+  frame_number:uint; // Producer frame counter for loss/reorder detection.
+  labeled_markers:[MocapMarkerSample]; // Marker samples with stable source identifiers.
+  unlabeled_markers:[MocapMarkerSample]; // Marker samples without stable source identifiers.
+  rigid_bodies:[MocapRigidBodySample]; // Rigid-body pose samples.
+  skeleton_segments:[MocapSegmentSample]; // Skeleton segment pose samples.
+}

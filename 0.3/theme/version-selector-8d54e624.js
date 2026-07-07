@@ -3,7 +3,7 @@
     { dir: "main", label: "main (development)" },
     { dir: "0.3", label: "0.3" },
   ];
-  const current = "main";
+  const current = "0.3";
   function docsBaseUrl() {
     const script = document.currentScript || document.querySelector('script[src*="version-selector"]');
     if (!script) {
