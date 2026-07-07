@@ -44,17 +44,52 @@ jobs:
                 --notes "Release ${GITHUB_REF_NAME}"
             fi
           '
+      - name: Check published package versions
+        id: published
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          rust=false
+          python=false
+          javascript=false
+          user_agent="CogniPilot/synapse_fbs release workflow"
+
+          if curl --fail --silent --show-error --user-agent "${user_agent}" "https://crates.io/api/v1/crates/synapse_fbs/${version}" >/dev/null; then
+            rust=true
+          fi
+          if curl --fail --silent --show-error --user-agent "${user_agent}" "https://pypi.org/pypi/synapse-fbs/${version}/json" >/dev/null; then
+            python=true
+          fi
+          if nix develop --command npm view "@cognipilot/synapse-fbs@${version}" version >/dev/null 2>&1; then
+            javascript=true
+          fi
+
+          {
+            echo "version=${version}"
+            echo "rust=${rust}"
+            echo "python=${python}"
+            echo "javascript=${javascript}"
+          } >> "${GITHUB_OUTPUT}"
+
+          echo "version=${version}"
+          echo "rust=${rust}"
+          echo "python=${python}"
+          echo "javascript=${javascript}"
       - name: Authenticate with crates.io
+        if: steps.published.outputs.rust != 'true'
         id: crates-io-auth
         uses: rust-lang/crates-io-auth-action@v1
       - name: Publish Rust crate to crates.io
+        if: steps.published.outputs.rust != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
         run: nix develop --command cargo publish --manifest-path target/xtask/packages/rust/Cargo.toml --allow-dirty
       - name: Publish Python package to PyPI
+        if: steps.published.outputs.python != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: target/xtask/packages/python/dist/
       - name: Publish JavaScript package to npm
+        if: steps.published.outputs.javascript != 'true'
         run: nix develop --command npm publish --access public
         working-directory: target/xtask/packages/js
