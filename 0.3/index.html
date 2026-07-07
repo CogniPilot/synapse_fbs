@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-98273ec1.js";
+            window.path_to_searchindex_js = "searchindex-aec10a37.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c9744c58.js"></script>
@@ -205,7 +205,7 @@
 <h2 id="topic-catalog"><a class="header" href="#topic-catalog">Topic Catalog</a></h2>
 <p>The generated topic catalog is included as <code>topics.json</code> in schema-asset archives and as language helpers where the package has a public API. It records <code>TopicId</code>, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.</p>
 <p>Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.</p>
-<h2 id="ros-and-flatros"><a class="header" href="#ros-and-flatros">ROS And FlatROS</a></h2>
+<h2 id="ros-and-flatros"><a class="header" href="#ros-and-flatros">ROS and FlatROS</a></h2>
 <p>ROS messages are local integration types, not the Synapse over-the-air format. They are useful for visualization, autonomy stacks, simulation, rosbag tooling, and operator workflows, but they should not replace compact Synapse FlatBuffers payloads on constrained vehicle links.</p>
 <p>ROS 2 integration should happen at the edge through bridge nodes that translate selected Synapse topics into ROS concepts only where ROS tooling needs them. The planned flatros2 path is a generated ROS workspace or release archive that consumes the Synapse schemas and topic catalog, depends on <code>flatros2</code>, and provides adapter nodes without making ROS message definitions the protocol source of truth.</p>
 <h2 id="layout-rules"><a class="header" href="#layout-rules">Layout Rules</a></h2>
