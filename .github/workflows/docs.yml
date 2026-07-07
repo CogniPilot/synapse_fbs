@@ -31,12 +31,13 @@ jobs:
         run: |
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
+            docs_version="${version%.*}"
           elif [[ "${GITHUB_REF_TYPE}" == "branch" ]]; then
-            version="${GITHUB_REF_NAME}"
+            docs_version="${GITHUB_REF_NAME}"
           else
-            version="manual"
+            docs_version="manual"
           fi
-          echo "DOCS_VERSION=${version}" >> "${GITHUB_ENV}"
+          echo "DOCS_VERSION=${docs_version}" >> "${GITHUB_ENV}"
       - name: Prepare gh-pages worktree
         shell: bash
         run: |

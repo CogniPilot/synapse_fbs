@@ -283,7 +283,7 @@ otherwise.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.3.1"
+synapse_fbs = "0.3.2"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -333,7 +333,7 @@ include(FetchContent)
 
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.3.1/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.3.2/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -373,7 +373,7 @@ Generate the static schema documentation locally:
 
 ```sh
 cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
-cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.3.1 --out-dir target/xtask/docs
+cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.3 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -387,7 +387,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.3.1` (which must match `PACKAGE_VERSION` in
+Pushing a tag like `v0.3.2` (which must match `PACKAGE_VERSION` in
 `tools.lock`) publishes:
 
 - staged `target/xtask/packages/rust/` to crates.io using
@@ -410,8 +410,9 @@ using a versioned URL and `URL_HASH SHA256=...`.
 
 ## Schema Docs
 
-The docs workflow publishes versioned schema documentation to the `gh-pages`
-branch. Pushes to `main` update `/main/`; release tags like `v0.3.1` update
-`/0.3.1/`. The root docs URL redirects to `/main/`, and the mdBook version
-selector links to published release docs:
+The docs workflow publishes schema documentation to the `gh-pages` branch.
+Pushes to `main` update `/main/`; release tags update the matching minor
+version docs, so `v0.3.2` updates `/0.3/`. Exact historical docs can be rebuilt
+from the corresponding tag. The root docs URL redirects to `/main/`, and the
+mdBook version selector links to published release docs:
 <https://cognipilot.github.io/synapse_fbs/>.
