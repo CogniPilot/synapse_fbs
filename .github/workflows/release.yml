@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/nix-installer-action@v22
       - uses: DeterminateSystems/magic-nix-cache-action@v12
       - name: Build and verify
         run: nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- ci --release-name "${GITHUB_REF_NAME}"
