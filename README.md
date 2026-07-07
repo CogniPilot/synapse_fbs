@@ -1,8 +1,10 @@
 # synapse_fbs
 
 [![CI](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml)
-[![Docs](https://github.com/CogniPilot/synapse_fbs/actions/workflows/docs.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/docs.yml)
-[![Release](https://github.com/CogniPilot/synapse_fbs/actions/workflows/release.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/release.yml)
+[![Schema docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://cognipilot.github.io/synapse_fbs/)
+[![crates.io](https://img.shields.io/crates/v/synapse_fbs)](https://crates.io/crates/synapse_fbs)
+[![PyPI](https://img.shields.io/pypi/v/synapse-fbs)](https://pypi.org/project/synapse-fbs/)
+[![npm](https://img.shields.io/npm/v/@cognipilot/synapse-fbs)](https://www.npmjs.com/package/@cognipilot/synapse-fbs)
 
 FlatBuffers schemas and generated language bindings for Synapse.
 
