@@ -416,12 +416,11 @@ Pushing a semantic version tag such as `v0.3.3` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
-- staged `target/xtask/packages/rust/` to crates.io using
-  `CARGO_REGISTRY_TOKEN`
+- staged `target/xtask/packages/rust/` to crates.io using trusted publishing
 - staged `target/xtask/packages/python/dist/` to PyPI using trusted publishing
   (the `synapse-fbs` PyPI project must have this repository's
   `release.yml` workflow registered as a trusted publisher before tagging)
-- staged `target/xtask/packages/js/` to npm using `NPM_TOKEN` with provenance
+- staged `target/xtask/packages/js/` to npm using trusted publishing
 - GitHub Release assets:
   - Python wheel and sdist
   - Rust `.crate` source package

@@ -56,12 +56,5 @@ jobs:
         with:
           packages-dir: target/xtask/packages/python/dist/
       - name: Publish JavaScript package to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            npm config set //registry.npmjs.org/:_authToken "${NODE_AUTH_TOKEN}"
-            npm publish --provenance --access public
-          '
+        run: nix develop --command npm publish --access public
         working-directory: target/xtask/packages/js

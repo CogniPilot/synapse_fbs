@@ -69,7 +69,7 @@
               git
               github-cli
               mdbook
-              nodejs_22
+              nodejs_24
               python
               rustc
               rustfmt
