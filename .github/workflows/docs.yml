@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 concurrency:
   group: docs
@@ -23,9 +24,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install mdBook
-        run: cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v12
       - name: Resolve docs version
         shell: bash
         run: |
@@ -59,7 +59,7 @@ jobs:
 
           echo "PAGES_DIR=${pages_dir}" >> "${GITHUB_ENV}"
       - name: Generate docs
-        run: cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version "${DOCS_VERSION}" --out-dir "${PAGES_DIR}"
+        run: nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version "${DOCS_VERSION}" --out-dir "${PAGES_DIR}"
       - name: Publish docs
         shell: bash
         run: |

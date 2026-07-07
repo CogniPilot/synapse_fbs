@@ -1,5 +1,5 @@
 [package]
-name = "synapse-fbs-xtask"
+name = "xtask"
 version = "0.1.0"
 edition = "2024"
 publish = false
@@ -7,3 +7,4 @@ publish = false
 [dependencies]
 minijinja = { version = "=2.19.0", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
+toml = "=0.9.9"

@@ -106,6 +106,43 @@ struct Tools {
     mdbook_version: String,
 }
 
+#[derive(Debug, serde::Deserialize)]
+struct ToolsFile {
+    package: PackageTools,
+    flatbuffers: FlatbuffersTools,
+    #[serde(rename = "flatbuffers-build")]
+    flatbuffers_build: FlatbuffersBuildTools,
+    flatcc: FlatccTools,
+    docs: DocsTools,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct PackageTools {
+    version: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct FlatbuffersTools {
+    version: String,
+    commit: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct FlatbuffersBuildTools {
+    version: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct FlatccTools {
+    version: String,
+    commit: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct DocsTools {
+    mdbook: String,
+}
+
 #[derive(Debug)]
 struct Options {
     release_name: String,
@@ -299,45 +336,40 @@ fn parse_args() -> Result<(String, Options)> {
 fn find_repo_root(start: &Path) -> Result<PathBuf> {
     let mut dir = start.to_path_buf();
     loop {
-        if dir.join("tools.lock").is_file() && dir.join("fbs/all.fbs").is_file() {
+        if dir.join("xtask/Cargo.toml").is_file() && dir.join("fbs/all.fbs").is_file() {
             return Ok(dir);
         }
         if !dir.pop() {
-            return fail("could not find repository root containing tools.lock and fbs/all.fbs");
+            return fail(
+                "could not find repository root containing xtask/Cargo.toml and fbs/all.fbs",
+            );
         }
     }
 }
 
-fn read_tools(root: &Path) -> Result<Tools> {
-    let content = fs::read_to_string(root.join("tools.lock"))?;
-    let mut values = BTreeMap::new();
-    for line in content.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let Some((key, value)) = line.split_once('=') else {
-            return fail(format!("invalid tools.lock line: {line}"));
-        };
-        values.insert(key.to_string(), value.to_string());
+fn read_tools(_root: &Path) -> Result<Tools> {
+    let Some(path) = env::var_os("SYNAPSE_FBS_TOOLS_TOML").map(PathBuf::from) else {
+        return fail("SYNAPSE_FBS_TOOLS_TOML is not set. Run inside `nix develop`.");
+    };
+    if !path.is_file() {
+        return fail(format!(
+            "could not find Nix-generated tool manifest at {}",
+            path.display()
+        ));
     }
+    let content = fs::read_to_string(&path)?;
+    let parsed: ToolsFile = toml::from_str(&content)
+        .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
 
     Ok(Tools {
-        package_version: required_value(&values, "PACKAGE_VERSION")?,
-        flatbuffers_version: required_value(&values, "FLATBUFFERS_VERSION")?,
-        flatbuffers_commit: required_value(&values, "FLATBUFFERS_COMMIT")?,
-        flatbuffers_build_version: required_value(&values, "FLATBUFFERS_BUILD_VERSION")?,
-        flatcc_version: required_value(&values, "FLATCC_VERSION")?,
-        flatcc_commit: required_value(&values, "FLATCC_COMMIT")?,
-        mdbook_version: required_value(&values, "MDBOOK_VERSION")?,
+        package_version: parsed.package.version,
+        flatbuffers_version: parsed.flatbuffers.version,
+        flatbuffers_commit: parsed.flatbuffers.commit,
+        flatbuffers_build_version: parsed.flatbuffers_build.version,
+        flatcc_version: parsed.flatcc.version,
+        flatcc_commit: parsed.flatcc.commit,
+        mdbook_version: parsed.docs.mdbook,
     })
-}
-
-fn required_value(values: &BTreeMap<String, String>, key: &str) -> Result<String> {
-    values
-        .get(key)
-        .cloned()
-        .ok_or_else(|| io::Error::other(format!("missing {key} in tools.lock")).into())
 }
 
 /// Exercise the rendered catalog helpers with whichever toolchains are
@@ -605,7 +637,7 @@ fn check_release_version(tools: &Tools, release_name: &str) -> Result<()> {
     }
     if version != tools.package_version {
         return fail(format!(
-            "release tag '{release_name}' does not match PACKAGE_VERSION={} in tools.lock",
+            "release tag '{release_name}' does not match package.version={} in flake.nix",
             tools.package_version
         ));
     }
@@ -791,6 +823,7 @@ fn build_flatcc(root: &Path, tools: &Tools) -> Result<FlatccBuild> {
         .arg("-B")
         .arg(&build)
         .arg("-DCMAKE_BUILD_TYPE=Release")
+        .arg("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
         .arg("-DFLATCC_TEST=OFF")
         .arg("-DFLATCC_ALLOW_WERROR=OFF"))?;
     run(Command::new("cmake")
@@ -3015,7 +3048,7 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("## Topic Catalog\n\n");
     md.push_str("The generated topic catalog is included as `topics.json` in schema-asset archives and as language helpers where the package has a public API. It records `TopicId`, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.\n\n");
     md.push_str("Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.\n\n");
-    md.push_str("## ROS And FlatROS\n\n");
+    md.push_str("## ROS and FlatROS\n\n");
     md.push_str("ROS messages are local integration types, not the Synapse over-the-air format. They are useful for visualization, autonomy stacks, simulation, rosbag tooling, and operator workflows, but they should not replace compact Synapse FlatBuffers payloads on constrained vehicle links.\n\n");
     md.push_str("ROS 2 integration should happen at the edge through bridge nodes that translate selected Synapse topics into ROS concepts only where ROS tooling needs them. The planned flatros2 path is a generated ROS workspace or release archive that consumes the Synapse schemas and topic catalog, depends on `flatros2`, and provides adapter nodes without making ROS message definitions the protocol source of truth.\n\n");
     md.push_str("## Layout Rules\n\n");

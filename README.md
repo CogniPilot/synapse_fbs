@@ -1,16 +1,25 @@
 # synapse_fbs
 
+[![CI](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml)
+[![Docs](https://github.com/CogniPilot/synapse_fbs/actions/workflows/docs.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/docs.yml)
+[![Release](https://github.com/CogniPilot/synapse_fbs/actions/workflows/release.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/release.yml)
+
 FlatBuffers schemas and generated language bindings for Synapse.
 
 This repository is the schema source of truth for Synapse messages. It keeps
 the checked-in source small and uses CI to generate the language bindings and
-release artifacts from the pinned toolchain in `tools.lock`.
+release artifacts from the pinned Linux toolchain in `flake.nix`.
 
-Published Synapse FlatBuffers documentation:
-<https://cognipilot.github.io/synapse_fbs/>
+## Documentation and Packages
 
-Design decisions and the phased plan are recorded in [ROADMAP.md](ROADMAP.md);
-the analysis behind them is in [REVIEW.md](REVIEW.md).
+- Schema docs: <https://cognipilot.github.io/synapse_fbs/>
+- Main-branch schema docs: <https://cognipilot.github.io/synapse_fbs/main/>
+- Latest 0.3 schema docs: <https://cognipilot.github.io/synapse_fbs/0.3/>
+- GitHub releases: <https://github.com/CogniPilot/synapse_fbs/releases>
+- Rust crate: <https://crates.io/crates/synapse_fbs>
+- Rust API docs: <https://docs.rs/synapse_fbs>
+- Python package: <https://pypi.org/project/synapse-fbs/>
+- JavaScript package: <https://www.npmjs.com/package/@cognipilot/synapse-fbs>
 
 ## Motivation
 
@@ -199,7 +208,7 @@ decode them directly. Flight controllers stream index-less MCAP and files are
 recovered/reindexed post-flight. Release archives include `bfbs/*.bfbs` and
 `bfbs.sha256` manifests for exactly this use.
 
-## ROS And FlatROS
+## ROS and FlatROS
 
 ROS messages are local integration types, not the Synapse wire format. The
 common ROS message definitions are dynamically sized (string frame ids,
@@ -259,7 +268,7 @@ sizes are computed and checked on every build.
 - `rust/`, `python/`, `js/`, `c/`, `cpp/`: package skeletons for the published
   artifacts.
 - `xtask/`: reproducible local and CI build driver.
-- `tools.lock`: pinned package, generator, and runtime versions.
+- `flake.nix`: pinned Linux build environment and release tool versions.
 
 Generated Rust, Python, and JavaScript package trees are intentionally not
 committed. The `xtask` build stages package skeletons under
@@ -268,14 +277,14 @@ from `fbs/all.fbs` before building release packages.
 
 ## Version Pins
 
-Generation is version-locked from `tools.lock`. CI builds a vendored `flatc`
+Generation is version-locked from `flake.nix`. CI builds a vendored `flatc`
 from `flatbuffers-build = "=0.2.4+flatc-25.12.19"` and verifies that the
 compiler reports `flatc version 25.12.19`. The Rust package depends on
 `flatbuffers = "=25.12.19"` and the Python package depends on
 `flatbuffers==25.12.19` so generated code and runtimes stay in lockstep. CI
 also builds pinned FlatCC, uses pinned `mdbook` for schema documentation, and
 publishes generated C and C++ archives for downstream CMake consumers.
-Release tags must match `PACKAGE_VERSION` in `tools.lock`; the build fails
+Release tags must match `package.version` in `flake.nix`; the build fails
 otherwise.
 
 ## Rust
@@ -283,7 +292,7 @@ otherwise.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.3.2"
+synapse_fbs = "0.3"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -331,9 +340,11 @@ they need it instead of vendoring generated files:
 ```cmake
 include(FetchContent)
 
+set(SYNAPSE_FBS_VERSION 0.3.3)
+
 FetchContent_Declare(
   synapse_fbs
-  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v0.3.2/synapse_fbs-c.tar.gz
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/v${SYNAPSE_FBS_VERSION}/synapse_fbs-c.tar.gz
   URL_HASH SHA256=<release sha256>
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
@@ -350,17 +361,32 @@ interface target.
 
 ## Local Build
 
+The repository is built from a pinned Linux toolchain in `flake.nix`. The flake
+targets `x86_64-linux` and `aarch64-linux`; on non-Linux hosts, use a Linux VM,
+container, or WSL environment. Install Nix with flakes enabled, then run
+commands through `nix develop` so Cargo, FlatBuffers, FlatCC, mdBook, Node,
+Python packaging tools, and GitHub CLI all come from the same pinned
+environment CI uses.
+
+Open an interactive development shell:
+
+```sh
+nix develop
+```
+
+The examples below use the one-off `nix develop --command` form.
+
 Fast schema validation (parse, doc-comment enforcement, unit-suffix lint,
 TopicId/union consistency, payload sizes, catalog helper smoke tests):
 
 ```sh
-cargo run --locked --manifest-path xtask/Cargo.toml -- check
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- check
 ```
 
 Run the same full task that CI runs:
 
 ```sh
-cargo run --locked --manifest-path xtask/Cargo.toml -- ci
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 ```
 
 The `ci` task builds pinned `flatc` and FlatCC, stages Rust/Python/JavaScript
@@ -372,8 +398,7 @@ through CMake `FetchContent`.
 Generate the static schema documentation locally:
 
 ```sh
-cargo install mdbook --version "$(awk -F= '/^MDBOOK_VERSION=/{print $2}' tools.lock)" --locked
-cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.3 --out-dir target/xtask/docs
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.3 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -387,8 +412,9 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a tag like `v0.3.2` (which must match `PACKAGE_VERSION` in
-`tools.lock`) publishes:
+Pushing a semantic version tag such as `v0.3.3` publishes a GitHub Release and
+the language packages. The tag must match `package.version` in `flake.nix`; the
+release build fails before publishing if they differ.
 
 - staged `target/xtask/packages/rust/` to crates.io using
   `CARGO_REGISTRY_TOKEN`
@@ -410,9 +436,12 @@ using a versioned URL and `URL_HASH SHA256=...`.
 
 ## Schema Docs
 
-The docs workflow publishes schema documentation to the `gh-pages` branch.
-Pushes to `main` update `/main/`; release tags update the matching minor
-version docs, so `v0.3.2` updates `/0.3/`. Exact historical docs can be rebuilt
-from the corresponding tag. The root docs URL redirects to `/main/`, and the
-mdBook version selector links to published release docs:
+The docs workflow publishes schema documentation to the `gh-pages` branch used
+by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
+matching minor-version docs, so `v0.3.3` updates `/0.3/`. Only the latest patch
+for each published minor line is kept on GitHub Pages. Exact historical docs can
+be rebuilt from the corresponding tag.
+
+The root docs URL provides a version selector and forwards browsers to
+`/main/`. The mdBook version selector links back to the published release docs:
 <https://cognipilot.github.io/synapse_fbs/>.
