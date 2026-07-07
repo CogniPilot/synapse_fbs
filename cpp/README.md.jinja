@@ -5,8 +5,37 @@ under `bfbs/`. The archive also ships `topics.json` and
 `include/synapse/topic_catalog.h` for canonical Zenoh keys, `TopicId`, root
 table names, and payload types.
 
-Add the archive with CMake `FetchContent` and link `synapse_fbs::cpp`, or add
-`include/` to the compiler include path directly.
+Use the archive through CMake and link `synapse_fbs::cpp`, or add `include/` to
+the compiler include path directly.
+
+Prefer `find_package` when the archive is downloaded, extracted, or installed
+outside the project configure step:
+
+```cmake
+find_package(synapse_fbs {{ package_version }} CONFIG REQUIRED)
+
+target_link_libraries(app PRIVATE synapse_fbs::cpp)
+```
+
+Set `CMAKE_PREFIX_PATH` to the extracted archive root, for example
+`/path/to/synapse_fbs-cpp`.
+
+Use `FetchContent` when the project should fetch the GitHub Release archive
+directly.
+
+```cmake
+include(FetchContent)
+
+FetchContent_Declare(
+  synapse_fbs
+  URL https://github.com/CogniPilot/synapse_fbs/releases/download/{{ release_name }}/synapse_fbs-cpp.tar.gz
+  URL_HASH SHA256=<release sha256>
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(synapse_fbs)
+
+target_link_libraries(app PRIVATE synapse_fbs::cpp)
+```
 
 ```cpp
 #include <synapse/topic_catalog.h>

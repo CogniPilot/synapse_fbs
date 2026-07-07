@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 3.20)
+project(synapse_fbs_find_package_c_smoke C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+find_package(synapse_fbs {{ package_version }} CONFIG REQUIRED)
+
+if(NOT TARGET synapse_fbs::c)
+  message(FATAL_ERROR "missing target: synapse_fbs::c")
+endif()
+if(NOT TARGET synapse_fbs::flatcc_runtime)
+  message(FATAL_ERROR "missing target: synapse_fbs::flatcc_runtime")
+endif()
+if(NOT TARGET synapse_fbs::print)
+  message(FATAL_ERROR "missing target: synapse_fbs::print")
+endif()
+
+add_executable(smoke main.c)
+target_link_libraries(smoke PRIVATE
+  synapse_fbs::c
+  synapse_fbs::flatcc_runtime
+  synapse_fbs::print
+)

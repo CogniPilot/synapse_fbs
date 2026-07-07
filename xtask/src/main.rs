@@ -1545,7 +1545,7 @@ fn build_archives(
     write_bfbs_hashes(&c_root, &c_root.join("bfbs.sha256"))?;
     let runtime_source_paths = runtime_source_names(&c_root.join("src/flatcc-runtime"))?
         .into_iter()
-        .map(|source| format!("  \"${{CMAKE_CURRENT_LIST_DIR}}/src/flatcc-runtime/{source}\""))
+        .map(|source| format!("  \"${{_SYNAPSE_FBS_ROOT}}/src/flatcc-runtime/{source}\""))
         .collect::<Vec<_>>()
         .join("\n");
     copy_render_template_tree(
@@ -1576,6 +1576,8 @@ fn build_archives(
         &workdir,
         &artifacts.join("synapse_fbs-c.tar.gz"),
     )?;
+    smoke_cmake_find_package_c(&templates, tools, &workdir, &c_root)?;
+    smoke_cmake_find_package_cpp(&templates, tools, &workdir, &cpp_root)?;
     print_artifacts(&artifacts)?;
 
     Ok(())
@@ -4191,6 +4193,88 @@ fn smoke_cmake_fetch(templates: &Templates, workdir: &Path, archive: &Path) -> R
     run(Command::new("cmake")
         .arg("--build")
         .arg(fetch_smoke.join("build"))
+        .arg("--parallel")
+        .arg("2"))?;
+
+    Ok(())
+}
+
+fn smoke_cmake_find_package_c(
+    templates: &Templates,
+    tools: &Tools,
+    workdir: &Path,
+    package_root: &Path,
+) -> Result<()> {
+    println!("smoke-testing CMake find_package C archive usage");
+
+    let smoke_dir = workdir.join("find-package-c-smoke");
+    reset_dir(&smoke_dir)?;
+    templates.render_to_file(
+        "xtask/cmake_find_package_c_smoke/CMakeLists.txt.jinja",
+        context! {
+            package_version => tools.package_version.as_str(),
+        },
+        &smoke_dir.join("CMakeLists.txt"),
+    )?;
+    templates.render_to_file(
+        "xtask/smoke.c.jinja",
+        context! {},
+        &smoke_dir.join("main.c"),
+    )?;
+
+    run(Command::new("cmake")
+        .arg("-S")
+        .arg(&smoke_dir)
+        .arg("-B")
+        .arg(smoke_dir.join("build"))
+        .arg(format!(
+            "-DCMAKE_PREFIX_PATH={}",
+            package_root.to_string_lossy()
+        )))?;
+    run(Command::new("cmake")
+        .arg("--build")
+        .arg(smoke_dir.join("build"))
+        .arg("--parallel")
+        .arg("2"))?;
+
+    Ok(())
+}
+
+fn smoke_cmake_find_package_cpp(
+    templates: &Templates,
+    tools: &Tools,
+    workdir: &Path,
+    package_root: &Path,
+) -> Result<()> {
+    println!("smoke-testing CMake find_package C++ archive usage");
+
+    let smoke_dir = workdir.join("find-package-cpp-smoke");
+    reset_dir(&smoke_dir)?;
+    templates.render_to_file(
+        "xtask/cmake_find_package_cpp_smoke/CMakeLists.txt.jinja",
+        context! {
+            package_version => tools.package_version.as_str(),
+        },
+        &smoke_dir.join("CMakeLists.txt"),
+    )?;
+    templates.render_to_file(
+        "xtask/smoke.cpp.jinja",
+        context! {},
+        &smoke_dir.join("main.cpp"),
+    )?;
+
+    run(Command::new("cmake")
+        .arg("-S")
+        .arg(&smoke_dir)
+        .arg("-B")
+        .arg(smoke_dir.join("build"))
+        .arg(format!(
+            "-DCMAKE_PREFIX_PATH={}",
+            package_root.to_string_lossy()
+        )))?;
+    run(Command::new("cmake")
+        .arg("--build")
+        .arg(smoke_dir.join("build"))
         .arg("--parallel")
         .arg("2"))?;
 

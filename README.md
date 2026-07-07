@@ -336,8 +336,22 @@ under `target/xtask/packages/js`.
 ## C and C++ Archives
 
 Release CI publishes generated C and C++ archives for downstream CMake
-consumers. Firmware projects should fetch the release archive directly where
-they need it instead of vendoring generated files:
+consumers. Prefer `find_package` for projects that download, extract, or
+install the release archive as part of their dependency setup:
+
+```cmake
+find_package(synapse_fbs 0.3.3 CONFIG REQUIRED)
+
+target_link_libraries(app PRIVATE synapse_fbs::c)
+```
+
+Point `CMAKE_PREFIX_PATH` at the extracted archive root, for example
+`synapse_fbs-c/` or `synapse_fbs-cpp/`. The C archive provides
+`synapse_fbs::c`, `synapse_fbs::flatcc_runtime`, and `synapse_fbs::print`; the
+C++ archive provides `synapse_fbs::cpp`.
+
+For projects that do not have a package/dependency setup, `FetchContent`
+remains the simplest direct-from-release path:
 
 ```cmake
 include(FetchContent)
@@ -355,11 +369,12 @@ FetchContent_MakeAvailable(synapse_fbs)
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
 
+Use `synapse_fbs-cpp.tar.gz` and `synapse_fbs::cpp` for C++ consumers.
+
 The C archive also carries `zephyr/module.yml`, so west manifest projects can
 add it as a Zephyr module. Link `synapse_fbs::flatcc_runtime` only when using
 generated builders, verifiers, or JSON helpers — reader accessors are
-header-only. The C++ archive provides the analogous `synapse_fbs::cpp`
-interface target.
+header-only.
 
 ## Local Build
 
@@ -432,8 +447,8 @@ release build fails before publishing if they differ.
     `zephyr/module.yml`, and `bfbs/*.bfbs` reflection schemas
 
 The generated C archive is intentionally generic. Downstream firmware projects
-that need it should fetch the release tarball directly from their own CMake
-using a versioned URL and `URL_HASH SHA256=...`.
+that need it should consume a release tarball with `find_package` or fetch it
+directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 ## Schema Docs
 

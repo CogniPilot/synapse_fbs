@@ -1,0 +1,5 @@
+get_filename_component(_SYNAPSE_FBS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../.." ABSOLUTE)
+include("${_SYNAPSE_FBS_ROOT}/cmake/synapse_fbs-c-targets.cmake")
+unset(_SYNAPSE_FBS_ROOT)
+
+set(synapse_fbs_FOUND TRUE)

@@ -1,0 +1,14 @@
+cmake_minimum_required(VERSION 3.20)
+project(synapse_fbs_find_package_cpp_smoke CXX)
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+find_package(synapse_fbs {{ package_version }} CONFIG REQUIRED)
+
+if(NOT TARGET synapse_fbs::cpp)
+  message(FATAL_ERROR "missing target: synapse_fbs::cpp")
+endif()
+
+add_executable(smoke main.cpp)
+target_link_libraries(smoke PRIVATE synapse_fbs::cpp)

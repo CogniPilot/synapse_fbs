@@ -1,0 +1,28 @@
+if(TARGET synapse_fbs::c)
+  return()
+endif()
+
+if(NOT DEFINED _SYNAPSE_FBS_ROOT)
+  get_filename_component(_SYNAPSE_FBS_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+endif()
+
+add_library(synapse_fbs_c INTERFACE)
+add_library(synapse_fbs::c ALIAS synapse_fbs_c)
+
+target_include_directories(synapse_fbs_c INTERFACE
+  "${_SYNAPSE_FBS_ROOT}/include"
+)
+
+add_library(synapse_fbs_flatcc_runtime STATIC EXCLUDE_FROM_ALL
+{{ runtime_source_paths }}
+)
+add_library(synapse_fbs::flatcc_runtime ALIAS synapse_fbs_flatcc_runtime)
+
+target_link_libraries(synapse_fbs_flatcc_runtime PUBLIC synapse_fbs_c)
+
+add_library(synapse_fbs_print STATIC EXCLUDE_FROM_ALL
+  "${_SYNAPSE_FBS_ROOT}/src/topic_print.c"
+)
+add_library(synapse_fbs::print ALIAS synapse_fbs_print)
+
+target_link_libraries(synapse_fbs_print PUBLIC synapse_fbs_c)

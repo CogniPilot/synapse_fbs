@@ -1,0 +1,14 @@
+if(TARGET synapse_fbs::cpp)
+  return()
+endif()
+
+if(NOT DEFINED _SYNAPSE_FBS_ROOT)
+  get_filename_component(_SYNAPSE_FBS_ROOT "${CMAKE_CURRENT_LIST_DIR}/.." ABSOLUTE)
+endif()
+
+add_library(synapse_fbs_cpp INTERFACE)
+add_library(synapse_fbs::cpp ALIAS synapse_fbs_cpp)
+
+target_include_directories(synapse_fbs_cpp INTERFACE
+  "${_SYNAPSE_FBS_ROOT}/include"
+)
