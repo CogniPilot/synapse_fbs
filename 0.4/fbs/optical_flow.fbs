@@ -1,0 +1,37 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Integrated optical-flow sample from an image sensor or flow module. This is
+// a raw-layer topic: flow is the sensor's integrated angular image motion.
+struct OpticalFlowData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  flow_rad:synapse.types.Vec2f; // Integrated angular flow about the sensor X and Y axes in radians over integration_timespan_us.
+  delta_angle_flu_rad:synapse.types.Vec3f; // Integrated body rotation in the FLU frame during the same interval.
+  distance_m:float; // Measured distance to the observed surface.
+  integration_timespan_us:uint; // Integration interval for flow_rad and delta_angle_flu_rad.
+  max_flow_rate_rad_s:float; // Maximum measurable angular flow rate.
+  min_ground_distance_m:float; // Minimum valid range for distance-compensated flow.
+  max_ground_distance_m:float; // Maximum valid range for distance-compensated flow.
+  quality_pct:ubyte; // Flow quality from 0 to 100.
+}
+
+// Velocity estimate derived from optical flow.
+struct OpticalFlowVelocityData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  velocity_flu_m_s:synapse.types.Vec2f; // Planar velocity estimate in the body FLU frame.
+  velocity_enu_m_s:synapse.types.Vec2f; // Planar velocity estimate in the local ENU frame.
+  flow_rate_uncompensated_rad_s:synapse.types.Vec2f; // Raw angular flow rate before gyro compensation.
+  flow_rate_compensated_rad_s:synapse.types.Vec2f; // Angular flow rate after gyro compensation.
+  gyro_flu_rad_s:synapse.types.Vec3f; // Body angular rate used for compensation.
+}
+
+// FlatBuffers root wrapper for OpticalFlowData.
+table OpticalFlow {
+  data:OpticalFlowData; // Fixed-layout optical-flow payload.
+}
+
+// FlatBuffers root wrapper for OpticalFlowVelocityData.
+table OpticalFlowVelocity {
+  data:OpticalFlowVelocityData; // Fixed-layout optical-flow velocity payload.
+}

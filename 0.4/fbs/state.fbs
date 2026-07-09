@@ -1,0 +1,316 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Sensor and subsystem bits for the VehicleHealthData sensor bitmasks.
+enum SensorComponentFlags:uint (bit_flags) {
+  Gyro, // Angular-rate sensing.
+  Accel, // Linear-acceleration sensing.
+  Mag, // Magnetic field sensing.
+  AbsolutePressure, // Static pressure sensing.
+  DifferentialPressure, // Differential pressure sensing.
+  Gnss, // Global navigation satellite receiver.
+  OpticalFlow, // Optical-flow sensing.
+  VisionPosition, // Vision or motion-capture positioning input.
+  Rangefinder, // Distance-to-surface sensing.
+  RadioControl, // Manual receiver input.
+  MotorOutputs, // Actuator and motor output path.
+  Battery, // Battery monitoring.
+  Estimator, // State estimator.
+  Logging, // Onboard logging.
+  CommandLink, // Command and telemetry link.
+  Terrain, // Terrain database or terrain following.
+}
+
+// Vehicle-level status bits for VehicleHealthData.flags.
+enum VehicleHealthFlags:ubyte (bit_flags) {
+  Armed, // Actuators are allowed to produce motion.
+  Failsafe, // An active failsafe is affecting vehicle behavior.
+}
+
+// Field-validity bits for AttitudeEstimateData.flags.
+enum AttitudeEstimateFlags:ubyte (bit_flags) {
+  AttitudeValid, // The attitude quaternion is usable.
+  RatesValid, // The angular-velocity fields are usable.
+}
+
+// Field-validity bits for LocalPositionEstimateData.flags.
+enum LocalPositionFlags:ubyte (bit_flags) {
+  XyValid, // Horizontal position is valid.
+  ZValid, // Vertical position is valid.
+  VxyValid, // Horizontal velocity is valid.
+  VzValid, // Vertical velocity is valid.
+}
+
+// Field-validity bits for ExternalOdometryData.flags.
+enum ExternalOdometryFlags:ushort (bit_flags) {
+  PositionValid, // position_enu_m is meaningful.
+  AttitudeValid, // attitude is meaningful.
+  LinearVelocityValid, // linear_velocity_enu_m_s is meaningful.
+  AngularVelocityValid, // angular_velocity_flu_rad_s is meaningful.
+  PoseStddevValid, // Position and attitude standard-deviation fields are meaningful.
+  TwistStddevValid, // Linear and angular velocity standard-deviation fields are meaningful.
+  LatencyValid, // latency_us is meaningful.
+  Extrapolated, // State was predicted without a current accepted mocap correction.
+  OutlierRejected, // A current mocap update was rejected by innovation gates.
+  Degraded, // State is usable but tracking quality or uncertainty is degraded.
+  Lost, // State should not be used for navigation.
+}
+
+// Quality/status state for external odometry producer output.
+enum ExternalOdometryStatus:ubyte {
+  Unknown = 0, // Producer did not report a quality/status state.
+  Filtered = 1, // Current mocap update was accepted into the estimate.
+  ExtrapolatedShort = 2, // Short prediction-only gap after the last accepted mocap update.
+  ExtrapolatedLong = 3, // Extended prediction-only gap; downstream users should degrade behavior.
+  Lost = 4, // Extrapolation exceeded the producer's safe limit.
+  OutlierRejected = 5, // Current mocap update was rejected and the state was predicted.
+  Degraded = 6, // Current mocap update was accepted but quality is reduced.
+}
+
+// Field-validity bits for GlobalPositionEstimateData.flags.
+enum GlobalPositionFlags:ubyte (bit_flags) {
+  Valid, // The global position estimate is usable for navigation.
+  YawValid, // The yaw estimate is usable.
+}
+
+// Field-validity bits for HomeReferenceData.flags.
+enum HomeReferenceFlags:ubyte (bit_flags) {
+  PositionValid, // Geodetic and local home positions are valid.
+  AttitudeValid, // The home alignment quaternion is valid.
+  ApproachValid, // The approach vector is valid.
+}
+
+// Vehicle-wide state summary for operator displays and failsafe supervision.
+struct VehicleHealthData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  sensors_present:uint; // Bitmask of SensorComponentFlags bits for detected components.
+  sensors_enabled:uint; // Bitmask of SensorComponentFlags bits enabled for use.
+  sensors_health:uint; // Bitmask of SensorComponentFlags bits currently considered healthy.
+  sensors_present_ext:uint; // Reserved extension bitmask for future component bits.
+  sensors_enabled_ext:uint; // Reserved extension bitmask for future component bits.
+  sensors_health_ext:uint; // Reserved extension bitmask for future component bits.
+  load_dpermille:ushort; // Main controller load as deci-percent, where 1000 means 100%.
+  voltage_battery_cv:ushort; // Primary battery pack voltage in centi-volts.
+  current_battery_da:short; // Primary battery current in deci-amps; positive means discharge.
+  drop_rate_comm_cpercent:ushort; // Communication drop rate as centi-percent.
+  errors_comm:ushort; // Communication error count.
+  battery_remaining_pct:byte; // Remaining primary battery percentage, or negative when unknown.
+  vehicle_type:ubyte; // Producer-defined vehicle class.
+  flight_mode:ubyte; // Producer-defined active flight mode.
+  system_state:ubyte; // Producer-defined high-level system state.
+  link_quality_pct:ubyte; // Command/control link quality from 0 to 100.
+  flags:ubyte; // Bitmask of VehicleHealthFlags bits.
+}
+
+// Pairing between Unix time and monotonic boot time.
+struct TimeReferenceData {
+  time_unix_us:ulong; // Unix epoch timestamp corresponding to time_boot_us.
+  time_boot_us:ulong; // Monotonic boot timestamp at which time_unix_us was sampled.
+}
+
+// Attitude estimate and angular velocity from the active estimator. The
+// quaternion is the only attitude representation on the wire; consumers
+// derive Euler angles locally when needed for display.
+struct AttitudeEstimateData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  attitude:synapse.types.Quaternionf; // Orientation rotating body FLU vectors into the ENU world frame.
+  angular_velocity_flu_rad_s:synapse.types.RateTriplet; // Body angular velocity in the FLU frame.
+  flags:ubyte; // Bitmask of AttitudeEstimateFlags bits.
+}
+
+// Local-frame position estimate for navigation and control.
+struct LocalPositionEstimateData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  position_enu_m:synapse.types.Vec3f; // Local position relative to the active local origin.
+  velocity_enu_m_s:synapse.types.Vec3f; // Local velocity in the ENU frame.
+  acceleration_enu_m_s2:synapse.types.Vec3f; // Local acceleration in the ENU frame.
+  yaw_rad:float; // Heading angle; zero east and positive counter-clockwise.
+  yaw_rate_rad_s:float; // Heading rate, positive counter-clockwise.
+  flags:ubyte; // Bitmask of LocalPositionFlags bits.
+  xy_reset_counter:ubyte; // Increments when the estimator resets or jumps the horizontal state.
+  z_reset_counter:ubyte; // Increments when the estimator resets or jumps the vertical state.
+}
+
+// Global geodetic position estimate with compact velocity and status fields.
+struct GlobalPositionEstimateData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
+  longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
+  altitude_msl_mm:int; // Height above mean sea level.
+  relative_altitude_mm:int; // Height above the active home or local origin.
+  velocity_east_cm_s:short; // East component of global-frame velocity.
+  velocity_north_cm_s:short; // North component of global-frame velocity.
+  velocity_up_cm_s:short; // Up component of global-frame velocity.
+  yaw_cdeg:short; // Heading in the range -18000 to 18000; zero east and positive counter-clockwise per REP-0103.
+  source:ubyte; // Producer-defined source identifier for this global estimate.
+  flags:ubyte; // Bitmask of GlobalPositionFlags bits.
+}
+
+// Combined pose, twist, covariance, and estimator metadata.
+struct OdometryEstimateData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  position_enu_m:synapse.types.Vec3f; // Local position in the ENU frame.
+  attitude:synapse.types.Quaternionf; // Orientation rotating body FLU vectors into the ENU world frame.
+  velocity_enu_m_s:synapse.types.Vec3f; // Linear velocity in the ENU frame.
+  angular_velocity_flu_rad_s:synapse.types.RateTriplet; // Body angular velocity in the FLU frame.
+  pose_covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular covariance for position and orientation.
+  velocity_covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular covariance for linear and angular velocity.
+  reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
+  estimator_type:ubyte; // Producer-defined estimator implementation identifier.
+  quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
+}
+
+// External pose and twist measurement for estimator input. Pose is expressed
+// in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. The
+// timestamp is the estimate timestamp; the last accepted mocap capture
+// timestamp is carried separately for dropout handling.
+struct ExternalOdometryData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  last_mocap_timestamp_us:ulong; // Last accepted mocap measurement timestamp in monotonic boot time.
+  latency_us:uint; // Producer-estimated estimate-to-publication latency or state age.
+  extrapolation_us:uint; // Time since last accepted mocap correction.
+  sequence:uint; // Producer sequence for loss/reorder detection.
+  position_enu_m:synapse.types.Vec3f; // Measured local/world position in ENU.
+  attitude:synapse.types.Quaternionf; // Measured orientation rotating body FLU vectors into ENU.
+  linear_velocity_enu_m_s:synapse.types.Vec3f; // Measured linear velocity in ENU.
+  angular_velocity_flu_rad_s:synapse.types.RateTriplet; // Measured angular velocity in body FLU.
+  position_stddev_enu_m:synapse.types.Vec3f; // One-sigma position uncertainty in ENU.
+  attitude_stddev_rad:synapse.types.Vec3f; // One-sigma roll, pitch, and yaw uncertainty in radians.
+  linear_velocity_stddev_enu_m_s:synapse.types.Vec3f; // One-sigma linear velocity uncertainty in ENU.
+  angular_velocity_stddev_flu_rad_s:synapse.types.RateTriplet; // One-sigma angular velocity uncertainty in body FLU.
+  tracking_quality_pct:ubyte; // Tracking or solve quality from 0 to 100.
+  status:ExternalOdometryStatus; // Producer state quality and extrapolation status.
+  frames_since_last_mocap_count:ushort; // Prediction-only frame count since the last accepted mocap correction.
+  flags:ushort; // Bitmask of ExternalOdometryFlags bits.
+  source_id:ubyte; // External source instance identifier.
+  id:ubyte; // Tracked rigid-body instance identifier; also the instance segment of the Zenoh key.
+}
+
+// Optional covariance companion for ExternalOdometryData. Publish this only when
+// consumers subscribe to the covariance topic or request estimator diagnostics;
+// the high-rate external odometry topic carries diagonal stddevs. The
+// covariance is over the 12D tangent state [theta, velocity, position,
+// angular_velocity], where theta is the attitude perturbation in the body-FLU
+// tangent and velocity/position are ENU.
+struct ExternalOdometryCovarianceData {
+  timestamp_us:ulong; // Estimate timestamp matching ExternalOdometryData.timestamp_us.
+  sequence:uint; // Producer sequence matching ExternalOdometryData.sequence.
+  covariance:synapse.types.CovarianceUpperTriangle78f; // Upper-triangular covariance for the 12D tangent state.
+  source_id:ubyte; // External source instance identifier.
+  id:ubyte; // Tracked rigid-body instance identifier.
+}
+
+// Estimator health and innovation-test summary. The flags field is
+// deliberately producer-defined: estimator status models differ between
+// implementations and are standardized via discovery records, not the schema.
+struct EstimatorHealthData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  flags:ushort; // Producer-defined estimator status and fault bitmask.
+  velocity_test_ratio:float; // Innovation test ratio for velocity observations.
+  pos_horiz_test_ratio:float; // Innovation test ratio for horizontal position observations.
+  pos_vert_test_ratio:float; // Innovation test ratio for vertical position observations.
+  mag_test_ratio:float; // Innovation test ratio for magnetic observations.
+  hagl_test_ratio:float; // Innovation test ratio for height-above-ground observations.
+  tas_test_ratio:float; // Innovation test ratio for true-airspeed observations.
+  pos_horiz_accuracy_m:float; // Estimated one-sigma horizontal position accuracy.
+  pos_vert_accuracy_m:float; // Estimated one-sigma vertical position accuracy.
+}
+
+// Mission progress and mission database identifiers.
+struct MissionProgressData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  mission_id:uint; // Identifier that changes when the mission plan changes.
+  fence_id:uint; // Identifier that changes when the geofence set changes.
+  rally_points_id:uint; // Identifier that changes when the rally-point set changes.
+  current_seq:ushort; // Current mission item sequence number.
+  total:ushort; // Total number of mission items known to the producer.
+  mission_state:synapse.types.MissionState; // Mission execution state.
+  mission_mode:ubyte; // Producer-defined mission mode or mission type.
+}
+
+// Navigation controller target and tracking-error summary. Angles follow
+// REP-0103: zero east, positive counter-clockwise, range -18000 to 18000.
+struct NavigationTargetData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  altitude_error_m:float; // Target altitude minus estimated altitude.
+  airspeed_error_m_s:float; // Target airspeed minus estimated airspeed.
+  xtrack_error_m:float; // Cross-track error relative to the active path.
+  desired_roll_cdeg:short; // Roll angle requested by navigation.
+  desired_pitch_cdeg:short; // Pitch angle requested by navigation.
+  desired_yaw_cdeg:short; // Navigation yaw command.
+  target_yaw_cdeg:short; // Yaw toward the active target.
+  distance_to_waypoint_m:ushort; // Remaining straight-line distance to the active waypoint.
+}
+
+// Home position and local-origin reference.
+struct HomeReferenceData {
+  timestamp_us:ulong; // Reference timestamp in monotonic boot time.
+  latitude_deg_e7:int; // Home latitude in WGS-84 degrees scaled by 1e7.
+  longitude_deg_e7:int; // Home longitude in WGS-84 degrees scaled by 1e7.
+  altitude_msl_mm:int; // Home height above mean sea level.
+  local_position_enu_m:synapse.types.Vec3f; // Home position in the active local ENU frame.
+  attitude:synapse.types.Quaternionf; // Map-to-local alignment rotating FLU vectors at home into ENU.
+  approach_enu_m:synapse.types.Vec3f; // Preferred approach point or vector in the local ENU frame.
+  flags:ubyte; // Bitmask of HomeReferenceFlags bits.
+}
+
+// FlatBuffers root wrapper for VehicleHealthData.
+table VehicleHealth {
+  data:VehicleHealthData; // Fixed-layout vehicle-health payload.
+}
+
+// FlatBuffers root wrapper for TimeReferenceData.
+table TimeReference {
+  data:TimeReferenceData; // Fixed-layout time-reference payload.
+}
+
+// FlatBuffers root wrapper for AttitudeEstimateData.
+table AttitudeEstimate {
+  data:AttitudeEstimateData; // Fixed-layout attitude-estimate payload.
+}
+
+// FlatBuffers root wrapper for LocalPositionEstimateData.
+table LocalPositionEstimate {
+  data:LocalPositionEstimateData; // Fixed-layout local-position payload.
+}
+
+// FlatBuffers root wrapper for GlobalPositionEstimateData.
+table GlobalPositionEstimate {
+  data:GlobalPositionEstimateData; // Fixed-layout global-position payload.
+}
+
+// FlatBuffers root wrapper for OdometryEstimateData.
+table OdometryEstimate {
+  data:OdometryEstimateData; // Fixed-layout odometry payload.
+}
+
+// FlatBuffers root wrapper for ExternalOdometryData.
+table ExternalOdometry {
+  data:ExternalOdometryData; // Fixed-layout external-odometry payload.
+}
+
+// FlatBuffers root wrapper for ExternalOdometryCovarianceData.
+table ExternalOdometryCovariance {
+  data:ExternalOdometryCovarianceData; // Fixed-layout optional external-odometry covariance payload.
+}
+
+// FlatBuffers root wrapper for EstimatorHealthData.
+table EstimatorHealth {
+  data:EstimatorHealthData; // Fixed-layout estimator-health payload.
+}
+
+// FlatBuffers root wrapper for MissionProgressData.
+table MissionProgress {
+  data:MissionProgressData; // Fixed-layout mission-progress payload.
+}
+
+// FlatBuffers root wrapper for NavigationTargetData.
+table NavigationTarget {
+  data:NavigationTargetData; // Fixed-layout navigation-target payload.
+}
+
+// FlatBuffers root wrapper for HomeReferenceData.
+table HomeReference {
+  data:HomeReferenceData; // Fixed-layout home-reference payload.
+}
