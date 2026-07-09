@@ -5,6 +5,8 @@ include "control.fbs";
 include "optical_flow.fbs";
 include "mocap.fbs";
 include "telemetry.fbs";
+include "sim.fbs";
+include "trajectory.fbs";
 
 namespace synapse.topic;
 
@@ -40,17 +42,18 @@ union SynapseMessage {
   AttitudeCommand, // Attitude setpoint command.
   RateCommand, // Body-rate setpoint command.
   LocalPositionCommand, // Local position/velocity/acceleration/yaw command.
-  VehicleCommand, // Generic command with floating-point arguments.
-  GeoCommand, // Geographic command with scaled latitude/longitude precision.
-  CommandResult, // Command result and progress response.
+  TrajectorySegment, // Bezier or polynomial trajectory segment setpoint.
   ActuatorCommand, // Normalized actuator command.
   ActuatorFeedback, // Normalized actuator feedback.
   PwmSignalOutputs, // Raw PWM output pulse widths.
   ControlLoopMetrics, // Control-loop timing and load metrics.
   TextStatus, // Human-readable status text.
   GcsStatus, // Compact status aggregate for low-rate ground-control links.
-  MocapFrame, // Motion-capture samples for one capture timestamp.
-  MocapDefinition, // Cached motion-capture object definitions.
+  ExternalOdometry, // External pose and twist measurement for estimator input.
+  ExternalOdometryCovariance, // Optional external odometry covariance companion.
+  MocapFrame, // Raw motion-capture marker and rigid-body samples.
+  LockstepTick, // Deterministic simulation barrier tick.
+  LockstepStatus, // Deterministic simulation participant status.
 }
 
 // Fixed-layout header carried by the optional multiplexed Frame transport.

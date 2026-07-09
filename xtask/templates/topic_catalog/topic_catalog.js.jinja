@@ -32,6 +32,10 @@ const commands = [
     key: {{ command.key|tojson }},
     requestType: {{ command.request_type|tojson }},
     replyType: {{ command.reply_type|tojson }},
+    requestEncoding: {{ command.request_encoding|tojson }},
+    requestSize: {{ command.request_size|tojson }},
+    replyEncoding: {{ command.reply_encoding|tojson }},
+    replySize: {{ command.reply_size|tojson }},
     description: {{ command.description|tojson }}
   }){% if not loop.last %},{% endif %}
 {%- endfor %}

@@ -1,20 +1,20 @@
 include "types.fbs";
-include "control.fbs";
+include "trajectory.fbs";
 
 namespace synapse.cmd;
 
 // Stable numeric identifiers for command and transfer services. Zenoh
-// deployments select services by key (synapse/v1/cmd/<name>); non-Zenoh
+// deployments select services by key name under synapse/v1/cmd; non-Zenoh
 // request/reply transports such as framed serial links use these ids as the
 // service discriminator. Values mirror the generated command catalog.
 enum CmdId:ushort {
   Unknown = 0, // Reserved value for invalid or unassigned services.
-  VehicleCommand = 1, // Generic command with floating-point arguments.
-  GeoCommand = 2, // Geographic command with scaled latitude/longitude precision.
-  ParamGet = 3, // Fetch one parameter by name, or all parameters.
-  ParamSet = 4, // Set one parameter.
-  MissionGet = 5, // Fetch the mission plan.
-  MissionSet = 6, // Replace the mission plan.
+  ParamGet = 1, // Fetch one parameter by name, or a paged parameter catalog chunk.
+  ParamSet = 2, // Set one parameter.
+  MissionGet = 3, // Fetch a paged GPS mission chunk.
+  MissionSet = 4, // Replace or patch a GPS mission in bounded chunks.
+  TrajectoryGet = 5, // Fetch a paged trajectory segment chunk.
+  TrajectorySet = 6, // Replace or patch a trajectory in bounded chunks.
 }
 
 // Value type carried by a ParamValue record.
@@ -23,6 +23,32 @@ enum ParamKind:ubyte {
   Int = 1, // int_value carries the parameter.
   Bool = 2, // int_value carries the parameter as zero or one.
   Text = 3, // text_value carries the parameter.
+}
+
+// Common flags for paged transfer requests and replies.
+enum TransferFlags:ushort (bit_flags) {
+  First, // This chunk starts a transfer.
+  Last, // This chunk completes a transfer.
+  More, // More chunks are expected after this reply.
+  Commit, // Receiver should commit the staged transfer after accepting this chunk.
+  FailedSeqValid, // failed_seq identifies the item or segment that failed validation.
+}
+
+// GPS mission item class.
+enum MissionItemKind:ubyte {
+  Waypoint = 0, // Navigate to a geographic waypoint.
+  Takeoff = 1, // Take off to the target altitude.
+  Land = 2, // Land at the target location.
+  Loiter = 3, // Hold at the target location.
+}
+
+// Mission item validity and behavior bits.
+enum MissionItemFlags:ushort (bit_flags) {
+  Current, // Receiver should make this the current item when committed.
+  Autocontinue, // Navigation should automatically continue after completing this item.
+  YawValid, // yaw_rad is meaningful.
+  AcceptanceRadiusValid, // acceptance_radius_m is meaningful.
+  LoiterTimeValid, // loiter_time_s is meaningful.
 }
 
 // One named parameter value. Tables are appropriate here: parameter transfer
@@ -35,17 +61,22 @@ table ParamValue {
   text_value:string; // Text value when kind is Text.
 }
 
-// Request one parameter by name, or all parameters when name is absent.
+// Request one parameter by name, or a paged catalog chunk when name is absent.
 // Served as a Zenoh queryable on the cmd key space.
 table ParamGetRequest {
-  name:string; // Parameter name to fetch; absent or empty requests all parameters.
+  name:string; // Parameter name to fetch; absent or empty requests the catalog page.
+  offset:uint; // First parameter index requested for paged catalog reads.
+  limit:ushort; // Maximum number of parameter values requested.
 }
 
 // Reply to ParamGetRequest.
 table ParamGetReply {
   result:synapse.types.CommandResultCode; // Request outcome.
   values:[ParamValue]; // Returned parameter values.
+  offset:uint; // First parameter index carried in values.
   total:uint; // Total number of parameters held by the producer.
+  result_detail:int; // Producer-defined extended result or error detail.
+  flags:ushort; // Bitmask of TransferFlags bits.
 }
 
 // Request to set one parameter. Served as a Zenoh queryable.
@@ -57,34 +88,105 @@ table ParamSetRequest {
 table ParamSetReply {
   result:synapse.types.CommandResultCode; // Request outcome.
   value:ParamValue; // Parameter value in effect after the request.
+  result_detail:int; // Producer-defined extended result or error detail.
 }
 
-// One mission item: a sequenced geographic command.
-table MissionItem {
+// One fixed-layout GPS mission item. This is not a generic command; it is the
+// compact transfer representation for GPS waypoint-style missions.
+struct MissionItemData {
   seq:uint; // Item sequence number starting at zero.
-  item:synapse.topic.GeoCommandData; // Fixed-layout geographic command payload.
+  latitude_deg_e7:int; // Target latitude in WGS-84 degrees scaled by 1e7.
+  longitude_deg_e7:int; // Target longitude in WGS-84 degrees scaled by 1e7.
+  altitude_m:float; // Target altitude in meters in the selected frame.
+  acceptance_radius_m:float; // Acceptance radius in meters when the corresponding flag is set.
+  loiter_time_s:float; // Loiter duration in seconds when the corresponding flag is set.
+  yaw_rad:float; // Requested yaw angle when the corresponding flag is set.
+  frame:synapse.types.GeoAltitudeFrame; // Altitude reference frame for altitude_m.
+  kind:MissionItemKind; // GPS mission item class.
+  flags:ushort; // Bitmask of MissionItemFlags bits.
 }
 
-// Request the mission plan. Served as a Zenoh queryable.
+// Request a bounded GPS mission chunk. Served as a Zenoh queryable.
 table MissionGetRequest {
   mission_id:uint; // Mission identifier to fetch, or zero for the current plan.
+  offset:uint; // First mission item sequence requested.
+  limit:ushort; // Maximum number of items requested.
 }
 
 // Reply to MissionGetRequest.
 table MissionGetReply {
   result:synapse.types.CommandResultCode; // Request outcome.
   mission_id:uint; // Identifier of the returned plan; matches MissionProgressData.mission_id.
-  items:[MissionItem]; // Mission items in sequence order.
+  plan_version:uint; // Monotonic mission revision identifier.
+  offset:uint; // First mission item sequence carried in items.
+  total:uint; // Total number of mission items in the plan.
+  result_detail:int; // Producer-defined extended result or error detail.
+  failed_seq:uint; // Failed item sequence when FailedSeqValid is set.
+  flags:ushort; // Bitmask of TransferFlags bits.
+  items:[MissionItemData]; // Mission items in sequence order.
 }
 
-// Request to replace the mission plan. Served as a Zenoh queryable.
+// Request to replace or patch a GPS mission in bounded chunks. Served as a
+// Zenoh queryable and by non-Zenoh request/reply transports.
 table MissionSetRequest {
   mission_id:uint; // Identifier the producer should report for this plan.
-  items:[MissionItem]; // Mission items in sequence order.
+  expected_plan_version:uint; // Required current revision, or zero when the producer permits blind replace.
+  plan_version:uint; // New mission revision identifier.
+  offset:uint; // First mission item sequence carried in items.
+  total:uint; // Total number of mission items in the final plan.
+  plan_crc32:uint; // CRC-32 of the complete final plan in canonical transfer encoding.
+  flags:ushort; // Bitmask of TransferFlags bits.
+  items:[MissionItemData]; // Mission items in sequence order for this chunk.
 }
 
 // Reply to MissionSetRequest.
 table MissionSetReply {
   result:synapse.types.CommandResultCode; // Request outcome.
-  mission_id:uint; // Identifier of the plan now active in the producer.
+  mission_id:uint; // Identifier of the plan now staged or active in the producer.
+  plan_version:uint; // Mission revision accepted by the producer.
+  result_detail:int; // Producer-defined extended result or error detail.
+  failed_seq:uint; // Failed item sequence when FailedSeqValid is set.
+  flags:ushort; // Bitmask of TransferFlags bits.
+}
+
+// Request a bounded trajectory segment chunk. Served as a Zenoh queryable.
+table TrajectoryGetRequest {
+  trajectory_id:uint; // Trajectory identifier to fetch.
+  offset:uint; // First trajectory segment sequence requested.
+  limit:ushort; // Maximum number of segments requested.
+}
+
+// Reply to TrajectoryGetRequest.
+table TrajectoryGetReply {
+  result:synapse.types.CommandResultCode; // Request outcome.
+  trajectory_id:uint; // Identifier of the returned trajectory.
+  plan_version:uint; // Monotonic trajectory revision identifier.
+  offset:uint; // First segment sequence carried in segments.
+  total:uint; // Total number of segments in the trajectory.
+  result_detail:int; // Producer-defined extended result or error detail.
+  failed_seq:uint; // Failed segment sequence when FailedSeqValid is set.
+  flags:ushort; // Bitmask of TransferFlags bits.
+  segments:[synapse.topic.TrajectorySegmentData]; // Fixed-layout trajectory segment payloads.
+}
+
+// Request to replace or patch a trajectory in bounded chunks.
+table TrajectorySetRequest {
+  trajectory_id:uint; // Trajectory identifier the producer should report for this plan.
+  expected_plan_version:uint; // Required current revision, or zero when the producer permits blind replace.
+  plan_version:uint; // New trajectory revision identifier.
+  offset:uint; // First segment sequence carried in segments.
+  total:uint; // Total number of segments in the final trajectory.
+  plan_crc32:uint; // CRC-32 of the complete final trajectory in canonical transfer encoding.
+  flags:ushort; // Bitmask of TransferFlags bits.
+  segments:[synapse.topic.TrajectorySegmentData]; // Fixed-layout trajectory segment payloads.
+}
+
+// Reply to TrajectorySetRequest.
+table TrajectorySetReply {
+  result:synapse.types.CommandResultCode; // Request outcome.
+  trajectory_id:uint; // Identifier of the trajectory now staged or active in the producer.
+  plan_version:uint; // Trajectory revision accepted by the producer.
+  result_detail:int; // Producer-defined extended result or error detail.
+  failed_seq:uint; // Failed segment sequence when FailedSeqValid is set.
+  flags:ushort; // Bitmask of TransferFlags bits.
 }

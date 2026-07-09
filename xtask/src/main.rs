@@ -19,9 +19,10 @@ const SCHEMAS: &[&str] = &[
     "fbs/optical_flow.fbs",
     "fbs/mocap.fbs",
     "fbs/telemetry.fbs",
+    "fbs/sim.fbs",
+    "fbs/trajectory.fbs",
     "fbs/transport.fbs",
     "fbs/transfer.fbs",
-    "fbs/sil.fbs",
     "fbs/all.fbs",
 ];
 
@@ -37,45 +38,45 @@ const LIVELINESS_KEY_PREFIX: &str = "synapse/v1/live";
 const COMMANDS: &[(u16, &str, &str, &str, &str)] = &[
     (
         1,
-        "vehicle_command",
-        "synapse.topic.VehicleCommandData",
-        "synapse.topic.CommandResultData",
-        "Generic command with floating-point arguments.",
-    ),
-    (
-        2,
-        "geo_command",
-        "synapse.topic.GeoCommandData",
-        "synapse.topic.CommandResultData",
-        "Geographic command with scaled latitude/longitude precision.",
-    ),
-    (
-        3,
         "param_get",
         "synapse.cmd.ParamGetRequest",
         "synapse.cmd.ParamGetReply",
-        "Fetch one parameter by name, or all parameters.",
+        "Fetch one parameter by name, or a paged parameter catalog chunk.",
     ),
     (
-        4,
+        2,
         "param_set",
         "synapse.cmd.ParamSetRequest",
         "synapse.cmd.ParamSetReply",
         "Set one parameter.",
     ),
     (
-        5,
+        3,
         "mission_get",
         "synapse.cmd.MissionGetRequest",
         "synapse.cmd.MissionGetReply",
-        "Fetch the mission plan.",
+        "Fetch a paged GPS mission chunk.",
     ),
     (
-        6,
+        4,
         "mission_set",
         "synapse.cmd.MissionSetRequest",
         "synapse.cmd.MissionSetReply",
-        "Replace the mission plan.",
+        "Replace or patch a GPS mission in bounded chunks.",
+    ),
+    (
+        5,
+        "trajectory_get",
+        "synapse.cmd.TrajectoryGetRequest",
+        "synapse.cmd.TrajectoryGetReply",
+        "Fetch a paged trajectory segment chunk.",
+    ),
+    (
+        6,
+        "trajectory_set",
+        "synapse.cmd.TrajectorySetRequest",
+        "synapse.cmd.TrajectorySetReply",
+        "Replace or patch a trajectory in bounded chunks.",
     ),
 ];
 
@@ -87,10 +88,15 @@ const VEHICLE_SCOPE_TOPICS: &[&str] = &[
     "AirData",
     "OpticalFlow",
     "OpticalFlowVelocity",
+    "ExternalOdometry",
+    "MocapFrame",
+    "TrajectorySegment",
     "ActuatorCommand",
     "ActuatorFeedback",
     "PwmSignalOutputs",
     "ControlLoopMetrics",
+    "LockstepTick",
+    "LockstepStatus",
 ];
 
 const LEGACY_DOC_DIRS: &[&str] = &["0.1.6"];
@@ -174,7 +180,7 @@ fn check(root: &Path) -> Result<()> {
     let templates = Templates::new(root)?;
     let check_dir = root.join("target/xtask/check");
     reset_dir(&check_dir)?;
-    let context = topic_catalog_context(&topics);
+    let context = topic_catalog_context(&docs, &topics)?;
     for (template, output) in [
         ("xtask/topic_catalog/topics.json.jinja", "topics.json"),
         (
@@ -388,6 +394,8 @@ if (keyForTopic('VehicleHealth') !== 'synapse/v1/topic/vehicle_health') throw ne
 if (topicByKey('/synapse/v1/topic/gnss_fix')?.name !== 'GnssFix') throw new Error('bad topicByKey');
 if (commandByName('mission_set')?.key !== 'synapse/v1/cmd/mission_set') throw new Error('bad command helper');
 if (commandByName('param_get')?.requestType !== 'synapse.cmd.ParamGetRequest') throw new Error('bad command type');
+if (commandByName('param_get')?.requestEncoding !== 'table') throw new Error('bad command encoding');
+if (commandByName('param_get')?.requestSize !== null) throw new Error('bad command size');
 console.log('catalog js helpers ok');
 "#;
         run(Command::new("node")
@@ -414,6 +422,8 @@ assert tc.key_for_topic("VehicleHealth") == "synapse/v1/topic/vehicle_health"
 assert tc.topic_by_key("/synapse/v1/topic/gnss_fix").name == "GnssFix"
 assert tc.command_by_name("mission_set").key == "synapse/v1/cmd/mission_set"
 assert tc.command_by_name("param_get").request_type == "synapse.cmd.ParamGetRequest"
+assert tc.command_by_name("param_get").request_encoding == "table"
+assert tc.command_by_name("param_get").request_size is None
 print("catalog python helpers ok")
 "#;
         run(Command::new(&python)
@@ -514,8 +524,10 @@ int main(void) {
     assert(by_key != NULL && by_key->id == 1);
 
     const synapse_command_info_t *command = synapse_command_by_name("param_get");
-    assert(command != NULL && command->id == 3 &&
+    assert(command != NULL && command->id == 1 &&
            strcmp(command->request_type, "synapse.cmd.ParamGetRequest") == 0);
+    assert(strcmp(command->request_encoding, "table") == 0 &&
+           command->request_size == 0);
 
     printf("catalog c helpers ok\n");
     return 0;
@@ -573,9 +585,9 @@ int main(void) {
     }
     assert(found_quat_w);
 
-    const synapse_topic_info_t *mocap = synapse_topic_by_name("MocapFrame");
-    assert(mocap != NULL && !mocap->fixed_layout);
-    assert(synapse_topic_fields_by_id(mocap->id) == NULL);
+    const synapse_topic_info_t *text = synapse_topic_by_name("TextStatus");
+    assert(text != NULL && !text->fixed_layout);
+    assert(synapse_topic_fields_by_id(text->id) == NULL);
     assert(synapse_topic_snprint(line, sizeof(line), health->id, payload,
                                  fields->payload_size + 1) < 0);
 
@@ -616,8 +628,10 @@ fn main() {
 
     assert_eq!(topic_by_key("cub1/synapse/v1/topic/vehicle_health").unwrap().id, 1);
     let command = command_by_name("param_get").unwrap();
-    assert_eq!(command.id, 3);
+    assert_eq!(command.id, 1);
     assert_eq!(command.request_type, "synapse.cmd.ParamGetRequest");
+    assert_eq!(command.request_encoding, "table");
+    assert_eq!(command.request_size, None);
 
     println!("catalog rust helpers ok");
 }
@@ -895,7 +909,7 @@ fn generate_bindings(
     validate_schema_docs(&docs)?;
     validate_protocol(&docs)?;
     let topics = topic_entries(&docs)?;
-    write_package_topic_catalogs(templates, packages, &topics)?;
+    write_package_topic_catalogs(templates, packages, &docs, &topics)?;
 
     // The Rust crate ships the wire contract itself: schema sources, compiled
     // binary schemas, and a generated debug decoder, so downstream tools do
@@ -903,7 +917,7 @@ fn generate_bindings(
     copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
     generate_reflection_schemas(root, flatc, &packages.rust.join("bfbs"))?;
     write_rust_embedded_schemas(templates, &docs, &packages.rust)?;
-    write_rust_topic_decode(templates, &topics, &packages.rust)?;
+    write_rust_topic_decode(templates, &docs, &topics, &packages.rust)?;
 
     Ok(())
 }
@@ -911,20 +925,22 @@ fn generate_bindings(
 fn write_package_topic_catalogs(
     templates: &Templates,
     packages: &PackagePaths,
+    docs: &SchemaDoc,
     topics: &[TopicEntry],
 ) -> Result<()> {
-    write_js_topic_catalogs(templates, &packages.js, topics)?;
-    write_rust_topic_catalog(templates, &packages.rust, topics)?;
-    write_python_topic_catalog(templates, &packages.python, topics)?;
+    write_js_topic_catalogs(templates, &packages.js, docs, topics)?;
+    write_rust_topic_catalog(templates, &packages.rust, docs, topics)?;
+    write_python_topic_catalog(templates, &packages.python, docs, topics)?;
     Ok(())
 }
 
 fn write_js_topic_catalogs(
     templates: &Templates,
     package_root: &Path,
+    docs: &SchemaDoc,
     topics: &[TopicEntry],
 ) -> Result<()> {
-    let context = topic_catalog_context(topics);
+    let context = topic_catalog_context(docs, topics)?;
     templates.render_to_file(
         "xtask/topic_catalog/topics.json.jinja",
         context.clone(),
@@ -945,11 +961,12 @@ fn write_js_topic_catalogs(
 fn write_rust_topic_catalog(
     templates: &Templates,
     package_root: &Path,
+    docs: &SchemaDoc,
     topics: &[TopicEntry],
 ) -> Result<()> {
     templates.render_to_file(
         "xtask/topic_catalog/topic_catalog.rs.jinja",
-        topic_catalog_context(topics),
+        topic_catalog_context(docs, topics)?,
         &package_root.join("src/topic_catalog.rs"),
     )
 }
@@ -957,11 +974,12 @@ fn write_rust_topic_catalog(
 fn write_python_topic_catalog(
     templates: &Templates,
     package_root: &Path,
+    docs: &SchemaDoc,
     topics: &[TopicEntry],
 ) -> Result<()> {
     templates.render_to_file(
         "xtask/topic_catalog/topic_catalog.py.jinja",
-        topic_catalog_context(topics),
+        topic_catalog_context(docs, topics)?,
         &package_root.join("synapse/topic_catalog.py"),
     )
 }
@@ -969,9 +987,10 @@ fn write_python_topic_catalog(
 fn write_c_topic_catalogs(
     templates: &Templates,
     package_root: &Path,
+    docs: &SchemaDoc,
     topics: &[TopicEntry],
 ) -> Result<()> {
-    let context = topic_catalog_context(topics);
+    let context = topic_catalog_context(docs, topics)?;
     templates.render_to_file(
         "xtask/topic_catalog/topics.json.jinja",
         context.clone(),
@@ -984,8 +1003,59 @@ fn write_c_topic_catalogs(
     )
 }
 
-fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
-    Value::from_serialize(TopicCatalogContext {
+fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Value> {
+    let mut layouts = BTreeMap::new();
+    let mut commands = Vec::new();
+    for (id, name, request_type, reply_type, description) in COMMANDS {
+        let key = format!("{CMD_KEY_PREFIX}/{name}");
+        let request_meta = command_payload_metadata(docs, request_type, &mut layouts)?;
+        let reply_meta = command_payload_metadata(docs, reply_type, &mut layouts)?;
+        commands.push(CommandTemplateEntry {
+            id: *id,
+            name: (*name).to_string(),
+            key: key.clone(),
+            request_type: (*request_type).to_string(),
+            reply_type: (*reply_type).to_string(),
+            request_encoding: request_meta.encoding,
+            request_size: request_meta.size,
+            reply_encoding: reply_meta.encoding,
+            reply_size: reply_meta.size,
+            description: (*description).to_string(),
+            name_literal: source_string_literal(name),
+            key_literal: source_string_literal(&key),
+            request_type_literal: source_string_literal(request_type),
+            reply_type_literal: source_string_literal(reply_type),
+            request_encoding_literal: source_string_literal(request_meta.encoding),
+            request_size_c: request_meta
+                .size
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "0".to_string()),
+            request_size_python: request_meta
+                .size
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "None".to_string()),
+            request_size_rust: request_meta
+                .size
+                .map(|value| format!("Some({value})"))
+                .unwrap_or_else(|| "None".to_string()),
+            reply_encoding_literal: source_string_literal(reply_meta.encoding),
+            reply_size_c: reply_meta
+                .size
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "0".to_string()),
+            reply_size_python: reply_meta
+                .size
+                .map(|value| value.to_string())
+                .unwrap_or_else(|| "None".to_string()),
+            reply_size_rust: reply_meta
+                .size
+                .map(|value| format!("Some({value})"))
+                .unwrap_or_else(|| "None".to_string()),
+            description_literal: source_string_literal(description),
+        });
+    }
+
+    Ok(Value::from_serialize(TopicCatalogContext {
         version: 2,
         key_prefix: TOPIC_KEY_PREFIX,
         cmd_key_prefix: CMD_KEY_PREFIX,
@@ -1093,26 +1163,8 @@ fn topic_catalog_context(topics: &[TopicEntry]) -> Value {
                 }
             })
             .collect(),
-        commands: COMMANDS
-            .iter()
-            .map(|(id, name, request_type, reply_type, description)| {
-                let key = format!("{CMD_KEY_PREFIX}/{name}");
-                CommandTemplateEntry {
-                    id: *id,
-                    name: (*name).to_string(),
-                    key: key.clone(),
-                    request_type: (*request_type).to_string(),
-                    reply_type: (*reply_type).to_string(),
-                    description: (*description).to_string(),
-                    name_literal: source_string_literal(name),
-                    key_literal: source_string_literal(&key),
-                    request_type_literal: source_string_literal(request_type),
-                    reply_type_literal: source_string_literal(reply_type),
-                    description_literal: source_string_literal(description),
-                }
-            })
-            .collect(),
-    })
+        commands,
+    }))
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -1176,12 +1228,13 @@ fn write_rust_embedded_schemas(
 
 fn write_rust_topic_decode(
     templates: &Templates,
+    docs: &SchemaDoc,
     topics: &[TopicEntry],
     package_root: &Path,
 ) -> Result<()> {
     templates.render_to_file(
         "xtask/topic_catalog/topic_decode.rs.jinja",
-        topic_catalog_context(topics),
+        topic_catalog_context(docs, topics)?,
         &package_root.join("src/topic_decode.rs"),
     )
 }
@@ -1354,7 +1407,8 @@ fn build_js_package(
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
     validate_protocol(&docs)?;
-    write_js_topic_catalogs(templates, package_root, &topic_entries(&docs)?)?;
+    let topics = topic_entries(&docs)?;
+    write_js_topic_catalogs(templates, package_root, &docs, &topics)?;
     write_schema_hashes(root, &package_root.join("schema.sha256"))?;
     write_bfbs_hashes(package_root, &package_root.join("bfbs.sha256"))?;
 
@@ -1471,7 +1525,7 @@ fn build_archives(
         cpp_root.join("third_party/flatbuffers/LICENSE"),
     )?;
     copy_common_archive_files(root, &cpp_root)?;
-    write_c_topic_catalogs(&templates, &cpp_root, &topics)?;
+    write_c_topic_catalogs(&templates, &cpp_root, &docs, &topics)?;
     write_schema_hashes(root, &cpp_root.join("schema.sha256"))?;
     write_bfbs_hashes(&cpp_root, &cpp_root.join("bfbs.sha256"))?;
     copy_render_template_tree(
@@ -1533,7 +1587,7 @@ fn build_archives(
         c_root.join("third_party/flatcc/NOTICE"),
     )?;
     copy_common_archive_files(root, &c_root)?;
-    write_c_topic_catalogs(&templates, &c_root, &topics)?;
+    write_c_topic_catalogs(&templates, &c_root, &docs, &topics)?;
     write_c_topic_print(
         &templates,
         &docs,
@@ -1720,6 +1774,12 @@ struct TopicEntry {
     description: String,
 }
 
+#[derive(Clone, Copy, Debug)]
+struct CommandPayloadMetadata {
+    encoding: &'static str,
+    size: Option<usize>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct TopicCatalogContext {
     version: u8,
@@ -1781,11 +1841,23 @@ struct CommandTemplateEntry {
     key: String,
     request_type: String,
     reply_type: String,
+    request_encoding: &'static str,
+    request_size: Option<usize>,
+    reply_encoding: &'static str,
+    reply_size: Option<usize>,
     description: String,
     name_literal: String,
     key_literal: String,
     request_type_literal: String,
     reply_type_literal: String,
+    request_encoding_literal: String,
+    request_size_c: String,
+    request_size_python: String,
+    request_size_rust: String,
+    reply_encoding_literal: String,
+    reply_size_c: String,
+    reply_size_python: String,
+    reply_size_rust: String,
     description_literal: String,
 }
 
@@ -2119,6 +2191,36 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
     }
 
     Ok(topics)
+}
+
+fn command_payload_metadata(
+    docs: &SchemaDoc,
+    type_name: &str,
+    layouts: &mut BTreeMap<String, (usize, usize)>,
+) -> Result<CommandPayloadMetadata> {
+    let lookup = type_lookup_name(type_name);
+    let Some((_, entity)) = find_schema_entity(docs, &lookup) else {
+        return fail(format!("command type {type_name} does not resolve to a schema entity"));
+    };
+    match entity.kind {
+        SchemaEntityKind::Struct => {
+            let mut visiting = BTreeSet::new();
+            let size = struct_layout(docs, &lookup, layouts, &mut visiting)?.0;
+            Ok(CommandPayloadMetadata {
+                encoding: "struct",
+                size: Some(size),
+            })
+        }
+        SchemaEntityKind::Table => Ok(CommandPayloadMetadata {
+            encoding: "table",
+            size: None,
+        }),
+        _ => fail(format!(
+            "command type {type_name} resolves to {} {}, expected struct or table",
+            entity.kind.as_str(),
+            entity.name
+        )),
+    }
 }
 
 fn round_up(value: usize, align: usize) -> usize {
@@ -2555,6 +2657,8 @@ fn lint_allowlisted(name: &str) -> bool {
         "target_component",
         "seq",
         "sequence",
+        "offset",
+        "limit",
         "sensors_present",
         "sensors_enabled",
         "sensors_health",
@@ -2571,6 +2675,7 @@ fn lint_allowlisted(name: &str) -> bool {
         || name.ends_with("_seq")
         || name.ends_with("_number")
         || name.ends_with("_version")
+        || name.ends_with("_crc32")
     {
         return true;
     }
@@ -3042,13 +3147,14 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("Synapse is intended to be straightforward to use with Zenoh. The canonical encoding publishes each fixed-layout topic's bare payload struct bytes on a stable key expression: the key identifies the stream and the type, so the same bytes serve shared memory, Zenoh values, radio frames, and log messages with zero re-serialization. Little-endian byte order is a protocol requirement. Variable-size topics and generic bridges use the thin FlatBuffers root tables instead; the catalog `encoding` field records which applies.\n\n");
     md.push_str("Several parts of the schema support this model:\n\n");
     md.push_str("- **Fixed-layout payload structs:** every runtime topic payload is a struct with a documented byte size, so consumers can decode by overlay without FlatBuffers machinery.\n");
-    md.push_str("- **Generated topic catalog:** release artifacts include `TopicId`, canonical Zenoh key, root table, payload struct and size, scope, encoding, and helper lookups so applications do not hand-maintain routing tables.\n");
+    md.push_str("- **Generated topic catalog:** release artifacts include `TopicId`, canonical Zenoh key, root table, payload struct and size, scope, encoding, command request/reply encoding, and helper lookups so applications do not hand-maintain routing tables.\n");
     md.push_str("- **Stable topic identifiers:** `TopicId` is available for bridges, logs, serial frames, or compact routing tables, while Zenoh deployments can use key expressions as the primary discriminator.\n");
     md.push_str("- **No transport checksums in payloads:** Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.\n");
     md.push_str("- **Schema assets in every release:** npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.\n\n");
     md.push_str("Canonical keys use `synapse/v1/topic/<topic_name>[/<instance>]`; the `v1` segment is the schema-major compatibility signal, and multi-instance sensor topics append an instance segment so subscribers can select one sensor without decoding payloads. Deployments prepend vehicle, swarm, or site namespaces (for example `cub1/synapse/v1/topic/gnss_fix`); namespace prefixes come from deployment configuration and are never hardcoded in firmware. The package helpers parse namespaced keys and look up topics by `TopicId`, name, key, or key suffix. Commands and transfers are Zenoh queryables under `synapse/v1/cmd/...`; `synapse/v1/meta/...` and `synapse/v1/live/...` are reserved for schema metadata and liveliness.\n\n");
+    md.push_str("Lockstep simulation is modeled as pub/sub state, not query/reply RPC. A simulator publishes `LockstepTick` on `synapse/v1/topic/lockstep_tick`, and each participant publishes `LockstepStatus` on `synapse/v1/topic/lockstep_status/<id>`. Strict lockstep waits for a matching `run_id` and completed status sequence before sending the next tick. Use liveliness tokens under `synapse/v1/live/...` for endpoint presence; the status topic is the protocol acknowledgement, not discovery.\n\n");
     md.push_str("## Topic Catalog\n\n");
-    md.push_str("The generated topic catalog is included as `topics.json` in schema-asset archives and as language helpers where the package has a public API. It records `TopicId`, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.\n\n");
+    md.push_str("The generated topic catalog is included as `topics.json` in schema-asset archives and as language helpers where the package has a public API. It records `TopicId`, canonical key expression, FlatBuffers root table, fixed-layout payload type and size, schema file, topic encoding, command request/reply encoding, and descriptions from schema comments.\n\n");
     md.push_str("Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.\n\n");
     md.push_str("## ROS and FlatROS\n\n");
     md.push_str("ROS messages are local integration types, not the Synapse over-the-air format. They are useful for visualization, autonomy stacks, simulation, rosbag tooling, and operator workflows, but they should not replace compact Synapse FlatBuffers payloads on constrained vehicle links.\n\n");

@@ -38,6 +38,10 @@ typedef struct synapse_command_info {
     const char *key;
     const char *request_type; /* fully qualified FlatBuffers type */
     const char *reply_type;   /* fully qualified FlatBuffers type */
+    const char *request_encoding;
+    size_t request_size; /* zero when request_encoding is table */
+    const char *reply_encoding;
+    size_t reply_size; /* zero when reply_encoding is table */
     const char *description;
 } synapse_command_info_t;
 
@@ -72,6 +76,10 @@ static const synapse_command_info_t synapse_commands[] = {
         {{ command.key_literal }},
         {{ command.request_type_literal }},
         {{ command.reply_type_literal }},
+        {{ command.request_encoding_literal }},
+        {{ command.request_size_c }},
+        {{ command.reply_encoding_literal }},
+        {{ command.reply_size_c }},
         {{ command.description_literal }},
     },
 {%- endfor %}

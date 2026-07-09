@@ -135,55 +135,6 @@ struct LocalPositionCommandData {
   coordinate_frame:synapse.types.LocalFrame; // Frame in which the setpoint is expressed.
 }
 
-// Generic command with seven floating-point arguments. Commands travel as
-// Zenoh queryable requests on the cmd key space; the reply payload is
-// CommandResultData. The transport provides correlation, retry, and timeout.
-struct VehicleCommandData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  arg0:float; // Command-specific argument 0.
-  arg1:float; // Command-specific argument 1.
-  arg2:float; // Command-specific argument 2.
-  arg3:float; // Command-specific argument 3.
-  arg4:float; // Command-specific argument 4.
-  arg5:float; // Command-specific argument 5.
-  arg6:float; // Command-specific argument 6.
-  command_id:ushort; // Producer-defined command identifier.
-  target_system:ubyte; // Target system identifier, or zero for broadcast/default.
-  target_component:ubyte; // Target component identifier, or zero for broadcast/default.
-}
-
-// Geographic command form preserving global-coordinate precision. Also used
-// as the mission-item payload for mission transfer.
-struct GeoCommandData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
-  arg0:float; // Command-specific argument 0.
-  arg1:float; // Command-specific argument 1.
-  arg2:float; // Command-specific argument 2.
-  arg3:float; // Command-specific argument 3.
-  latitude_deg_e7:int; // Target latitude in WGS-84 degrees scaled by 1e7.
-  longitude_deg_e7:int; // Target longitude in WGS-84 degrees scaled by 1e7.
-  altitude_m:float; // Target altitude in meters in the frame selected by frame.
-  command_id:ushort; // Producer-defined command identifier.
-  frame:synapse.types.GeoAltitudeFrame; // Altitude reference frame for altitude_m.
-  target_system:ubyte; // Target system identifier, or zero for broadcast/default.
-  target_component:ubyte; // Target component identifier, or zero for broadcast/default.
-  current:bool; // True when this item should become current immediately.
-  autocontinue:bool; // True when navigation should automatically continue after this item.
-}
-
-// Result, progress, and routing information for command execution. Sent as
-// the queryable reply for command requests; InProgress replies may stream
-// until a terminal result is reached.
-struct CommandResultData {
-  timestamp_us:ulong; // Result timestamp in monotonic boot time.
-  result_detail:int; // Producer-defined extended result or error detail.
-  command_id:ushort; // Command identifier this result refers to.
-  result:synapse.types.CommandResultCode; // Command execution result.
-  progress_pct:ubyte; // Completion progress from 0 to 100 while InProgress.
-  target_system:ubyte; // System identifier that produced or should receive the result.
-  target_component:ubyte; // Component identifier that produced or should receive the result.
-}
-
 // Normalized actuator command for up to sixteen logical actuator controls.
 struct ActuatorCommandData {
   timestamp_us:ulong; // Command timestamp in monotonic boot time.
@@ -301,21 +252,6 @@ table RateCommand {
 // FlatBuffers root wrapper for LocalPositionCommandData.
 table LocalPositionCommand {
   data:LocalPositionCommandData; // Fixed-layout local-position-command payload.
-}
-
-// FlatBuffers root wrapper for VehicleCommandData.
-table VehicleCommand {
-  data:VehicleCommandData; // Fixed-layout generic command payload.
-}
-
-// FlatBuffers root wrapper for GeoCommandData.
-table GeoCommand {
-  data:GeoCommandData; // Fixed-layout geographic command payload.
-}
-
-// FlatBuffers root wrapper for CommandResultData.
-table CommandResult {
-  data:CommandResultData; // Fixed-layout command-result payload.
 }
 
 // FlatBuffers root wrapper for ActuatorCommandData.

@@ -25,9 +25,10 @@ export const schemaFiles = Object.freeze([
   'optical_flow.fbs',
   'mocap.fbs',
   'telemetry.fbs',
+  'sim.fbs',
+  'trajectory.fbs',
   'transport.fbs',
   'transfer.fbs',
-  'sil.fbs',
   'all.fbs'
 ]);
 

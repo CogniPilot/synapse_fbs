@@ -20,6 +20,10 @@ export interface CommandInfo {
   readonly key: string;
   readonly requestType: string;
   readonly replyType: string;
+  readonly requestEncoding: string;
+  readonly requestSize: number | null;
+  readonly replyEncoding: string;
+  readonly replySize: number | null;
   readonly description: string;
 }
 

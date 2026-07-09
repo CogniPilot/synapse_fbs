@@ -16,7 +16,8 @@ release artifacts from the pinned Linux toolchain in `flake.nix`.
 
 - Schema docs: <https://cognipilot.github.io/synapse_fbs/>
 - Main-branch schema docs: <https://cognipilot.github.io/synapse_fbs/main/>
-- Latest 0.3 schema docs: <https://cognipilot.github.io/synapse_fbs/0.3/>
+- Latest 0.4 schema docs: <https://cognipilot.github.io/synapse_fbs/0.4/>
+- Design use cases: [USE_CASES.md](USE_CASES.md)
 - GitHub releases: <https://github.com/CogniPilot/synapse_fbs/releases>
 - Rust crate: <https://crates.io/crates/synapse_fbs>
 - Rust API docs: <https://docs.rs/synapse_fbs>
@@ -107,26 +108,41 @@ parse namespaced keys back into namespace, topic, and instance.
 
 **Encoding.** The canonical value for a fixed-layout topic is the bare payload
 struct bytes; the key identifies the type and the catalog records the exact
-byte size. Variable-size topics (`TextStatus`, mocap) and generic bridges use
-the thin FlatBuffers root tables; the catalog `encoding` field says which
-applies per topic.
+byte size. Variable-size topics (`TextStatus`, `MocapFrame`) and generic
+bridges use the thin FlatBuffers root tables; the catalog `encoding` field
+says which applies per topic.
+
+**Mocap has raw and estimator paths.** `MocapFrame` preserves source-like raw
+marker and 6DOF rigid-body samples for logging and bridge processing.
+Estimators consume `ExternalOdometry`, a fixed-layout pose/twist measurement.
+Frame ids are not carried in high-rate payloads: pose and linear velocity are
+ENU, angular velocity is body FLU, and bridges transform before publishing.
+Full 12D tangent-state covariance is an opt-in companion topic,
+`ExternalOdometryCovariance`, rather than part of the default 240 Hz path.
 
 **Commands are queryables, not topics.** A GCS issues
-`get("cub1/synapse/v1/cmd/vehicle_command", payload)` and receives
-`CommandResultData` replies (streaming `InProgress` until terminal). The
-transport provides correlation, timeout, and retry, so command messages carry
-no confirmation counters. Mission and parameter transfer use the same pattern
-with the request/reply tables in `fbs/transfer.fbs`. Streaming setpoints
-(`AttitudeCommand`, `RateCommand`, `LocalPositionCommand`) remain pub/sub
-topics.
+`get("cub1/synapse/v1/cmd/mission_get", payload)` and receives the matching
+reply table. Parameter, mission, and trajectory transfer all use bounded
+request/reply tables in `fbs/transfer.fbs`. Streaming setpoints
+(`AttitudeCommand`, `RateCommand`, `LocalPositionCommand`,
+`TrajectorySegment`) remain pub/sub topics.
+
+**Lockstep simulation uses topics.** A simulator publishes `LockstepTick` on
+`synapse/v1/topic/lockstep_tick`; each participant publishes
+`LockstepStatus` on `synapse/v1/topic/lockstep_status/<id>`. Strict lockstep
+waits for a matching `run_id` and completed status sequence before publishing
+the next tick. Use Zenoh liveliness tokens under `synapse/v1/live/...` for
+endpoint presence; the status topic is the protocol acknowledgement, not
+discovery.
 
 ## Topic Catalog
 
 The generated catalog is the source of truth for bridge and routing metadata:
 `TopicId`, canonical key, root table, fixed-layout payload type and byte size,
 `scope` (`vehicle` topics never leave the vehicle network; `any` topics may be
-bridged subject to rate policy), `encoding`, `multi_instance`, and the command
-key space. It ships as `topics.json` plus language helpers.
+bridged subject to rate policy), `encoding`, `multi_instance`, and command
+request/reply encoding metadata. It ships as `topics.json` plus language
+helpers.
 
 JavaScript:
 
@@ -184,7 +200,7 @@ Zenoh transport otherwise provides:
   bit set carry a `synapse.cmd.CmdId` value in the `topic_id` field instead
   of a `TopicId`, with `seq` correlating a reply to its request. The payload
   is the same request/reply message the Zenoh queryable would carry, so
-  mission and parameter transfer work identically over serial.
+  parameter, mission, and trajectory transfer work identically over serial.
 
 Link-specific delimiting, integrity, authentication, or encryption belong to
 the framing layer, never inside topic payloads. The FlatBuffers `Frame`
@@ -241,7 +257,7 @@ that need root objects.
 Use FlatBuffers `table`, `string`, or vector fields only when the data is
 naturally variable-size, optional, or needs FlatBuffers root/union behavior:
 thin root wrappers around fixed structs, transport envelopes, text status,
-cached definition records (mocap), and request/reply transfer messages.
+and request/reply transfer messages.
 
 Schema validation is enforced by `xtask`: every entity and field must be
 documented, quantitative fields must carry a recognized unit suffix, `TopicId`
@@ -254,14 +270,18 @@ sizes are computed and checked on every build.
   enums, and topic identifiers.
 - `fbs/sensors.fbs`: GNSS, inertial, air data, and power telemetry (raw
   layer).
-- `fbs/state.fbs`: vehicle health, estimates, mission progress, and
-  navigation status (estimate layer).
-- `fbs/control.fbs`: manual input, setpoints, commands, actuators, and loop
+- `fbs/state.fbs`: vehicle health, estimates, external odometry, mission
+  progress, and navigation status (estimate layer).
+- `fbs/control.fbs`: manual input, setpoints, actuators, and loop
   metrics.
+- `fbs/trajectory.fbs`: fixed-layout Bezier and polynomial trajectory
+  segments.
 - `fbs/telemetry.fbs`: compact ground-control status aggregate.
 - `fbs/transport.fbs`: optional multiplexed frame and message union.
-- `fbs/transfer.fbs`: mission and parameter queryable request/reply messages.
-- `fbs/{mocap,optical_flow,sil}.fbs`: focused support schemas.
+- `fbs/transfer.fbs`: parameter, mission, and trajectory queryable
+  request/reply messages.
+- `fbs/mocap.fbs`: raw motion-capture marker and 6DOF frame data.
+- `fbs/{optical_flow,sim}.fbs`: focused support schemas.
 - `fbs/all.fbs`: aggregate include used by package generation.
 - `topics.json` / topic catalog helpers: topic IDs, canonical keys, payload
   sizes, scopes, encodings, and command metadata in release artifacts.
@@ -294,7 +314,7 @@ otherwise.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.3"
+synapse_fbs = "0.4"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -340,7 +360,7 @@ consumers. Prefer `find_package` for projects that download, extract, or
 install the release archive as part of their dependency setup:
 
 ```cmake
-find_package(synapse_fbs 0.3.3 CONFIG REQUIRED)
+find_package(synapse_fbs 0.4.0 CONFIG REQUIRED)
 
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
@@ -356,7 +376,7 @@ remains the simplest direct-from-release path:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.3.3)
+set(SYNAPSE_FBS_VERSION 0.4.0)
 
 FetchContent_Declare(
   synapse_fbs
@@ -415,7 +435,7 @@ through CMake `FetchContent`.
 Generate the static schema documentation locally:
 
 ```sh
-nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.3 --out-dir target/xtask/docs
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.4 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -429,7 +449,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a semantic version tag such as `v0.3.3` publishes a GitHub Release and
+Pushing a semantic version tag such as `v0.4.0` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
@@ -454,7 +474,7 @@ directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes schema documentation to the `gh-pages` branch used
 by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.3.3` updates `/0.3/`. Only the latest patch
+matching minor-version docs, so `v0.4.0` updates `/0.4/`. Only the latest patch
 for each published minor line is kept on GitHub Pages. Exact historical docs can
 be rebuilt from the corresponding tag.
 
