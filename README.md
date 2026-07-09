@@ -16,7 +16,7 @@ release artifacts from the pinned Linux toolchain in `flake.nix`.
 
 - Schema docs: <https://cognipilot.github.io/synapse_fbs/>
 - Main-branch schema docs: <https://cognipilot.github.io/synapse_fbs/main/>
-- Latest 0.4 schema docs: <https://cognipilot.github.io/synapse_fbs/0.4/>
+- Latest 0.5 schema docs: <https://cognipilot.github.io/synapse_fbs/0.5/>
 - Design use cases: [USE_CASES.md](USE_CASES.md)
 - GitHub releases: <https://github.com/CogniPilot/synapse_fbs/releases>
 - Rust crate: <https://crates.io/crates/synapse_fbs>
@@ -114,11 +114,11 @@ says which applies per topic.
 
 **Mocap has raw and estimator paths.** `MocapFrame` preserves source-like raw
 marker and 6DOF rigid-body samples for logging and bridge processing.
-Estimators consume `ExternalOdometry`, a fixed-layout pose/twist measurement.
-Frame ids are not carried in high-rate payloads: pose and linear velocity are
-ENU, angular velocity is body FLU, and bridges transform before publishing.
-Full 12D tangent-state covariance is an opt-in companion topic,
-`ExternalOdometryCovariance`, rather than part of the default 240 Hz path.
+Estimators consume `ExternalOdometry`, a compact fixed-layout pose/twist
+measurement. Frame ids are not carried in high-rate payloads: pose and linear
+velocity are ENU, angular velocity is body FLU, and bridges transform before
+publishing. Uncertainty and full 12D tangent-state covariance are opt-in
+companion data, not part of the default 240 Hz path.
 
 **Commands are queryables, not topics.** A GCS issues
 `get("cub1/synapse/v1/cmd/mission_get", payload)` and receives the matching
@@ -360,7 +360,7 @@ consumers. Prefer `find_package` for projects that download, extract, or
 install the release archive as part of their dependency setup:
 
 ```cmake
-find_package(synapse_fbs 0.4.0 CONFIG REQUIRED)
+find_package(synapse_fbs 0.5.0 CONFIG REQUIRED)
 
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
@@ -376,7 +376,7 @@ remains the simplest direct-from-release path:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.4.0)
+set(SYNAPSE_FBS_VERSION 0.5.0)
 
 FetchContent_Declare(
   synapse_fbs
@@ -435,7 +435,7 @@ through CMake `FetchContent`.
 Generate the static schema documentation locally:
 
 ```sh
-nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.4 --out-dir target/xtask/docs
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.5 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -449,7 +449,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a semantic version tag such as `v0.4.0` publishes a GitHub Release and
+Pushing a semantic version tag such as `v0.5.0` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
@@ -474,7 +474,7 @@ directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes schema documentation to the `gh-pages` branch used
 by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.4.0` updates `/0.4/`. Only the latest patch
+matching minor-version docs, so `v0.5.0` updates `/0.5/`. Only the latest patch
 for each published minor line is kept on GitHub Pages. Exact historical docs can
 be rebuilt from the corresponding tag.
 
