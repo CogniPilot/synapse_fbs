@@ -2200,7 +2200,9 @@ fn command_payload_metadata(
 ) -> Result<CommandPayloadMetadata> {
     let lookup = type_lookup_name(type_name);
     let Some((_, entity)) = find_schema_entity(docs, &lookup) else {
-        return fail(format!("command type {type_name} does not resolve to a schema entity"));
+        return fail(format!(
+            "command type {type_name} does not resolve to a schema entity"
+        ));
     };
     match entity.kind {
         SchemaEntityKind::Struct => {
