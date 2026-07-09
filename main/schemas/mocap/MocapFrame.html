@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,19 +180,22 @@
                     <main>
                         <h1 id="table-mocapframe"><a class="header" href="#table-mocapframe"><code>table</code> MocapFrame</a></h1>
 <p><a href="../mocap.html">fbs/mocap.fbs</a> / <a href="../../fbs/mocap.fbs">Source schema</a></p>
-<p>Variable-size mocap frame containing all tracked samples for one timestamp.</p>
+<p>Raw mocap frame for logging, debugging, and bridge-level processing. This is intentionally table-encoded; estimators should consume ExternalOdometry.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Frame timestamp in monotonic boot time.</td></tr>
-<tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Producer frame counter for loss/reorder detection.</td></tr>
-<tr><td><code>labeled_markers</code></td><td><code>[</code><a href="MocapMarkerSample.html"><code>MocapMarkerSample</code></a><code>]</code></td><td></td><td>Marker samples with stable source identifiers.</td></tr>
-<tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="MocapMarkerSample.html"><code>MocapMarkerSample</code></a><code>]</code></td><td></td><td>Marker samples without stable source identifiers.</td></tr>
-<tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="MocapRigidBodySample.html"><code>MocapRigidBodySample</code></a><code>]</code></td><td></td><td>Rigid-body pose samples.</td></tr>
-<tr><td><code>skeleton_segments</code></td><td><code>[</code><a href="MocapSegmentSample.html"><code>MocapSegmentSample</code></a><code>]</code></td><td></td><td>Skeleton segment pose samples.</td></tr>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Marker timestamp in monotonic boot time.</td></tr>
+<tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Source frame number.</td></tr>
+<tr><td><code>drop_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame drop rate in deci-percent.</td></tr>
+<tr><td><code>out_of_sync_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame out-of-sync rate in deci-percent.</td></tr>
+<tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>Mocap source instance identifier.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MocapRawFlags bits describing the frame as a whole.</td></tr>
+<tr><td><code>markers</code></td><td><code>[</code><a href="MocapMarkerData.html"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
+<tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="MocapMarkerData.html"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
+<tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="MocapRigidBodyData.html"><code>MocapRigidBodyData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body samples.</td></tr>
 </tbody>
 </table>
 </div>
@@ -201,7 +204,7 @@
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../../schemas/mocap/MocapDefinition.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../schemas/mocap/MocapRigidBodyData.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -215,7 +218,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../../schemas/mocap/MocapDefinition.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../schemas/mocap/MocapRigidBodyData.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

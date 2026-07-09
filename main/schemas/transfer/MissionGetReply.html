@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,7 +189,13 @@
 <tbody>
 <tr><td><code>result</code></td><td><a href="../types/CommandResultCode.html"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
 <tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier of the returned plan; matches MissionProgressData.mission_id.</td></tr>
-<tr><td><code>items</code></td><td><code>[</code><a href="MissionItem.html"><code>MissionItem</code></a><code>]</code></td><td></td><td>Mission items in sequence order.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>Monotonic mission revision identifier.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First mission item sequence carried in items.</td></tr>
+<tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of mission items in the plan.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>failed_seq</code></td><td><code>uint</code></td><td></td><td>Failed item sequence when FailedSeqValid is set.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+<tr><td><code>items</code></td><td><code>[</code><a href="MissionItemData.html"><code>MissionItemData</code></a><code>]</code></td><td></td><td>Mission items in sequence order.</td></tr>
 </tbody>
 </table>
 </div>

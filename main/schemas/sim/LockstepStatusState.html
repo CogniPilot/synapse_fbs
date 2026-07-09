@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>struct MocapSegmentSample - Synapse FlatBuffers main</title>
+        <title>enum LockstepStatusState - Synapse FlatBuffers main</title>
 
 
         <!-- Custom HTML head -->
@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,20 +178,23 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="struct-mocapsegmentsample"><a class="header" href="#struct-mocapsegmentsample"><code>struct</code> MocapSegmentSample</a></h1>
-<p><a href="../mocap.html">fbs/mocap.fbs</a> / <a href="../../fbs/mocap.fbs">Source schema</a></p>
-<p>Fixed-layout pose sample for a tracked skeleton segment.</p>
+                        <h1 id="enum-lockstepstatusstate"><a class="header" href="#enum-lockstepstatusstate"><code>enum</code> LockstepStatusState</a></h1>
+<p><a href="../sim.html">fbs/sim.fbs</a> / <a href="../../fbs/sim.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Participant state for lockstep status messages.</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>skeleton_id</code></td><td><code>int</code></td><td></td><td>Skeleton identifier assigned by the mocap source.</td></tr>
-<tr><td><code>segment_id</code></td><td><code>int</code></td><td></td><td>Segment identifier within the skeleton.</td></tr>
-<tr><td><code>position_enu_m</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Segment position in the mocap ENU frame.</td></tr>
-<tr><td><code>attitude</code></td><td><a href="../types/Quaternionf.html"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Segment orientation rotating segment FLU vectors into the mocap ENU frame.</td></tr>
-<tr><td><code>tracking_valid</code></td><td><code>bool</code></td><td></td><td>True when the segment is actively tracked in this frame.</td></tr>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Participant state is not reported.</td></tr>
+<tr><td><code>Ready</code></td><td><code>1</code></td><td>Participant is initialized and ready to accept lockstep ticks.</td></tr>
+<tr><td><code>Running</code></td><td><code>2</code></td><td>Participant accepted a tick and is advancing to the target time.</td></tr>
+<tr><td><code>Completed</code></td><td><code>3</code></td><td>Participant reached the target boot time for sequence.</td></tr>
+<tr><td><code>ResetAck</code></td><td><code>4</code></td><td>Participant reset its lockstep state in response to a Reset tick.</td></tr>
+<tr><td><code>MissedTick</code></td><td><code>5</code></td><td>Participant observed a sequence gap or superseded tick.</td></tr>
+<tr><td><code>Error</code></td><td><code>6</code></td><td>Participant cannot continue without external recovery.</td></tr>
 </tbody>
 </table>
 </div>
@@ -200,11 +203,11 @@
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../../schemas/mocap/MocapRigidBodySample.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../schemas/sim/LockstepTickFlags.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../../schemas/mocap/MocapMarkerDefinition.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../schemas/sim/LockstepTickData.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -214,11 +217,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../../schemas/mocap/MocapRigidBodySample.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../schemas/sim/LockstepTickFlags.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../../schemas/mocap/MocapMarkerDefinition.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../schemas/sim/LockstepTickData.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

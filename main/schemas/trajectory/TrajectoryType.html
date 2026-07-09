@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>struct VehicleCommandData - Synapse FlatBuffers main</title>
+        <title>enum TrajectoryType - Synapse FlatBuffers main</title>
 
 
         <!-- Custom HTML head -->
@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,27 +178,19 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="struct-vehiclecommanddata"><a class="header" href="#struct-vehiclecommanddata"><code>struct</code> VehicleCommandData</a></h1>
-<p><a href="../control.html">fbs/control.fbs</a> / <a href="../../fbs/control.fbs">Source schema</a></p>
-<p>Generic command with seven floating-point arguments. Commands travel as Zenoh queryable requests on the cmd key space; the reply payload is CommandResultData. The transport provides correlation, retry, and timeout.</p>
-<p><strong>FlatBuffers root table:</strong> <code>VehicleCommand</code></p>
+                        <h1 id="enum-trajectorytype"><a class="header" href="#enum-trajectorytype"><code>enum</code> TrajectoryType</a></h1>
+<p><a href="../trajectory.html">fbs/trajectory.fbs</a> / <a href="../../fbs/trajectory.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Coefficient interpretation for a trajectory segment.</p>
 <div class="table-wrapper">
 <table>
 <thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
-<tr><td><code>arg0</code></td><td><code>float</code></td><td></td><td>Command-specific argument 0.</td></tr>
-<tr><td><code>arg1</code></td><td><code>float</code></td><td></td><td>Command-specific argument 1.</td></tr>
-<tr><td><code>arg2</code></td><td><code>float</code></td><td></td><td>Command-specific argument 2.</td></tr>
-<tr><td><code>arg3</code></td><td><code>float</code></td><td></td><td>Command-specific argument 3.</td></tr>
-<tr><td><code>arg4</code></td><td><code>float</code></td><td></td><td>Command-specific argument 4.</td></tr>
-<tr><td><code>arg5</code></td><td><code>float</code></td><td></td><td>Command-specific argument 5.</td></tr>
-<tr><td><code>arg6</code></td><td><code>float</code></td><td></td><td>Command-specific argument 6.</td></tr>
-<tr><td><code>command_id</code></td><td><code>ushort</code></td><td></td><td>Producer-defined command identifier.</td></tr>
-<tr><td><code>target_system</code></td><td><code>ubyte</code></td><td></td><td>Target system identifier, or zero for broadcast/default.</td></tr>
-<tr><td><code>target_component</code></td><td><code>ubyte</code></td><td></td><td>Target component identifier, or zero for broadcast/default.</td></tr>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Trajectory interpretation is not reported.</td></tr>
+<tr><td><code>Bezier</code></td><td><code>1</code></td><td>Coefficients are Bezier control points.</td></tr>
+<tr><td><code>Polynomial</code></td><td><code>2</code></td><td>Coefficients are polynomial coefficients.</td></tr>
 </tbody>
 </table>
 </div>
@@ -207,11 +199,11 @@
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../../schemas/control/LocalPositionCommandData.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../schemas/trajectory.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../../schemas/control/GeoCommandData.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../schemas/trajectory/TrajectoryDegree.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -221,11 +213,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../../schemas/control/LocalPositionCommandData.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../schemas/trajectory.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../../schemas/control/GeoCommandData.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../schemas/trajectory/TrajectoryDegree.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

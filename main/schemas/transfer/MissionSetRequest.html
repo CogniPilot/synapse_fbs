@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,7 +180,7 @@
                     <main>
                         <h1 id="table-missionsetrequest"><a class="header" href="#table-missionsetrequest"><code>table</code> MissionSetRequest</a></h1>
 <p><a href="../transfer.html">fbs/transfer.fbs</a> / <a href="../../fbs/transfer.fbs">Source schema</a></p>
-<p>Request to replace the mission plan. Served as a Zenoh queryable.</p>
+<p>Request to replace or patch a GPS mission in bounded chunks. Served as a Zenoh queryable and by non-Zenoh request/reply transports.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -188,7 +188,13 @@
 </thead>
 <tbody>
 <tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier the producer should report for this plan.</td></tr>
-<tr><td><code>items</code></td><td><code>[</code><a href="MissionItem.html"><code>MissionItem</code></a><code>]</code></td><td></td><td>Mission items in sequence order.</td></tr>
+<tr><td><code>expected_plan_version</code></td><td><code>uint</code></td><td></td><td>Required current revision, or zero when the producer permits blind replace.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>New mission revision identifier.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First mission item sequence carried in items.</td></tr>
+<tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of mission items in the final plan.</td></tr>
+<tr><td><code>plan_crc32</code></td><td><code>uint</code></td><td></td><td>CRC-32 of the complete final plan in canonical transfer encoding.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+<tr><td><code>items</code></td><td><code>[</code><a href="MissionItemData.html"><code>MissionItemData</code></a><code>]</code></td><td></td><td>Mission items in sequence order for this chunk.</td></tr>
 </tbody>
 </table>
 </div>

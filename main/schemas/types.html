@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c9744c58.js"></script>
+        <script src="../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -190,8 +190,10 @@
 <tr><td><code>struct</code></td><td><a href="types/Vec2f.html"><code>Vec2f</code></a></td><td>Two-component float vector used for planar rates, flow, and image motion.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/Vec3f.html"><code>Vec3f</code></a></td><td>Three-component float vector used for ENU world vectors and FLU body vectors.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/Quaternionf.html"><code>Quaternionf</code></a></td><td>Unit quaternion in Hamilton convention, component order w, x, y, z. It rotates body-frame FLU vectors into the world ENU frame: v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.</td></tr>
+<tr><td><code>struct</code></td><td><a href="types/RotationMatrix3f.html"><code>RotationMatrix3f</code></a></td><td>Row-major 3x3 rotation matrix.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/RateTriplet.html"><code>RateTriplet</code></a></td><td>Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/CovarianceUpperTriangle21f.html"><code>CovarianceUpperTriangle21f</code></a></td><td>Upper-triangular 6x6 covariance matrix stored row-major as 21 float values. State order is x, y, z translation followed by rotation about x, y, z.</td></tr>
+<tr><td><code>struct</code></td><td><a href="types/CovarianceUpperTriangle78f.html"><code>CovarianceUpperTriangle78f</code></a></td><td>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. For external odometry covariance the tangent-state order is attitude perturbation, velocity, position, angular velocity.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/Severity.html"><code>Severity</code></a></td><td>Text and diagnostic severity levels following RFC 5424 syslog numbering.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/CommandResultCode.html"><code>CommandResultCode</code></a></td><td>Result of command or transfer request execution.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/GnssFixType.html"><code>GnssFixType</code></a></td><td>GNSS receiver fix quality.</td></tr>
@@ -201,7 +203,6 @@
 <tr><td><code>enum</code></td><td><a href="types/MissionState.html"><code>MissionState</code></a></td><td>Mission execution state.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/GeoAltitudeFrame.html"><code>GeoAltitudeFrame</code></a></td><td>Altitude reference frame for geographic commands and mission items.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/LocalFrame.html"><code>LocalFrame</code></a></td><td>Local coordinate frame selector for local-frame commands.</td></tr>
-<tr><td><code>enum</code></td><td><a href="types/ReferenceFrame.html"><code>ReferenceFrame</code></a></td><td>Reference frame identifiers for odometry and pose products.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/TopicId.html"><code>TopicId</code></a></td><td>Stable numeric identifiers for well-known Synapse topics. Values are contiguous and mirror the SynapseMessage union order in transport.fbs.</td></tr>
 </tbody>
 </table>

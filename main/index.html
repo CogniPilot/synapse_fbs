@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c9744c58.js"></script>
+        <script src="toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -196,14 +196,15 @@
 <p>Several parts of the schema support this model:</p>
 <ul>
 <li><strong>Fixed-layout payload structs:</strong> every runtime topic payload is a struct with a documented byte size, so consumers can decode by overlay without FlatBuffers machinery.</li>
-<li><strong>Generated topic catalog:</strong> release artifacts include <code>TopicId</code>, canonical Zenoh key, root table, payload struct and size, scope, encoding, and helper lookups so applications do not hand-maintain routing tables.</li>
+<li><strong>Generated topic catalog:</strong> release artifacts include <code>TopicId</code>, canonical Zenoh key, root table, payload struct and size, scope, encoding, command request/reply encoding, and helper lookups so applications do not hand-maintain routing tables.</li>
 <li><strong>Stable topic identifiers:</strong> <code>TopicId</code> is available for bridges, logs, serial frames, or compact routing tables, while Zenoh deployments can use key expressions as the primary discriminator.</li>
 <li><strong>No transport checksums in payloads:</strong> Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.</li>
 <li><strong>Schema assets in every release:</strong> npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.</li>
 </ul>
 <p>Canonical keys use <code>synapse/v1/topic/&lt;topic_name&gt;[/&lt;instance&gt;]</code>; the <code>v1</code> segment is the schema-major compatibility signal, and multi-instance sensor topics append an instance segment so subscribers can select one sensor without decoding payloads. Deployments prepend vehicle, swarm, or site namespaces (for example <code>cub1/synapse/v1/topic/gnss_fix</code>); namespace prefixes come from deployment configuration and are never hardcoded in firmware. The package helpers parse namespaced keys and look up topics by <code>TopicId</code>, name, key, or key suffix. Commands and transfers are Zenoh queryables under <code>synapse/v1/cmd/...</code>; <code>synapse/v1/meta/...</code> and <code>synapse/v1/live/...</code> are reserved for schema metadata and liveliness.</p>
+<p>Lockstep simulation is modeled as pub/sub state, not query/reply RPC. A simulator publishes <code>LockstepTick</code> on <code>synapse/v1/topic/lockstep_tick</code>, and each participant publishes <code>LockstepStatus</code> on <code>synapse/v1/topic/lockstep_status/&lt;id&gt;</code>. Strict lockstep waits for a matching <code>run_id</code> and completed status sequence before sending the next tick. Use liveliness tokens under <code>synapse/v1/live/...</code> for endpoint presence; the status topic is the protocol acknowledgement, not discovery.</p>
 <h2 id="topic-catalog"><a class="header" href="#topic-catalog">Topic Catalog</a></h2>
-<p>The generated topic catalog is included as <code>topics.json</code> in schema-asset archives and as language helpers where the package has a public API. It records <code>TopicId</code>, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.</p>
+<p>The generated topic catalog is included as <code>topics.json</code> in schema-asset archives and as language helpers where the package has a public API. It records <code>TopicId</code>, canonical key expression, FlatBuffers root table, fixed-layout payload type and size, schema file, topic encoding, command request/reply encoding, and descriptions from schema comments.</p>
 <p>Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.</p>
 <h2 id="ros-and-flatros"><a class="header" href="#ros-and-flatros">ROS and FlatROS</a></h2>
 <p>ROS messages are local integration types, not the Synapse over-the-air format. They are useful for visualization, autonomy stacks, simulation, rosbag tooling, and operator workflows, but they should not replace compact Synapse FlatBuffers payloads on constrained vehicle links.</p>
@@ -219,9 +220,10 @@
 <li><a href="schemas/mocap.html">fbs/mocap.fbs</a></li>
 <li><a href="schemas/optical_flow.html">fbs/optical_flow.fbs</a></li>
 <li><a href="schemas/sensors.html">fbs/sensors.fbs</a></li>
-<li><a href="schemas/sil.html">fbs/sil.fbs</a></li>
+<li><a href="schemas/sim.html">fbs/sim.fbs</a></li>
 <li><a href="schemas/state.html">fbs/state.fbs</a></li>
 <li><a href="schemas/telemetry.html">fbs/telemetry.fbs</a></li>
+<li><a href="schemas/trajectory.html">fbs/trajectory.fbs</a></li>
 <li><a href="schemas/transfer.html">fbs/transfer.fbs</a></li>
 <li><a href="schemas/transport.html">fbs/transport.fbs</a></li>
 <li><a href="schemas/types.html">fbs/types.fbs</a></li>

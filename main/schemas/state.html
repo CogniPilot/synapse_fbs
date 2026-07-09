@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c9744c58.js"></script>
+        <script src="../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,6 +192,8 @@
 <tr><td><code>enum</code></td><td><a href="state/VehicleHealthFlags.html"><code>VehicleHealthFlags</code></a></td><td>Vehicle-level status bits for VehicleHealthData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/AttitudeEstimateFlags.html"><code>AttitudeEstimateFlags</code></a></td><td>Field-validity bits for AttitudeEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/LocalPositionFlags.html"><code>LocalPositionFlags</code></a></td><td>Field-validity bits for LocalPositionEstimateData.flags.</td></tr>
+<tr><td><code>enum</code></td><td><a href="state/ExternalOdometryFlags.html"><code>ExternalOdometryFlags</code></a></td><td>Field-validity bits for ExternalOdometryData.flags.</td></tr>
+<tr><td><code>enum</code></td><td><a href="state/ExternalOdometryStatus.html"><code>ExternalOdometryStatus</code></a></td><td>Quality/status state for external odometry producer output.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/GlobalPositionFlags.html"><code>GlobalPositionFlags</code></a></td><td>Field-validity bits for GlobalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/HomeReferenceFlags.html"><code>HomeReferenceFlags</code></a></td><td>Field-validity bits for HomeReferenceData.flags.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/VehicleHealthData.html"><code>VehicleHealthData</code></a></td><td>Vehicle-wide state summary for operator displays and failsafe supervision.</td></tr>
@@ -200,6 +202,8 @@
 <tr><td><code>struct</code></td><td><a href="state/LocalPositionEstimateData.html"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/GlobalPositionEstimateData.html"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/OdometryEstimateData.html"><code>OdometryEstimateData</code></a></td><td>Combined pose, twist, covariance, and estimator metadata.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/ExternalOdometryData.html"><code>ExternalOdometryData</code></a></td><td>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. The timestamp is the estimate timestamp; the last accepted mocap capture timestamp is carried separately for dropout handling.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/ExternalOdometryCovarianceData.html"><code>ExternalOdometryCovarianceData</code></a></td><td>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries diagonal stddevs. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/EstimatorHealthData.html"><code>EstimatorHealthData</code></a></td><td>Estimator health and innovation-test summary. The flags field is deliberately producer-defined: estimator status models differ between implementations and are standardized via discovery records, not the schema.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/MissionProgressData.html"><code>MissionProgressData</code></a></td><td>Mission progress and mission database identifiers.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/NavigationTargetData.html"><code>NavigationTargetData</code></a></td><td>Navigation controller target and tracking-error summary. Angles follow REP-0103: zero east, positive counter-clockwise, range -18000 to 18000.</td></tr>
@@ -210,6 +214,8 @@
 <tr><td><code>table</code></td><td><code>LocalPositionEstimate</code> -&gt; <a href="state/LocalPositionEstimateData.html"><code>LocalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for LocalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>GlobalPositionEstimate</code> -&gt; <a href="state/GlobalPositionEstimateData.html"><code>GlobalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for GlobalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>OdometryEstimate</code> -&gt; <a href="state/OdometryEstimateData.html"><code>OdometryEstimateData</code></a></td><td>FlatBuffers root wrapper for OdometryEstimateData.</td></tr>
+<tr><td><code>table</code></td><td><code>ExternalOdometry</code> -&gt; <a href="state/ExternalOdometryData.html"><code>ExternalOdometryData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryData.</td></tr>
+<tr><td><code>table</code></td><td><code>ExternalOdometryCovariance</code> -&gt; <a href="state/ExternalOdometryCovarianceData.html"><code>ExternalOdometryCovarianceData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryCovarianceData.</td></tr>
 <tr><td><code>table</code></td><td><code>EstimatorHealth</code> -&gt; <a href="state/EstimatorHealthData.html"><code>EstimatorHealthData</code></a></td><td>FlatBuffers root wrapper for EstimatorHealthData.</td></tr>
 <tr><td><code>table</code></td><td><code>MissionProgress</code> -&gt; <a href="state/MissionProgressData.html"><code>MissionProgressData</code></a></td><td>FlatBuffers root wrapper for MissionProgressData.</td></tr>
 <tr><td><code>table</code></td><td><code>NavigationTarget</code> -&gt; <a href="state/NavigationTargetData.html"><code>NavigationTargetData</code></a></td><td>FlatBuffers root wrapper for NavigationTargetData.</td></tr>
@@ -222,7 +228,7 @@
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../schemas/sil/SimInput.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../schemas/sim/LockstepStatusData.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -236,7 +242,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../schemas/sil/SimInput.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../schemas/sim/LockstepStatusData.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

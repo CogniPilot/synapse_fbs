@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -181,7 +181,7 @@
                         <h1 id="enum-cmdid"><a class="header" href="#enum-cmdid"><code>enum</code> CmdId</a></h1>
 <p><a href="../transfer.html">fbs/transfer.fbs</a> / <a href="../../fbs/transfer.fbs">Source schema</a></p>
 <p><strong>Backing type:</strong> <code>ushort</code></p>
-<p>Stable numeric identifiers for command and transfer services. Zenoh deployments select services by key (synapse/v1/cmd/<name>); non-Zenoh request/reply transports such as framed serial links use these ids as the service discriminator. Values mirror the generated command catalog.</name></p>
+<p>Stable numeric identifiers for command and transfer services. Zenoh deployments select services by key name under synapse/v1/cmd; non-Zenoh request/reply transports such as framed serial links use these ids as the service discriminator. Values mirror the generated command catalog.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -189,12 +189,12 @@
 </thead>
 <tbody>
 <tr><td><code>Unknown</code></td><td><code>0</code></td><td>Reserved value for invalid or unassigned services.</td></tr>
-<tr><td><code>VehicleCommand</code></td><td><code>1</code></td><td>Generic command with floating-point arguments.</td></tr>
-<tr><td><code>GeoCommand</code></td><td><code>2</code></td><td>Geographic command with scaled latitude/longitude precision.</td></tr>
-<tr><td><code>ParamGet</code></td><td><code>3</code></td><td>Fetch one parameter by name, or all parameters.</td></tr>
-<tr><td><code>ParamSet</code></td><td><code>4</code></td><td>Set one parameter.</td></tr>
-<tr><td><code>MissionGet</code></td><td><code>5</code></td><td>Fetch the mission plan.</td></tr>
-<tr><td><code>MissionSet</code></td><td><code>6</code></td><td>Replace the mission plan.</td></tr>
+<tr><td><code>ParamGet</code></td><td><code>1</code></td><td>Fetch one parameter by name, or a paged parameter catalog chunk.</td></tr>
+<tr><td><code>ParamSet</code></td><td><code>2</code></td><td>Set one parameter.</td></tr>
+<tr><td><code>MissionGet</code></td><td><code>3</code></td><td>Fetch a paged GPS mission chunk.</td></tr>
+<tr><td><code>MissionSet</code></td><td><code>4</code></td><td>Replace or patch a GPS mission in bounded chunks.</td></tr>
+<tr><td><code>TrajectoryGet</code></td><td><code>5</code></td><td>Fetch a paged trajectory segment chunk.</td></tr>
+<tr><td><code>TrajectorySet</code></td><td><code>6</code></td><td>Replace or patch a trajectory in bounded chunks.</td></tr>
 </tbody>
 </table>
 </div>

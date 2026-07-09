@@ -1,6 +1,7 @@
 include "transport.fbs";
 include "telemetry.fbs";
+include "trajectory.fbs";
 include "transfer.fbs";
-include "sil.fbs";
+include "sim.fbs";
 
 namespace synapse;

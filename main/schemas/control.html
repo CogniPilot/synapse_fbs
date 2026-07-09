@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c9744c58.js"></script>
+        <script src="../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -198,9 +198,6 @@
 <tr><td><code>struct</code></td><td><a href="control/AttitudeCommandData.html"><code>AttitudeCommandData</code></a></td><td>Attitude setpoint with optional angular-rate and thrust feed-forward.</td></tr>
 <tr><td><code>struct</code></td><td><a href="control/RateCommandData.html"><code>RateCommandData</code></a></td><td>Body-rate setpoint with optional thrust feed-forward.</td></tr>
 <tr><td><code>struct</code></td><td><a href="control/LocalPositionCommandData.html"><code>LocalPositionCommandData</code></a></td><td>Local-frame position, velocity, acceleration, and yaw setpoint.</td></tr>
-<tr><td><code>struct</code></td><td><a href="control/VehicleCommandData.html"><code>VehicleCommandData</code></a></td><td>Generic command with seven floating-point arguments. Commands travel as Zenoh queryable requests on the cmd key space; the reply payload is CommandResultData. The transport provides correlation, retry, and timeout.</td></tr>
-<tr><td><code>struct</code></td><td><a href="control/GeoCommandData.html"><code>GeoCommandData</code></a></td><td>Geographic command form preserving global-coordinate precision. Also used as the mission-item payload for mission transfer.</td></tr>
-<tr><td><code>struct</code></td><td><a href="control/CommandResultData.html"><code>CommandResultData</code></a></td><td>Result, progress, and routing information for command execution. Sent as the queryable reply for command requests; InProgress replies may stream until a terminal result is reached.</td></tr>
 <tr><td><code>struct</code></td><td><a href="control/ActuatorCommandData.html"><code>ActuatorCommandData</code></a></td><td>Normalized actuator command for up to sixteen logical actuator controls.</td></tr>
 <tr><td><code>struct</code></td><td><a href="control/ActuatorFeedbackData.html"><code>ActuatorFeedbackData</code></a></td><td>Normalized actuator feedback for up to thirty-two physical outputs. The command message carries sixteen logical controls while feedback covers thirty-two physical outputs after mixing and allocation.</td></tr>
 <tr><td><code>struct</code></td><td><a href="control/PwmSignalOutputsData.html"><code>PwmSignalOutputsData</code></a></td><td>Raw PWM pulse-width outputs for servo and ESC drivers.</td></tr>
@@ -210,9 +207,6 @@
 <tr><td><code>table</code></td><td><code>AttitudeCommand</code> -&gt; <a href="control/AttitudeCommandData.html"><code>AttitudeCommandData</code></a></td><td>FlatBuffers root wrapper for AttitudeCommandData.</td></tr>
 <tr><td><code>table</code></td><td><code>RateCommand</code> -&gt; <a href="control/RateCommandData.html"><code>RateCommandData</code></a></td><td>FlatBuffers root wrapper for RateCommandData.</td></tr>
 <tr><td><code>table</code></td><td><code>LocalPositionCommand</code> -&gt; <a href="control/LocalPositionCommandData.html"><code>LocalPositionCommandData</code></a></td><td>FlatBuffers root wrapper for LocalPositionCommandData.</td></tr>
-<tr><td><code>table</code></td><td><code>VehicleCommand</code> -&gt; <a href="control/VehicleCommandData.html"><code>VehicleCommandData</code></a></td><td>FlatBuffers root wrapper for VehicleCommandData.</td></tr>
-<tr><td><code>table</code></td><td><code>GeoCommand</code> -&gt; <a href="control/GeoCommandData.html"><code>GeoCommandData</code></a></td><td>FlatBuffers root wrapper for GeoCommandData.</td></tr>
-<tr><td><code>table</code></td><td><code>CommandResult</code> -&gt; <a href="control/CommandResultData.html"><code>CommandResultData</code></a></td><td>FlatBuffers root wrapper for CommandResultData.</td></tr>
 <tr><td><code>table</code></td><td><code>ActuatorCommand</code> -&gt; <a href="control/ActuatorCommandData.html"><code>ActuatorCommandData</code></a></td><td>FlatBuffers root wrapper for ActuatorCommandData.</td></tr>
 <tr><td><code>table</code></td><td><code>ActuatorFeedback</code> -&gt; <a href="control/ActuatorFeedbackData.html"><code>ActuatorFeedbackData</code></a></td><td>FlatBuffers root wrapper for ActuatorFeedbackData.</td></tr>
 <tr><td><code>table</code></td><td><code>PwmSignalOutputs</code> -&gt; <a href="control/PwmSignalOutputsData.html"><code>PwmSignalOutputsData</code></a></td><td>FlatBuffers root wrapper for PwmSignalOutputsData.</td></tr>

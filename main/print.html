@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c9744c58.js"></script>
+        <script src="toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -197,14 +197,15 @@
 <p>Several parts of the schema support this model:</p>
 <ul>
 <li><strong>Fixed-layout payload structs:</strong> every runtime topic payload is a struct with a documented byte size, so consumers can decode by overlay without FlatBuffers machinery.</li>
-<li><strong>Generated topic catalog:</strong> release artifacts include <code>TopicId</code>, canonical Zenoh key, root table, payload struct and size, scope, encoding, and helper lookups so applications do not hand-maintain routing tables.</li>
+<li><strong>Generated topic catalog:</strong> release artifacts include <code>TopicId</code>, canonical Zenoh key, root table, payload struct and size, scope, encoding, command request/reply encoding, and helper lookups so applications do not hand-maintain routing tables.</li>
 <li><strong>Stable topic identifiers:</strong> <code>TopicId</code> is available for bridges, logs, serial frames, or compact routing tables, while Zenoh deployments can use key expressions as the primary discriminator.</li>
 <li><strong>No transport checksums in payloads:</strong> Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.</li>
 <li><strong>Schema assets in every release:</strong> npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.</li>
 </ul>
 <p>Canonical keys use <code>synapse/v1/topic/&lt;topic_name&gt;[/&lt;instance&gt;]</code>; the <code>v1</code> segment is the schema-major compatibility signal, and multi-instance sensor topics append an instance segment so subscribers can select one sensor without decoding payloads. Deployments prepend vehicle, swarm, or site namespaces (for example <code>cub1/synapse/v1/topic/gnss_fix</code>); namespace prefixes come from deployment configuration and are never hardcoded in firmware. The package helpers parse namespaced keys and look up topics by <code>TopicId</code>, name, key, or key suffix. Commands and transfers are Zenoh queryables under <code>synapse/v1/cmd/...</code>; <code>synapse/v1/meta/...</code> and <code>synapse/v1/live/...</code> are reserved for schema metadata and liveliness.</p>
+<p>Lockstep simulation is modeled as pub/sub state, not query/reply RPC. A simulator publishes <code>LockstepTick</code> on <code>synapse/v1/topic/lockstep_tick</code>, and each participant publishes <code>LockstepStatus</code> on <code>synapse/v1/topic/lockstep_status/&lt;id&gt;</code>. Strict lockstep waits for a matching <code>run_id</code> and completed status sequence before sending the next tick. Use liveliness tokens under <code>synapse/v1/live/...</code> for endpoint presence; the status topic is the protocol acknowledgement, not discovery.</p>
 <h2 id="topic-catalog"><a class="header" href="#topic-catalog">Topic Catalog</a></h2>
-<p>The generated topic catalog is included as <code>topics.json</code> in schema-asset archives and as language helpers where the package has a public API. It records <code>TopicId</code>, canonical key expression, FlatBuffers root table, fixed-layout payload type, schema file, and the topic description from the schema comments.</p>
+<p>The generated topic catalog is included as <code>topics.json</code> in schema-asset archives and as language helpers where the package has a public API. It records <code>TopicId</code>, canonical key expression, FlatBuffers root table, fixed-layout payload type and size, schema file, topic encoding, command request/reply encoding, and descriptions from schema comments.</p>
 <p>Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.</p>
 <h2 id="ros-and-flatros"><a class="header" href="#ros-and-flatros">ROS and FlatROS</a></h2>
 <p>ROS messages are local integration types, not the Synapse over-the-air format. They are useful for visualization, autonomy stacks, simulation, rosbag tooling, and operator workflows, but they should not replace compact Synapse FlatBuffers payloads on constrained vehicle links.</p>
@@ -220,9 +221,10 @@
 <li><a href="#fbsmocapfbs">fbs/mocap.fbs</a></li>
 <li><a href="#fbsoptical_flowfbs">fbs/optical_flow.fbs</a></li>
 <li><a href="#fbssensorsfbs">fbs/sensors.fbs</a></li>
-<li><a href="#fbssilfbs">fbs/sil.fbs</a></li>
+<li><a href="#fbssimfbs">fbs/sim.fbs</a></li>
 <li><a href="#fbsstatefbs">fbs/state.fbs</a></li>
 <li><a href="#fbstelemetryfbs">fbs/telemetry.fbs</a></li>
+<li><a href="#fbstrajectoryfbs">fbs/trajectory.fbs</a></li>
 <li><a href="#fbstransferfbs">fbs/transfer.fbs</a></li>
 <li><a href="#fbstransportfbs">fbs/transport.fbs</a></li>
 <li><a href="#fbstypesfbs">fbs/types.fbs</a></li>
@@ -231,7 +233,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fbsallfbs"><a class="header" href="#fbsallfbs"><code>fbs/all.fbs</code></a></h1>
 <p><strong>Namespace:</strong> <code>synapse</code></p>
-<p><strong>Includes:</strong> <a href="#fbstransportfbs"><code>transport.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbstransferfbs"><code>transfer.fbs</code></a>, <a href="#fbssilfbs"><code>sil.fbs</code></a></p>
+<p><strong>Includes:</strong> <a href="#fbstransportfbs"><code>transport.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a>, <a href="#fbstransferfbs"><code>transfer.fbs</code></a>, <a href="#fbssimfbs"><code>sim.fbs</code></a></p>
 <p><a href="fbs/all.fbs">Source schema</a></p>
 <p>This schema file does not define public entities.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -255,9 +257,6 @@
 <tr><td><code>struct</code></td><td><a href="#struct-attitudecommanddata"><code>AttitudeCommandData</code></a></td><td>Attitude setpoint with optional angular-rate and thrust feed-forward.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-ratecommanddata"><code>RateCommandData</code></a></td><td>Body-rate setpoint with optional thrust feed-forward.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-localpositioncommanddata"><code>LocalPositionCommandData</code></a></td><td>Local-frame position, velocity, acceleration, and yaw setpoint.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-vehiclecommanddata"><code>VehicleCommandData</code></a></td><td>Generic command with seven floating-point arguments. Commands travel as Zenoh queryable requests on the cmd key space; the reply payload is CommandResultData. The transport provides correlation, retry, and timeout.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-geocommanddata"><code>GeoCommandData</code></a></td><td>Geographic command form preserving global-coordinate precision. Also used as the mission-item payload for mission transfer.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-commandresultdata"><code>CommandResultData</code></a></td><td>Result, progress, and routing information for command execution. Sent as the queryable reply for command requests; InProgress replies may stream until a terminal result is reached.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-actuatorcommanddata"><code>ActuatorCommandData</code></a></td><td>Normalized actuator command for up to sixteen logical actuator controls.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-actuatorfeedbackdata"><code>ActuatorFeedbackData</code></a></td><td>Normalized actuator feedback for up to thirty-two physical outputs. The command message carries sixteen logical controls while feedback covers thirty-two physical outputs after mixing and allocation.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-pwmsignaloutputsdata"><code>PwmSignalOutputsData</code></a></td><td>Raw PWM pulse-width outputs for servo and ESC drivers.</td></tr>
@@ -267,9 +266,6 @@
 <tr><td><code>table</code></td><td><code>AttitudeCommand</code> -&gt; <a href="#struct-attitudecommanddata"><code>AttitudeCommandData</code></a></td><td>FlatBuffers root wrapper for AttitudeCommandData.</td></tr>
 <tr><td><code>table</code></td><td><code>RateCommand</code> -&gt; <a href="#struct-ratecommanddata"><code>RateCommandData</code></a></td><td>FlatBuffers root wrapper for RateCommandData.</td></tr>
 <tr><td><code>table</code></td><td><code>LocalPositionCommand</code> -&gt; <a href="#struct-localpositioncommanddata"><code>LocalPositionCommandData</code></a></td><td>FlatBuffers root wrapper for LocalPositionCommandData.</td></tr>
-<tr><td><code>table</code></td><td><code>VehicleCommand</code> -&gt; <a href="#struct-vehiclecommanddata"><code>VehicleCommandData</code></a></td><td>FlatBuffers root wrapper for VehicleCommandData.</td></tr>
-<tr><td><code>table</code></td><td><code>GeoCommand</code> -&gt; <a href="#struct-geocommanddata"><code>GeoCommandData</code></a></td><td>FlatBuffers root wrapper for GeoCommandData.</td></tr>
-<tr><td><code>table</code></td><td><code>CommandResult</code> -&gt; <a href="#struct-commandresultdata"><code>CommandResultData</code></a></td><td>FlatBuffers root wrapper for CommandResultData.</td></tr>
 <tr><td><code>table</code></td><td><code>ActuatorCommand</code> -&gt; <a href="#struct-actuatorcommanddata"><code>ActuatorCommandData</code></a></td><td>FlatBuffers root wrapper for ActuatorCommandData.</td></tr>
 <tr><td><code>table</code></td><td><code>ActuatorFeedback</code> -&gt; <a href="#struct-actuatorfeedbackdata"><code>ActuatorFeedbackData</code></a></td><td>FlatBuffers root wrapper for ActuatorFeedbackData.</td></tr>
 <tr><td><code>table</code></td><td><code>PwmSignalOutputs</code> -&gt; <a href="#struct-pwmsignaloutputsdata"><code>PwmSignalOutputsData</code></a></td><td>FlatBuffers root wrapper for PwmSignalOutputsData.</td></tr>
@@ -506,80 +502,6 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="struct-vehiclecommanddata"><a class="header" href="#struct-vehiclecommanddata"><code>struct</code> VehicleCommandData</a></h1>
-<p><a href="#fbscontrolfbs">fbs/control.fbs</a> / <a href="fbs/control.fbs">Source schema</a></p>
-<p>Generic command with seven floating-point arguments. Commands travel as Zenoh queryable requests on the cmd key space; the reply payload is CommandResultData. The transport provides correlation, retry, and timeout.</p>
-<p><strong>FlatBuffers root table:</strong> <code>VehicleCommand</code></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
-<tr><td><code>arg0</code></td><td><code>float</code></td><td></td><td>Command-specific argument 0.</td></tr>
-<tr><td><code>arg1</code></td><td><code>float</code></td><td></td><td>Command-specific argument 1.</td></tr>
-<tr><td><code>arg2</code></td><td><code>float</code></td><td></td><td>Command-specific argument 2.</td></tr>
-<tr><td><code>arg3</code></td><td><code>float</code></td><td></td><td>Command-specific argument 3.</td></tr>
-<tr><td><code>arg4</code></td><td><code>float</code></td><td></td><td>Command-specific argument 4.</td></tr>
-<tr><td><code>arg5</code></td><td><code>float</code></td><td></td><td>Command-specific argument 5.</td></tr>
-<tr><td><code>arg6</code></td><td><code>float</code></td><td></td><td>Command-specific argument 6.</td></tr>
-<tr><td><code>command_id</code></td><td><code>ushort</code></td><td></td><td>Producer-defined command identifier.</td></tr>
-<tr><td><code>target_system</code></td><td><code>ubyte</code></td><td></td><td>Target system identifier, or zero for broadcast/default.</td></tr>
-<tr><td><code>target_component</code></td><td><code>ubyte</code></td><td></td><td>Target component identifier, or zero for broadcast/default.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="struct-geocommanddata"><a class="header" href="#struct-geocommanddata"><code>struct</code> GeoCommandData</a></h1>
-<p><a href="#fbscontrolfbs">fbs/control.fbs</a> / <a href="fbs/control.fbs">Source schema</a></p>
-<p>Geographic command form preserving global-coordinate precision. Also used as the mission-item payload for mission transfer.</p>
-<p><strong>FlatBuffers root table:</strong> <code>GeoCommand</code></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
-<tr><td><code>arg0</code></td><td><code>float</code></td><td></td><td>Command-specific argument 0.</td></tr>
-<tr><td><code>arg1</code></td><td><code>float</code></td><td></td><td>Command-specific argument 1.</td></tr>
-<tr><td><code>arg2</code></td><td><code>float</code></td><td></td><td>Command-specific argument 2.</td></tr>
-<tr><td><code>arg3</code></td><td><code>float</code></td><td></td><td>Command-specific argument 3.</td></tr>
-<tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Target latitude in WGS-84 degrees scaled by 1e7.</td></tr>
-<tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Target longitude in WGS-84 degrees scaled by 1e7.</td></tr>
-<tr><td><code>altitude_m</code></td><td><code>float</code></td><td>meters</td><td>Target altitude in meters in the frame selected by frame.</td></tr>
-<tr><td><code>command_id</code></td><td><code>ushort</code></td><td></td><td>Producer-defined command identifier.</td></tr>
-<tr><td><code>frame</code></td><td><a href="#enum-geoaltitudeframe"><code>synapse.types.GeoAltitudeFrame</code></a></td><td></td><td>Altitude reference frame for altitude_m.</td></tr>
-<tr><td><code>target_system</code></td><td><code>ubyte</code></td><td></td><td>Target system identifier, or zero for broadcast/default.</td></tr>
-<tr><td><code>target_component</code></td><td><code>ubyte</code></td><td></td><td>Target component identifier, or zero for broadcast/default.</td></tr>
-<tr><td><code>current</code></td><td><code>bool</code></td><td></td><td>True when this item should become current immediately.</td></tr>
-<tr><td><code>autocontinue</code></td><td><code>bool</code></td><td></td><td>True when navigation should automatically continue after this item.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="struct-commandresultdata"><a class="header" href="#struct-commandresultdata"><code>struct</code> CommandResultData</a></h1>
-<p><a href="#fbscontrolfbs">fbs/control.fbs</a> / <a href="fbs/control.fbs">Source schema</a></p>
-<p>Result, progress, and routing information for command execution. Sent as the queryable reply for command requests; InProgress replies may stream until a terminal result is reached.</p>
-<p><strong>FlatBuffers root table:</strong> <code>CommandResult</code></p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Result timestamp in monotonic boot time.</td></tr>
-<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
-<tr><td><code>command_id</code></td><td><code>ushort</code></td><td></td><td>Command identifier this result refers to.</td></tr>
-<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Command execution result.</td></tr>
-<tr><td><code>progress_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Completion progress from 0 to 100 while InProgress.</td></tr>
-<tr><td><code>target_system</code></td><td><code>ubyte</code></td><td></td><td>System identifier that produced or should receive the result.</td></tr>
-<tr><td><code>target_component</code></td><td><code>ubyte</code></td><td></td><td>Component identifier that produced or should receive the result.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-actuatorcommanddata"><a class="header" href="#struct-actuatorcommanddata"><code>struct</code> ActuatorCommandData</a></h1>
 <p><a href="#fbscontrolfbs">fbs/control.fbs</a> / <a href="fbs/control.fbs">Source schema</a></p>
 <p>Normalized actuator command for up to sixteen logical actuator controls.</p>
@@ -722,151 +644,106 @@
 <tr><th>Kind</th><th>Name</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>struct</code></td><td><a href="#struct-mocapmarkersample"><code>MocapMarkerSample</code></a></td><td>Fixed-layout position sample for a labeled or unlabeled mocap marker.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-mocaprigidbodysample"><code>MocapRigidBodySample</code></a></td><td>Fixed-layout pose sample for a tracked mocap rigid body.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-mocapsegmentsample"><code>MocapSegmentSample</code></a></td><td>Fixed-layout pose sample for a tracked skeleton segment.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-mocapmarkerdefinition"><code>MocapMarkerDefinition</code></a></td><td>Static metadata for a mocap marker that consumers can cache.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-mocaprigidbodydefinition"><code>MocapRigidBodyDefinition</code></a></td><td>Static metadata for a mocap rigid body that consumers can cache.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-mocapsegmentdefinition"><code>MocapSegmentDefinition</code></a></td><td>Static metadata for a mocap skeleton segment that consumers can cache.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-mocapdefinition"><code>MocapDefinition</code></a></td><td>Variable-size mocap metadata packet describing tracked objects. This is a cached definition record and an intentional table boundary.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td>Variable-size mocap frame containing all tracked samples for one timestamp.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-mocaprawcomponent"><code>MocapRawComponent</code></a></td><td>Raw motion-capture component type represented by a sample.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-mocaprawflags"><code>MocapRawFlags</code></a></td><td>Validity and source-detail bits for raw mocap samples.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a></td><td>Raw 3D marker sample. The bridge converts coordinates into ENU meters while preserving the source marker id and residual.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-mocaprigidbodydata"><code>MocapRigidBodyData</code></a></td><td>Raw 6DOF rigid-body sample. The bridge converts coordinates into ENU meters while preserving the source rotation matrix and residual.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td>Raw mocap frame for logging, debugging, and bridge-level processing. This is intentionally table-encoded; estimators should consume ExternalOdometry.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="struct-mocapmarkersample"><a class="header" href="#struct-mocapmarkersample"><code>struct</code> MocapMarkerSample</a></h1>
+<h1 id="enum-mocaprawcomponent"><a class="header" href="#enum-mocaprawcomponent"><code>enum</code> MocapRawComponent</a></h1>
 <p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Fixed-layout position sample for a labeled or unlabeled mocap marker.</p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Raw motion-capture component type represented by a sample.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Component type is not reported.</td></tr>
+<tr><td><code>Marker3d</code></td><td><code>1</code></td><td>Labeled 3D marker sample.</td></tr>
+<tr><td><code>Marker3dNoLabel</code></td><td><code>2</code></td><td>Unlabeled 3D marker sample with a source-assigned tracking id.</td></tr>
+<tr><td><code>RigidBody6d</code></td><td><code>3</code></td><td>Six-degree-of-freedom rigid-body sample with rotation matrix.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-mocaprawflags"><a class="header" href="#enum-mocaprawflags"><code>enum</code> MocapRawFlags</a></h1>
+<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Validity and source-detail bits for raw mocap samples.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Valid</code></td><td></td><td>Position and rotation fields are meaningful.</td></tr>
+<tr><td><code>ResidualValid</code></td><td></td><td>residual_mm is meaningful.</td></tr>
+<tr><td><code>LabelValid</code></td><td></td><td>id indexes a known source label or rigid-body definition.</td></tr>
+<tr><td><code>TrackingIdValid</code></td><td></td><td>id is a source-assigned tracking id.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-mocapmarkerdata"><a class="header" href="#struct-mocapmarkerdata"><code>struct</code> MocapMarkerData</a></h1>
+<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
+<p>Raw 3D marker sample. The bridge converts coordinates into ENU meters while preserving the source marker id and residual.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Marker identifier assigned by the mocap source; negative values may indicate unlabeled markers.</td></tr>
-<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Marker position in the mocap ENU frame.</td></tr>
-<tr><td><code>residual</code></td><td><code>float</code></td><td></td><td>Producer-defined fit residual or reprojection error.</td></tr>
+<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Marker position in local/world ENU.</td></tr>
+<tr><td><code>residual_mm</code></td><td><code>float</code></td><td>millimeters</td><td>Source solve residual in millimeters.</td></tr>
+<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Label index or tracking id from the mocap source.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MocapRawFlags bits.</td></tr>
+<tr><td><code>component</code></td><td><a href="#enum-mocaprawcomponent"><code>MocapRawComponent</code></a></td><td></td><td>Labeled or unlabeled 3D component class.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="struct-mocaprigidbodysample"><a class="header" href="#struct-mocaprigidbodysample"><code>struct</code> MocapRigidBodySample</a></h1>
+<h1 id="struct-mocaprigidbodydata"><a class="header" href="#struct-mocaprigidbodydata"><code>struct</code> MocapRigidBodyData</a></h1>
 <p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Fixed-layout pose sample for a tracked mocap rigid body.</p>
+<p>Raw 6DOF rigid-body sample. The bridge converts coordinates into ENU meters while preserving the source rotation matrix and residual.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Rigid-body identifier assigned by the mocap source.</td></tr>
-<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Rigid-body position in the mocap ENU frame.</td></tr>
-<tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Rigid-body orientation rotating body FLU vectors into the mocap ENU frame.</td></tr>
-<tr><td><code>residual</code></td><td><code>float</code></td><td></td><td>Producer-defined solve residual or tracking error.</td></tr>
-<tr><td><code>tracking_valid</code></td><td><code>bool</code></td><td></td><td>True when the rigid body is actively tracked in this frame.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="struct-mocapsegmentsample"><a class="header" href="#struct-mocapsegmentsample"><code>struct</code> MocapSegmentSample</a></h1>
-<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Fixed-layout pose sample for a tracked skeleton segment.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>skeleton_id</code></td><td><code>int</code></td><td></td><td>Skeleton identifier assigned by the mocap source.</td></tr>
-<tr><td><code>segment_id</code></td><td><code>int</code></td><td></td><td>Segment identifier within the skeleton.</td></tr>
-<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Segment position in the mocap ENU frame.</td></tr>
-<tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Segment orientation rotating segment FLU vectors into the mocap ENU frame.</td></tr>
-<tr><td><code>tracking_valid</code></td><td><code>bool</code></td><td></td><td>True when the segment is actively tracked in this frame.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="table-mocapmarkerdefinition"><a class="header" href="#table-mocapmarkerdefinition"><code>table</code> MocapMarkerDefinition</a></h1>
-<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Static metadata for a mocap marker that consumers can cache.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Marker identifier used by MocapMarkerSample.</td></tr>
-<tr><td><code>name</code></td><td><code>string</code></td><td></td><td>Human-readable marker name.</td></tr>
-<tr><td><code>color</code></td><td><code>uint</code></td><td></td><td>Producer-defined display color encoded as an integer.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="table-mocaprigidbodydefinition"><a class="header" href="#table-mocaprigidbodydefinition"><code>table</code> MocapRigidBodyDefinition</a></h1>
-<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Static metadata for a mocap rigid body that consumers can cache.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Rigid-body identifier used by MocapRigidBodySample.</td></tr>
-<tr><td><code>name</code></td><td><code>string</code></td><td></td><td>Human-readable rigid-body name.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="table-mocapsegmentdefinition"><a class="header" href="#table-mocapsegmentdefinition"><code>table</code> MocapSegmentDefinition</a></h1>
-<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Static metadata for a mocap skeleton segment that consumers can cache.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>skeleton_id</code></td><td><code>int</code></td><td></td><td>Skeleton identifier used by MocapSegmentSample.</td></tr>
-<tr><td><code>skeleton_name</code></td><td><code>string</code></td><td></td><td>Human-readable skeleton name.</td></tr>
-<tr><td><code>segment_id</code></td><td><code>int</code></td><td></td><td>Segment identifier within the skeleton.</td></tr>
-<tr><td><code>segment_name</code></td><td><code>string</code></td><td></td><td>Human-readable segment name.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="table-mocapdefinition"><a class="header" href="#table-mocapdefinition"><code>table</code> MocapDefinition</a></h1>
-<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Variable-size mocap metadata packet describing tracked objects. This is a cached definition record and an intentional table boundary.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>source</code></td><td><code>string</code></td><td></td><td>Mocap system or producer name.</td></tr>
-<tr><td><code>frame_id</code></td><td><code>string</code></td><td></td><td>Frame name for the mocap ENU coordinate system.</td></tr>
-<tr><td><code>labeled_markers</code></td><td><code>[</code><a href="#table-mocapmarkerdefinition"><code>MocapMarkerDefinition</code></a><code>]</code></td><td></td><td>Marker definitions indexed by marker id.</td></tr>
-<tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#table-mocaprigidbodydefinition"><code>MocapRigidBodyDefinition</code></a><code>]</code></td><td></td><td>Rigid-body definitions indexed by rigid-body id.</td></tr>
-<tr><td><code>skeleton_segments</code></td><td><code>[</code><a href="#table-mocapsegmentdefinition"><code>MocapSegmentDefinition</code></a><code>]</code></td><td></td><td>Skeleton segment definitions indexed by skeleton and segment id.</td></tr>
+<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Rigid-body position in local/world ENU.</td></tr>
+<tr><td><code>rotation</code></td><td><a href="#struct-rotationmatrix3f"><code>synapse.types.RotationMatrix3f</code></a></td><td></td><td>Rotation matrix from body FLU to ENU.</td></tr>
+<tr><td><code>residual_mm</code></td><td><code>float</code></td><td>millimeters</td><td>Source 6DOF solve residual in millimeters.</td></tr>
+<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Rigid-body definition index from the mocap source.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MocapRawFlags bits.</td></tr>
+<tr><td><code>component</code></td><td><a href="#enum-mocaprawcomponent"><code>MocapRawComponent</code></a></td><td></td><td>RigidBody6d for current producers.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="table-mocapframe"><a class="header" href="#table-mocapframe"><code>table</code> MocapFrame</a></h1>
 <p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
-<p>Variable-size mocap frame containing all tracked samples for one timestamp.</p>
+<p>Raw mocap frame for logging, debugging, and bridge-level processing. This is intentionally table-encoded; estimators should consume ExternalOdometry.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Frame timestamp in monotonic boot time.</td></tr>
-<tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Producer frame counter for loss/reorder detection.</td></tr>
-<tr><td><code>labeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkersample"><code>MocapMarkerSample</code></a><code>]</code></td><td></td><td>Marker samples with stable source identifiers.</td></tr>
-<tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkersample"><code>MocapMarkerSample</code></a><code>]</code></td><td></td><td>Marker samples without stable source identifiers.</td></tr>
-<tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#struct-mocaprigidbodysample"><code>MocapRigidBodySample</code></a><code>]</code></td><td></td><td>Rigid-body pose samples.</td></tr>
-<tr><td><code>skeleton_segments</code></td><td><code>[</code><a href="#struct-mocapsegmentsample"><code>MocapSegmentSample</code></a><code>]</code></td><td></td><td>Skeleton segment pose samples.</td></tr>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Marker timestamp in monotonic boot time.</td></tr>
+<tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Source frame number.</td></tr>
+<tr><td><code>drop_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame drop rate in deci-percent.</td></tr>
+<tr><td><code>out_of_sync_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame out-of-sync rate in deci-percent.</td></tr>
+<tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>Mocap source instance identifier.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MocapRawFlags bits describing the frame as a whole.</td></tr>
+<tr><td><code>markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
+<tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
+<tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#struct-mocaprigidbodydata"><code>MocapRigidBodyData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body samples.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1179,37 +1056,96 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="fbssilfbs"><a class="header" href="#fbssilfbs"><code>fbs/sil.fbs</code></a></h1>
-<p><strong>Namespace:</strong> <code>synapse.sil</code></p>
-<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbscontrolfbs"><code>control.fbs</code></a></p>
-<p><a href="fbs/sil.fbs">Source schema</a></p>
+<h1 id="fbssimfbs"><a class="header" href="#fbssimfbs"><code>fbs/sim.fbs</code></a></h1>
+<p><strong>Namespace:</strong> <code>synapse.topic</code></p>
+<p><a href="fbs/sim.fbs">Source schema</a></p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Kind</th><th>Name</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>table</code></td><td><a href="#table-siminput"><code>SimInput</code></a></td><td>Simulation input root passed from a simulator into a controller under test.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-locksteptickflags"><code>LockstepTickFlags</code></a></td><td>Control bits for lockstep tick messages.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-lockstepstatusstate"><code>LockstepStatusState</code></a></td><td>Participant state for lockstep status messages.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-locksteptickdata"><code>LockstepTickData</code></a></td><td>Deterministic simulation barrier from a simulator to a controller or device under test. The receiver advances its monotonic boot clock until target_boot_time_us, runs work made ready by that time, then waits for the next tick.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-lockstepstatusdata"><code>LockstepStatusData</code></a></td><td>Deterministic simulation status from a controller or device under test back to the simulator. The simulator waits for a matching completed sequence before publishing the next tick when strict lockstep is required.</td></tr>
+<tr><td><code>table</code></td><td><code>LockstepTick</code> -&gt; <a href="#struct-locksteptickdata"><code>LockstepTickData</code></a></td><td>FlatBuffers root wrapper for LockstepTickData.</td></tr>
+<tr><td><code>table</code></td><td><code>LockstepStatus</code> -&gt; <a href="#struct-lockstepstatusdata"><code>LockstepStatusData</code></a></td><td>FlatBuffers root wrapper for LockstepStatusData.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="table-siminput"><a class="header" href="#table-siminput"><code>table</code> SimInput</a></h1>
-<p><a href="#fbssilfbs">fbs/sil.fbs</a> / <a href="fbs/sil.fbs">Source schema</a></p>
-<p>Simulation input root passed from a simulator into a controller under test.</p>
+<h1 id="enum-locksteptickflags"><a class="header" href="#enum-locksteptickflags"><code>enum</code> LockstepTickFlags</a></h1>
+<p><a href="#fbssimfbs">fbs/sim.fbs</a> / <a href="fbs/sim.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Control bits for lockstep tick messages.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Reset</code></td><td></td><td>Receiver should reset its lockstep state before applying this tick.</td></tr>
+<tr><td><code>Final</code></td><td></td><td>This tick is the final tick in the current lockstep run.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-lockstepstatusstate"><a class="header" href="#enum-lockstepstatusstate"><code>enum</code> LockstepStatusState</a></h1>
+<p><a href="#fbssimfbs">fbs/sim.fbs</a> / <a href="fbs/sim.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Participant state for lockstep status messages.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Participant state is not reported.</td></tr>
+<tr><td><code>Ready</code></td><td><code>1</code></td><td>Participant is initialized and ready to accept lockstep ticks.</td></tr>
+<tr><td><code>Running</code></td><td><code>2</code></td><td>Participant accepted a tick and is advancing to the target time.</td></tr>
+<tr><td><code>Completed</code></td><td><code>3</code></td><td>Participant reached the target boot time for sequence.</td></tr>
+<tr><td><code>ResetAck</code></td><td><code>4</code></td><td>Participant reset its lockstep state in response to a Reset tick.</td></tr>
+<tr><td><code>MissedTick</code></td><td><code>5</code></td><td>Participant observed a sequence gap or superseded tick.</td></tr>
+<tr><td><code>Error</code></td><td><code>6</code></td><td>Participant cannot continue without external recovery.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-locksteptickdata"><a class="header" href="#struct-locksteptickdata"><code>struct</code> LockstepTickData</a></h1>
+<p><a href="#fbssimfbs">fbs/sim.fbs</a> / <a href="fbs/sim.fbs">Source schema</a></p>
+<p>Deterministic simulation barrier from a simulator to a controller or device under test. The receiver advances its monotonic boot clock until target_boot_time_us, runs work made ready by that time, then waits for the next tick.</p>
+<p><strong>FlatBuffers root table:</strong> <code>LockstepTick</code></p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>gyro_flu_rad_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Simulated body angular velocity in the FLU frame.</td></tr>
-<tr><td><code>accel_flu_m_s2</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), meters per second squared</td><td>Simulated body linear acceleration in the FLU frame.</td></tr>
-<tr><td><code>rc</code></td><td><a href="#struct-radiocontroldata"><code>synapse.topic.RadioControlData</code></a></td><td></td><td>Simulated raw receiver input sample.</td></tr>
-<tr><td><code>rc_link_quality_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Simulated receiver link quality from 0 to 100.</td></tr>
-<tr><td><code>rc_valid</code></td><td><code>bool</code></td><td></td><td>True when rc contains a valid receiver sample.</td></tr>
-<tr><td><code>imu_valid</code></td><td><code>bool</code></td><td></td><td>True when gyro and accel contain valid inertial data.</td></tr>
-<tr><td><code>target_boot_time_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Target controller boot time for deterministic simulation stepping.</td></tr>
+<tr><td><code>target_boot_time_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Target receiver monotonic boot time for this step.</td></tr>
+<tr><td><code>run_id</code></td><td><code>uint</code></td><td></td><td>Lockstep run identifier; changes when the simulator restarts the run.</td></tr>
+<tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Monotonic tick sequence used to pair status with this tick.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of LockstepTickFlags bits.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-lockstepstatusdata"><a class="header" href="#struct-lockstepstatusdata"><code>struct</code> LockstepStatusData</a></h1>
+<p><a href="#fbssimfbs">fbs/sim.fbs</a> / <a href="fbs/sim.fbs">Source schema</a></p>
+<p>Deterministic simulation status from a controller or device under test back to the simulator. The simulator waits for a matching completed sequence before publishing the next tick when strict lockstep is required.</p>
+<p><strong>FlatBuffers root table:</strong> <code>LockstepStatus</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Receiver monotonic boot time reached when this status was sampled.</td></tr>
+<tr><td><code>run_id</code></td><td><code>uint</code></td><td></td><td>Lockstep run identifier copied from the accepted tick.</td></tr>
+<tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Most recent lockstep tick sequence accepted or completed.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>ushort</code></td><td></td><td>Compact participant-defined detail for MissedTick or Error states.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-lockstepstatusstate"><code>LockstepStatusState</code></a></td><td></td><td>Participant state for this sequence.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Lockstep participant instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1228,6 +1164,8 @@
 <tr><td><code>enum</code></td><td><a href="#enum-vehiclehealthflags"><code>VehicleHealthFlags</code></a></td><td>Vehicle-level status bits for VehicleHealthData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-attitudeestimateflags"><code>AttitudeEstimateFlags</code></a></td><td>Field-validity bits for AttitudeEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-localpositionflags"><code>LocalPositionFlags</code></a></td><td>Field-validity bits for LocalPositionEstimateData.flags.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-externalodometryflags"><code>ExternalOdometryFlags</code></a></td><td>Field-validity bits for ExternalOdometryData.flags.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-externalodometrystatus"><code>ExternalOdometryStatus</code></a></td><td>Quality/status state for external odometry producer output.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-globalpositionflags"><code>GlobalPositionFlags</code></a></td><td>Field-validity bits for GlobalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-homereferenceflags"><code>HomeReferenceFlags</code></a></td><td>Field-validity bits for HomeReferenceData.flags.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-vehiclehealthdata"><code>VehicleHealthData</code></a></td><td>Vehicle-wide state summary for operator displays and failsafe supervision.</td></tr>
@@ -1236,6 +1174,8 @@
 <tr><td><code>struct</code></td><td><a href="#struct-localpositionestimatedata"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-globalpositionestimatedata"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-odometryestimatedata"><code>OdometryEstimateData</code></a></td><td>Combined pose, twist, covariance, and estimator metadata.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-externalodometrydata"><code>ExternalOdometryData</code></a></td><td>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. The timestamp is the estimate timestamp; the last accepted mocap capture timestamp is carried separately for dropout handling.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-externalodometrycovariancedata"><code>ExternalOdometryCovarianceData</code></a></td><td>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries diagonal stddevs. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-estimatorhealthdata"><code>EstimatorHealthData</code></a></td><td>Estimator health and innovation-test summary. The flags field is deliberately producer-defined: estimator status models differ between implementations and are standardized via discovery records, not the schema.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-missionprogressdata"><code>MissionProgressData</code></a></td><td>Mission progress and mission database identifiers.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-navigationtargetdata"><code>NavigationTargetData</code></a></td><td>Navigation controller target and tracking-error summary. Angles follow REP-0103: zero east, positive counter-clockwise, range -18000 to 18000.</td></tr>
@@ -1246,6 +1186,8 @@
 <tr><td><code>table</code></td><td><code>LocalPositionEstimate</code> -&gt; <a href="#struct-localpositionestimatedata"><code>LocalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for LocalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>GlobalPositionEstimate</code> -&gt; <a href="#struct-globalpositionestimatedata"><code>GlobalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for GlobalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>OdometryEstimate</code> -&gt; <a href="#struct-odometryestimatedata"><code>OdometryEstimateData</code></a></td><td>FlatBuffers root wrapper for OdometryEstimateData.</td></tr>
+<tr><td><code>table</code></td><td><code>ExternalOdometry</code> -&gt; <a href="#struct-externalodometrydata"><code>ExternalOdometryData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryData.</td></tr>
+<tr><td><code>table</code></td><td><code>ExternalOdometryCovariance</code> -&gt; <a href="#struct-externalodometrycovariancedata"><code>ExternalOdometryCovarianceData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryCovarianceData.</td></tr>
 <tr><td><code>table</code></td><td><code>EstimatorHealth</code> -&gt; <a href="#struct-estimatorhealthdata"><code>EstimatorHealthData</code></a></td><td>FlatBuffers root wrapper for EstimatorHealthData.</td></tr>
 <tr><td><code>table</code></td><td><code>MissionProgress</code> -&gt; <a href="#struct-missionprogressdata"><code>MissionProgressData</code></a></td><td>FlatBuffers root wrapper for MissionProgressData.</td></tr>
 <tr><td><code>table</code></td><td><code>NavigationTarget</code> -&gt; <a href="#struct-navigationtargetdata"><code>NavigationTargetData</code></a></td><td>FlatBuffers root wrapper for NavigationTargetData.</td></tr>
@@ -1330,6 +1272,52 @@
 <tr><td><code>ZValid</code></td><td></td><td>Vertical position is valid.</td></tr>
 <tr><td><code>VxyValid</code></td><td></td><td>Horizontal velocity is valid.</td></tr>
 <tr><td><code>VzValid</code></td><td></td><td>Vertical velocity is valid.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-externalodometryflags"><a class="header" href="#enum-externalodometryflags"><code>enum</code> ExternalOdometryFlags</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Field-validity bits for ExternalOdometryData.flags.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PositionValid</code></td><td></td><td>position_enu_m is meaningful.</td></tr>
+<tr><td><code>AttitudeValid</code></td><td></td><td>attitude is meaningful.</td></tr>
+<tr><td><code>LinearVelocityValid</code></td><td></td><td>linear_velocity_enu_m_s is meaningful.</td></tr>
+<tr><td><code>AngularVelocityValid</code></td><td></td><td>angular_velocity_flu_rad_s is meaningful.</td></tr>
+<tr><td><code>PoseStddevValid</code></td><td></td><td>Position and attitude standard-deviation fields are meaningful.</td></tr>
+<tr><td><code>TwistStddevValid</code></td><td></td><td>Linear and angular velocity standard-deviation fields are meaningful.</td></tr>
+<tr><td><code>LatencyValid</code></td><td></td><td>latency_us is meaningful.</td></tr>
+<tr><td><code>Extrapolated</code></td><td></td><td>State was predicted without a current accepted mocap correction.</td></tr>
+<tr><td><code>OutlierRejected</code></td><td></td><td>A current mocap update was rejected by innovation gates.</td></tr>
+<tr><td><code>Degraded</code></td><td></td><td>State is usable but tracking quality or uncertainty is degraded.</td></tr>
+<tr><td><code>Lost</code></td><td></td><td>State should not be used for navigation.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-externalodometrystatus"><a class="header" href="#enum-externalodometrystatus"><code>enum</code> ExternalOdometryStatus</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Quality/status state for external odometry producer output.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Producer did not report a quality/status state.</td></tr>
+<tr><td><code>Filtered</code></td><td><code>1</code></td><td>Current mocap update was accepted into the estimate.</td></tr>
+<tr><td><code>ExtrapolatedShort</code></td><td><code>2</code></td><td>Short prediction-only gap after the last accepted mocap update.</td></tr>
+<tr><td><code>ExtrapolatedLong</code></td><td><code>3</code></td><td>Extended prediction-only gap; downstream users should degrade behavior.</td></tr>
+<tr><td><code>Lost</code></td><td><code>4</code></td><td>Extrapolation exceeded the producer’s safe limit.</td></tr>
+<tr><td><code>OutlierRejected</code></td><td><code>5</code></td><td>Current mocap update was rejected and the state was predicted.</td></tr>
+<tr><td><code>Degraded</code></td><td><code>6</code></td><td>Current mocap update was accepted but quality is reduced.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1498,11 +1486,61 @@
 <tr><td><code>angular_velocity_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Body angular velocity in the FLU frame.</td></tr>
 <tr><td><code>pose_covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular covariance for position and orientation.</td></tr>
 <tr><td><code>velocity_covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular covariance for linear and angular velocity.</td></tr>
-<tr><td><code>frame_id</code></td><td><a href="#enum-referenceframe"><code>synapse.types.ReferenceFrame</code></a></td><td></td><td>Reference frame of the pose fields.</td></tr>
-<tr><td><code>child_frame_id</code></td><td><a href="#enum-referenceframe"><code>synapse.types.ReferenceFrame</code></a></td><td></td><td>Frame of the twist fields.</td></tr>
 <tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
 <tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
 <tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-externalodometrydata"><a class="header" href="#struct-externalodometrydata"><code>struct</code> ExternalOdometryData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. The timestamp is the estimate timestamp; the last accepted mocap capture timestamp is carried separately for dropout handling.</p>
+<p><strong>FlatBuffers root table:</strong> <code>ExternalOdometry</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>last_mocap_timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Last accepted mocap measurement timestamp in monotonic boot time.</td></tr>
+<tr><td><code>latency_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Producer-estimated estimate-to-publication latency or state age.</td></tr>
+<tr><td><code>extrapolation_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Time since last accepted mocap correction.</td></tr>
+<tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Producer sequence for loss/reorder detection.</td></tr>
+<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Measured local/world position in ENU.</td></tr>
+<tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Measured orientation rotating body FLU vectors into ENU.</td></tr>
+<tr><td><code>linear_velocity_enu_m_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Measured linear velocity in ENU.</td></tr>
+<tr><td><code>angular_velocity_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Measured angular velocity in body FLU.</td></tr>
+<tr><td><code>position_stddev_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>One-sigma position uncertainty in ENU.</td></tr>
+<tr><td><code>attitude_stddev_rad</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>radians</td><td>One-sigma roll, pitch, and yaw uncertainty in radians.</td></tr>
+<tr><td><code>linear_velocity_stddev_enu_m_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>One-sigma linear velocity uncertainty in ENU.</td></tr>
+<tr><td><code>angular_velocity_stddev_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>One-sigma angular velocity uncertainty in body FLU.</td></tr>
+<tr><td><code>tracking_quality_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Tracking or solve quality from 0 to 100.</td></tr>
+<tr><td><code>status</code></td><td><a href="#enum-externalodometrystatus"><code>ExternalOdometryStatus</code></a></td><td></td><td>Producer state quality and extrapolation status.</td></tr>
+<tr><td><code>frames_since_last_mocap_count</code></td><td><code>ushort</code></td><td></td><td>Prediction-only frame count since the last accepted mocap correction.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of ExternalOdometryFlags bits.</td></tr>
+<tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>External source instance identifier.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Tracked rigid-body instance identifier; also the instance segment of the Zenoh key.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-externalodometrycovariancedata"><a class="header" href="#struct-externalodometrycovariancedata"><code>struct</code> ExternalOdometryCovarianceData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries diagonal stddevs. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</p>
+<p><strong>FlatBuffers root table:</strong> <code>ExternalOdometryCovariance</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp matching ExternalOdometryData.timestamp_us.</td></tr>
+<tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Producer sequence matching ExternalOdometryData.sequence.</td></tr>
+<tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>synapse.types.CovarianceUpperTriangle78f</code></a></td><td></td><td>Upper-triangular covariance for the 12D tangent state.</td></tr>
+<tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>External source instance identifier.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Tracked rigid-body instance identifier.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1669,9 +1707,122 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="fbstrajectoryfbs"><a class="header" href="#fbstrajectoryfbs"><code>fbs/trajectory.fbs</code></a></h1>
+<p><strong>Namespace:</strong> <code>synapse.topic</code></p>
+<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a></p>
+<p><a href="fbs/trajectory.fbs">Source schema</a></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Kind</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>enum</code></td><td><a href="#enum-trajectorytype"><code>TrajectoryType</code></a></td><td>Coefficient interpretation for a trajectory segment.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-trajectorydegree"><code>TrajectoryDegree</code></a></td><td>Polynomial or Bezier degree represented by a trajectory segment.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-trajectorysegmentflags"><code>TrajectorySegmentFlags</code></a></td><td>Validity and transfer behavior bits for TrajectorySegmentData.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-trajectorysegmentdata"><code>TrajectorySegmentData</code></a></td><td>Fixed-layout segment for high-rate trajectory exchange. Lower-degree trajectories ignore the higher-index coefficient fields.</td></tr>
+<tr><td><code>table</code></td><td><code>TrajectorySegment</code> -&gt; <a href="#struct-trajectorysegmentdata"><code>TrajectorySegmentData</code></a></td><td>FlatBuffers root wrapper for TrajectorySegmentData.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-trajectorytype"><a class="header" href="#enum-trajectorytype"><code>enum</code> TrajectoryType</a></h1>
+<p><a href="#fbstrajectoryfbs">fbs/trajectory.fbs</a> / <a href="fbs/trajectory.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Coefficient interpretation for a trajectory segment.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Trajectory interpretation is not reported.</td></tr>
+<tr><td><code>Bezier</code></td><td><code>1</code></td><td>Coefficients are Bezier control points.</td></tr>
+<tr><td><code>Polynomial</code></td><td><code>2</code></td><td>Coefficients are polynomial coefficients.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-trajectorydegree"><a class="header" href="#enum-trajectorydegree"><code>enum</code> TrajectoryDegree</a></h1>
+<p><a href="#fbstrajectoryfbs">fbs/trajectory.fbs</a> / <a href="fbs/trajectory.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Polynomial or Bezier degree represented by a trajectory segment.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Degree is not reported.</td></tr>
+<tr><td><code>Cubic</code></td><td><code>3</code></td><td>Degree 3 segment with p0 through p3 used.</td></tr>
+<tr><td><code>Quintic</code></td><td><code>5</code></td><td>Degree 5 segment with p0 through p5 used.</td></tr>
+<tr><td><code>Septic</code></td><td><code>7</code></td><td>Degree 7 segment with p0 through p7 used.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-trajectorysegmentflags"><a class="header" href="#enum-trajectorysegmentflags"><code>enum</code> TrajectorySegmentFlags</a></h1>
+<p><a href="#fbstrajectoryfbs">fbs/trajectory.fbs</a> / <a href="fbs/trajectory.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Validity and transfer behavior bits for TrajectorySegmentData.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Start</code></td><td></td><td>Segment starts a new trajectory revision.</td></tr>
+<tr><td><code>Final</code></td><td></td><td>Segment is the final segment in the trajectory revision.</td></tr>
+<tr><td><code>Replace</code></td><td></td><td>Receiver should discard older segments for this trajectory before applying this one.</td></tr>
+<tr><td><code>YawValid</code></td><td></td><td>The yaw coefficient fields are meaningful.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-trajectorysegmentdata"><a class="header" href="#struct-trajectorysegmentdata"><code>struct</code> TrajectorySegmentData</a></h1>
+<p><a href="#fbstrajectoryfbs">fbs/trajectory.fbs</a> / <a href="fbs/trajectory.fbs">Source schema</a></p>
+<p>Fixed-layout segment for high-rate trajectory exchange. Lower-degree trajectories ignore the higher-index coefficient fields.</p>
+<p><strong>FlatBuffers root table:</strong> <code>TrajectorySegment</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Publication timestamp in monotonic boot time.</td></tr>
+<tr><td><code>start_time_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Trajectory segment start time in the producer’s monotonic boot time.</td></tr>
+<tr><td><code>p0_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 0 in local ENU meters.</td></tr>
+<tr><td><code>p1_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 1 in local ENU meters.</td></tr>
+<tr><td><code>p2_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 2 in local ENU meters.</td></tr>
+<tr><td><code>p3_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 3 in local ENU meters.</td></tr>
+<tr><td><code>p4_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 4 in local ENU meters.</td></tr>
+<tr><td><code>p5_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 5 in local ENU meters.</td></tr>
+<tr><td><code>p6_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 6 in local ENU meters.</td></tr>
+<tr><td><code>p7_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 7 in local ENU meters.</td></tr>
+<tr><td><code>yaw0_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 0 in radians.</td></tr>
+<tr><td><code>yaw1_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 1 in radians.</td></tr>
+<tr><td><code>yaw2_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 2 in radians.</td></tr>
+<tr><td><code>yaw3_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 3 in radians.</td></tr>
+<tr><td><code>yaw4_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 4 in radians.</td></tr>
+<tr><td><code>yaw5_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 5 in radians.</td></tr>
+<tr><td><code>yaw6_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 6 in radians.</td></tr>
+<tr><td><code>yaw7_rad</code></td><td><code>float</code></td><td>radians</td><td>Yaw control point or polynomial coefficient 7 in radians.</td></tr>
+<tr><td><code>trajectory_id</code></td><td><code>uint</code></td><td></td><td>Trajectory stream or plan identifier.</td></tr>
+<tr><td><code>segment_seq</code></td><td><code>uint</code></td><td></td><td>Segment sequence number within the trajectory revision.</td></tr>
+<tr><td><code>duration_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Segment duration.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>Monotonic trajectory revision identifier.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TrajectorySegmentFlags bits.</td></tr>
+<tr><td><code>trajectory_type</code></td><td><a href="#enum-trajectorytype"><code>TrajectoryType</code></a></td><td></td><td>Bezier or polynomial coefficient interpretation.</td></tr>
+<tr><td><code>degree</code></td><td><a href="#enum-trajectorydegree"><code>TrajectoryDegree</code></a></td><td></td><td>Highest coefficient index used by this segment.</td></tr>
+<tr><td><code>frame</code></td><td><a href="#enum-localframe"><code>synapse.types.LocalFrame</code></a></td><td></td><td>Local frame for position control points or coefficients.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Optional topic instance identifier for multiple trajectory streams.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fbstransferfbs"><a class="header" href="#fbstransferfbs"><code>fbs/transfer.fbs</code></a></h1>
 <p><strong>Namespace:</strong> <code>synapse.cmd</code></p>
-<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbscontrolfbs"><code>control.fbs</code></a></p>
+<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a></p>
 <p><a href="fbs/transfer.fbs">Source schema</a></p>
 <div class="table-wrapper">
 <table>
@@ -1679,18 +1830,25 @@
 <tr><th>Kind</th><th>Name</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>enum</code></td><td><a href="#enum-cmdid"><code>CmdId</code></a></td><td>Stable numeric identifiers for command and transfer services. Zenoh deployments select services by key (synapse/v1/cmd/<name>); non-Zenoh request/reply transports such as framed serial links use these ids as the service discriminator. Values mirror the generated command catalog.</name></td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-cmdid"><code>CmdId</code></a></td><td>Stable numeric identifiers for command and transfer services. Zenoh deployments select services by key name under synapse/v1/cmd; non-Zenoh request/reply transports such as framed serial links use these ids as the service discriminator. Values mirror the generated command catalog.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-paramkind"><code>ParamKind</code></a></td><td>Value type carried by a ParamValue record.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-transferflags"><code>TransferFlags</code></a></td><td>Common flags for paged transfer requests and replies.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-missionitemkind"><code>MissionItemKind</code></a></td><td>GPS mission item class.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-missionitemflags"><code>MissionItemFlags</code></a></td><td>Mission item validity and behavior bits.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-paramvalue"><code>ParamValue</code></a></td><td>One named parameter value. Tables are appropriate here: parameter transfer is a cached request/reply flow, never a control-loop payload.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-paramgetrequest"><code>ParamGetRequest</code></a></td><td>Request one parameter by name, or all parameters when name is absent. Served as a Zenoh queryable on the cmd key space.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-paramgetrequest"><code>ParamGetRequest</code></a></td><td>Request one parameter by name, or a paged catalog chunk when name is absent. Served as a Zenoh queryable on the cmd key space.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-paramgetreply"><code>ParamGetReply</code></a></td><td>Reply to ParamGetRequest.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-paramsetrequest"><code>ParamSetRequest</code></a></td><td>Request to set one parameter. Served as a Zenoh queryable.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-paramsetreply"><code>ParamSetReply</code></a></td><td>Reply to ParamSetRequest.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-missionitem"><code>MissionItem</code></a></td><td>One mission item: a sequenced geographic command.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-missiongetrequest"><code>MissionGetRequest</code></a></td><td>Request the mission plan. Served as a Zenoh queryable.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-missionitemdata"><code>MissionItemData</code></a></td><td>One fixed-layout GPS mission item. This is not a generic command; it is the compact transfer representation for GPS waypoint-style missions.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-missiongetrequest"><code>MissionGetRequest</code></a></td><td>Request a bounded GPS mission chunk. Served as a Zenoh queryable.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-missiongetreply"><code>MissionGetReply</code></a></td><td>Reply to MissionGetRequest.</td></tr>
-<tr><td><code>table</code></td><td><a href="#table-missionsetrequest"><code>MissionSetRequest</code></a></td><td>Request to replace the mission plan. Served as a Zenoh queryable.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-missionsetrequest"><code>MissionSetRequest</code></a></td><td>Request to replace or patch a GPS mission in bounded chunks. Served as a Zenoh queryable and by non-Zenoh request/reply transports.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-missionsetreply"><code>MissionSetReply</code></a></td><td>Reply to MissionSetRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-trajectorygetrequest"><code>TrajectoryGetRequest</code></a></td><td>Request a bounded trajectory segment chunk. Served as a Zenoh queryable.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-trajectorygetreply"><code>TrajectoryGetReply</code></a></td><td>Reply to TrajectoryGetRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-trajectorysetrequest"><code>TrajectorySetRequest</code></a></td><td>Request to replace or patch a trajectory in bounded chunks.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-trajectorysetreply"><code>TrajectorySetReply</code></a></td><td>Reply to TrajectorySetRequest.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1698,7 +1856,7 @@
 <h1 id="enum-cmdid"><a class="header" href="#enum-cmdid"><code>enum</code> CmdId</a></h1>
 <p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
 <p><strong>Backing type:</strong> <code>ushort</code></p>
-<p>Stable numeric identifiers for command and transfer services. Zenoh deployments select services by key (synapse/v1/cmd/<name>); non-Zenoh request/reply transports such as framed serial links use these ids as the service discriminator. Values mirror the generated command catalog.</name></p>
+<p>Stable numeric identifiers for command and transfer services. Zenoh deployments select services by key name under synapse/v1/cmd; non-Zenoh request/reply transports such as framed serial links use these ids as the service discriminator. Values mirror the generated command catalog.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1706,12 +1864,12 @@
 </thead>
 <tbody>
 <tr><td><code>Unknown</code></td><td><code>0</code></td><td>Reserved value for invalid or unassigned services.</td></tr>
-<tr><td><code>VehicleCommand</code></td><td><code>1</code></td><td>Generic command with floating-point arguments.</td></tr>
-<tr><td><code>GeoCommand</code></td><td><code>2</code></td><td>Geographic command with scaled latitude/longitude precision.</td></tr>
-<tr><td><code>ParamGet</code></td><td><code>3</code></td><td>Fetch one parameter by name, or all parameters.</td></tr>
-<tr><td><code>ParamSet</code></td><td><code>4</code></td><td>Set one parameter.</td></tr>
-<tr><td><code>MissionGet</code></td><td><code>5</code></td><td>Fetch the mission plan.</td></tr>
-<tr><td><code>MissionSet</code></td><td><code>6</code></td><td>Replace the mission plan.</td></tr>
+<tr><td><code>ParamGet</code></td><td><code>1</code></td><td>Fetch one parameter by name, or a paged parameter catalog chunk.</td></tr>
+<tr><td><code>ParamSet</code></td><td><code>2</code></td><td>Set one parameter.</td></tr>
+<tr><td><code>MissionGet</code></td><td><code>3</code></td><td>Fetch a paged GPS mission chunk.</td></tr>
+<tr><td><code>MissionSet</code></td><td><code>4</code></td><td>Replace or patch a GPS mission in bounded chunks.</td></tr>
+<tr><td><code>TrajectoryGet</code></td><td><code>5</code></td><td>Fetch a paged trajectory segment chunk.</td></tr>
+<tr><td><code>TrajectorySet</code></td><td><code>6</code></td><td>Replace or patch a trajectory in bounded chunks.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1730,6 +1888,62 @@
 <tr><td><code>Int</code></td><td><code>1</code></td><td>int_value carries the parameter.</td></tr>
 <tr><td><code>Bool</code></td><td><code>2</code></td><td>int_value carries the parameter as zero or one.</td></tr>
 <tr><td><code>Text</code></td><td><code>3</code></td><td>text_value carries the parameter.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-transferflags"><a class="header" href="#enum-transferflags"><code>enum</code> TransferFlags</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Common flags for paged transfer requests and replies.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>First</code></td><td></td><td>This chunk starts a transfer.</td></tr>
+<tr><td><code>Last</code></td><td></td><td>This chunk completes a transfer.</td></tr>
+<tr><td><code>More</code></td><td></td><td>More chunks are expected after this reply.</td></tr>
+<tr><td><code>Commit</code></td><td></td><td>Receiver should commit the staged transfer after accepting this chunk.</td></tr>
+<tr><td><code>FailedSeqValid</code></td><td></td><td>failed_seq identifies the item or segment that failed validation.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-missionitemkind"><a class="header" href="#enum-missionitemkind"><code>enum</code> MissionItemKind</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>GPS mission item class.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Waypoint</code></td><td><code>0</code></td><td>Navigate to a geographic waypoint.</td></tr>
+<tr><td><code>Takeoff</code></td><td><code>1</code></td><td>Take off to the target altitude.</td></tr>
+<tr><td><code>Land</code></td><td><code>2</code></td><td>Land at the target location.</td></tr>
+<tr><td><code>Loiter</code></td><td><code>3</code></td><td>Hold at the target location.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-missionitemflags"><a class="header" href="#enum-missionitemflags"><code>enum</code> MissionItemFlags</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Mission item validity and behavior bits.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Current</code></td><td></td><td>Receiver should make this the current item when committed.</td></tr>
+<tr><td><code>Autocontinue</code></td><td></td><td>Navigation should automatically continue after completing this item.</td></tr>
+<tr><td><code>YawValid</code></td><td></td><td>yaw_rad is meaningful.</td></tr>
+<tr><td><code>AcceptanceRadiusValid</code></td><td></td><td>acceptance_radius_m is meaningful.</td></tr>
+<tr><td><code>LoiterTimeValid</code></td><td></td><td>loiter_time_s is meaningful.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1754,14 +1968,16 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="table-paramgetrequest"><a class="header" href="#table-paramgetrequest"><code>table</code> ParamGetRequest</a></h1>
 <p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
-<p>Request one parameter by name, or all parameters when name is absent. Served as a Zenoh queryable on the cmd key space.</p>
+<p>Request one parameter by name, or a paged catalog chunk when name is absent. Served as a Zenoh queryable on the cmd key space.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>name</code></td><td><code>string</code></td><td></td><td>Parameter name to fetch; absent or empty requests all parameters.</td></tr>
+<tr><td><code>name</code></td><td><code>string</code></td><td></td><td>Parameter name to fetch; absent or empty requests the catalog page.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First parameter index requested for paged catalog reads.</td></tr>
+<tr><td><code>limit</code></td><td><code>ushort</code></td><td></td><td>Maximum number of parameter values requested.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1777,7 +1993,10 @@
 <tbody>
 <tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
 <tr><td><code>values</code></td><td><code>[</code><a href="#table-paramvalue"><code>ParamValue</code></a><code>]</code></td><td></td><td>Returned parameter values.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First parameter index carried in values.</td></tr>
 <tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of parameters held by the producer.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1807,13 +2026,14 @@
 <tbody>
 <tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
 <tr><td><code>value</code></td><td><a href="#table-paramvalue"><code>ParamValue</code></a></td><td></td><td>Parameter value in effect after the request.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="table-missionitem"><a class="header" href="#table-missionitem"><code>table</code> MissionItem</a></h1>
+<h1 id="struct-missionitemdata"><a class="header" href="#struct-missionitemdata"><code>struct</code> MissionItemData</a></h1>
 <p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
-<p>One mission item: a sequenced geographic command.</p>
+<p>One fixed-layout GPS mission item. This is not a generic command; it is the compact transfer representation for GPS waypoint-style missions.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1821,14 +2041,22 @@
 </thead>
 <tbody>
 <tr><td><code>seq</code></td><td><code>uint</code></td><td></td><td>Item sequence number starting at zero.</td></tr>
-<tr><td><code>item</code></td><td><a href="#struct-geocommanddata"><code>synapse.topic.GeoCommandData</code></a></td><td></td><td>Fixed-layout geographic command payload.</td></tr>
+<tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Target latitude in WGS-84 degrees scaled by 1e7.</td></tr>
+<tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Target longitude in WGS-84 degrees scaled by 1e7.</td></tr>
+<tr><td><code>altitude_m</code></td><td><code>float</code></td><td>meters</td><td>Target altitude in meters in the selected frame.</td></tr>
+<tr><td><code>acceptance_radius_m</code></td><td><code>float</code></td><td>meters</td><td>Acceptance radius in meters when the corresponding flag is set.</td></tr>
+<tr><td><code>loiter_time_s</code></td><td><code>float</code></td><td>seconds</td><td>Loiter duration in seconds when the corresponding flag is set.</td></tr>
+<tr><td><code>yaw_rad</code></td><td><code>float</code></td><td>radians</td><td>Requested yaw angle when the corresponding flag is set.</td></tr>
+<tr><td><code>frame</code></td><td><a href="#enum-geoaltitudeframe"><code>synapse.types.GeoAltitudeFrame</code></a></td><td></td><td>Altitude reference frame for altitude_m.</td></tr>
+<tr><td><code>kind</code></td><td><a href="#enum-missionitemkind"><code>MissionItemKind</code></a></td><td></td><td>GPS mission item class.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MissionItemFlags bits.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="table-missiongetrequest"><a class="header" href="#table-missiongetrequest"><code>table</code> MissionGetRequest</a></h1>
 <p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
-<p>Request the mission plan. Served as a Zenoh queryable.</p>
+<p>Request a bounded GPS mission chunk. Served as a Zenoh queryable.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1836,6 +2064,8 @@
 </thead>
 <tbody>
 <tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Mission identifier to fetch, or zero for the current plan.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First mission item sequence requested.</td></tr>
+<tr><td><code>limit</code></td><td><code>ushort</code></td><td></td><td>Maximum number of items requested.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1851,14 +2081,20 @@
 <tbody>
 <tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
 <tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier of the returned plan; matches MissionProgressData.mission_id.</td></tr>
-<tr><td><code>items</code></td><td><code>[</code><a href="#table-missionitem"><code>MissionItem</code></a><code>]</code></td><td></td><td>Mission items in sequence order.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>Monotonic mission revision identifier.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First mission item sequence carried in items.</td></tr>
+<tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of mission items in the plan.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>failed_seq</code></td><td><code>uint</code></td><td></td><td>Failed item sequence when FailedSeqValid is set.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+<tr><td><code>items</code></td><td><code>[</code><a href="#struct-missionitemdata"><code>MissionItemData</code></a><code>]</code></td><td></td><td>Mission items in sequence order.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="table-missionsetrequest"><a class="header" href="#table-missionsetrequest"><code>table</code> MissionSetRequest</a></h1>
 <p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
-<p>Request to replace the mission plan. Served as a Zenoh queryable.</p>
+<p>Request to replace or patch a GPS mission in bounded chunks. Served as a Zenoh queryable and by non-Zenoh request/reply transports.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -1866,7 +2102,13 @@
 </thead>
 <tbody>
 <tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier the producer should report for this plan.</td></tr>
-<tr><td><code>items</code></td><td><code>[</code><a href="#table-missionitem"><code>MissionItem</code></a><code>]</code></td><td></td><td>Mission items in sequence order.</td></tr>
+<tr><td><code>expected_plan_version</code></td><td><code>uint</code></td><td></td><td>Required current revision, or zero when the producer permits blind replace.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>New mission revision identifier.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First mission item sequence carried in items.</td></tr>
+<tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of mission items in the final plan.</td></tr>
+<tr><td><code>plan_crc32</code></td><td><code>uint</code></td><td></td><td>CRC-32 of the complete final plan in canonical transfer encoding.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+<tr><td><code>items</code></td><td><code>[</code><a href="#struct-missionitemdata"><code>MissionItemData</code></a><code>]</code></td><td></td><td>Mission items in sequence order for this chunk.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1881,14 +2123,96 @@
 </thead>
 <tbody>
 <tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
-<tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier of the plan now active in the producer.</td></tr>
+<tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier of the plan now staged or active in the producer.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>Mission revision accepted by the producer.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>failed_seq</code></td><td><code>uint</code></td><td></td><td>Failed item sequence when FailedSeqValid is set.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-trajectorygetrequest"><a class="header" href="#table-trajectorygetrequest"><code>table</code> TrajectoryGetRequest</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p>Request a bounded trajectory segment chunk. Served as a Zenoh queryable.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>trajectory_id</code></td><td><code>uint</code></td><td></td><td>Trajectory identifier to fetch.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First trajectory segment sequence requested.</td></tr>
+<tr><td><code>limit</code></td><td><code>ushort</code></td><td></td><td>Maximum number of segments requested.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-trajectorygetreply"><a class="header" href="#table-trajectorygetreply"><code>table</code> TrajectoryGetReply</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p>Reply to TrajectoryGetRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
+<tr><td><code>trajectory_id</code></td><td><code>uint</code></td><td></td><td>Identifier of the returned trajectory.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>Monotonic trajectory revision identifier.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First segment sequence carried in segments.</td></tr>
+<tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of segments in the trajectory.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>failed_seq</code></td><td><code>uint</code></td><td></td><td>Failed segment sequence when FailedSeqValid is set.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+<tr><td><code>segments</code></td><td><code>[</code><a href="#struct-trajectorysegmentdata"><code>synapse.topic.TrajectorySegmentData</code></a><code>]</code></td><td></td><td>Fixed-layout trajectory segment payloads.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-trajectorysetrequest"><a class="header" href="#table-trajectorysetrequest"><code>table</code> TrajectorySetRequest</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p>Request to replace or patch a trajectory in bounded chunks.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>trajectory_id</code></td><td><code>uint</code></td><td></td><td>Trajectory identifier the producer should report for this plan.</td></tr>
+<tr><td><code>expected_plan_version</code></td><td><code>uint</code></td><td></td><td>Required current revision, or zero when the producer permits blind replace.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>New trajectory revision identifier.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First segment sequence carried in segments.</td></tr>
+<tr><td><code>total</code></td><td><code>uint</code></td><td></td><td>Total number of segments in the final trajectory.</td></tr>
+<tr><td><code>plan_crc32</code></td><td><code>uint</code></td><td></td><td>CRC-32 of the complete final trajectory in canonical transfer encoding.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
+<tr><td><code>segments</code></td><td><code>[</code><a href="#struct-trajectorysegmentdata"><code>synapse.topic.TrajectorySegmentData</code></a><code>]</code></td><td></td><td>Fixed-layout trajectory segment payloads.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-trajectorysetreply"><a class="header" href="#table-trajectorysetreply"><code>table</code> TrajectorySetReply</a></h1>
+<p><a href="#fbstransferfbs">fbs/transfer.fbs</a> / <a href="fbs/transfer.fbs">Source schema</a></p>
+<p>Reply to TrajectorySetRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Request outcome.</td></tr>
+<tr><td><code>trajectory_id</code></td><td><code>uint</code></td><td></td><td>Identifier of the trajectory now staged or active in the producer.</td></tr>
+<tr><td><code>plan_version</code></td><td><code>uint</code></td><td></td><td>Trajectory revision accepted by the producer.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>failed_seq</code></td><td><code>uint</code></td><td></td><td>Failed segment sequence when FailedSeqValid is set.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of TransferFlags bits.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fbstransportfbs"><a class="header" href="#fbstransportfbs"><code>fbs/transport.fbs</code></a></h1>
 <p><strong>Namespace:</strong> <code>synapse.topic</code></p>
-<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbssensorsfbs"><code>sensors.fbs</code></a>, <a href="#fbsstatefbs"><code>state.fbs</code></a>, <a href="#fbscontrolfbs"><code>control.fbs</code></a>, <a href="#fbsoptical_flowfbs"><code>optical_flow.fbs</code></a>, <a href="#fbsmocapfbs"><code>mocap.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a></p>
+<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbssensorsfbs"><code>sensors.fbs</code></a>, <a href="#fbsstatefbs"><code>state.fbs</code></a>, <a href="#fbscontrolfbs"><code>control.fbs</code></a>, <a href="#fbsoptical_flowfbs"><code>optical_flow.fbs</code></a>, <a href="#fbsmocapfbs"><code>mocap.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbssimfbs"><code>sim.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a></p>
 <p><a href="fbs/transport.fbs">Source schema</a></p>
 <div class="table-wrapper">
 <table>
@@ -1950,17 +2274,18 @@
 <tr><td><a href="#struct-attitudecommanddata"><code>AttitudeCommand</code></a></td><td><a href="#struct-attitudecommanddata"><code>AttitudeCommand</code></a></td><td>Attitude setpoint command.</td></tr>
 <tr><td><a href="#struct-ratecommanddata"><code>RateCommand</code></a></td><td><a href="#struct-ratecommanddata"><code>RateCommand</code></a></td><td>Body-rate setpoint command.</td></tr>
 <tr><td><a href="#struct-localpositioncommanddata"><code>LocalPositionCommand</code></a></td><td><a href="#struct-localpositioncommanddata"><code>LocalPositionCommand</code></a></td><td>Local position/velocity/acceleration/yaw command.</td></tr>
-<tr><td><a href="#struct-vehiclecommanddata"><code>VehicleCommand</code></a></td><td><a href="#struct-vehiclecommanddata"><code>VehicleCommand</code></a></td><td>Generic command with floating-point arguments.</td></tr>
-<tr><td><a href="#struct-geocommanddata"><code>GeoCommand</code></a></td><td><a href="#struct-geocommanddata"><code>GeoCommand</code></a></td><td>Geographic command with scaled latitude/longitude precision.</td></tr>
-<tr><td><a href="#struct-commandresultdata"><code>CommandResult</code></a></td><td><a href="#struct-commandresultdata"><code>CommandResult</code></a></td><td>Command result and progress response.</td></tr>
+<tr><td><a href="#struct-trajectorysegmentdata"><code>TrajectorySegment</code></a></td><td><a href="#struct-trajectorysegmentdata"><code>TrajectorySegment</code></a></td><td>Bezier or polynomial trajectory segment setpoint.</td></tr>
 <tr><td><a href="#struct-actuatorcommanddata"><code>ActuatorCommand</code></a></td><td><a href="#struct-actuatorcommanddata"><code>ActuatorCommand</code></a></td><td>Normalized actuator command.</td></tr>
 <tr><td><a href="#struct-actuatorfeedbackdata"><code>ActuatorFeedback</code></a></td><td><a href="#struct-actuatorfeedbackdata"><code>ActuatorFeedback</code></a></td><td>Normalized actuator feedback.</td></tr>
 <tr><td><a href="#struct-pwmsignaloutputsdata"><code>PwmSignalOutputs</code></a></td><td><a href="#struct-pwmsignaloutputsdata"><code>PwmSignalOutputs</code></a></td><td>Raw PWM output pulse widths.</td></tr>
 <tr><td><a href="#struct-controlloopmetricsdata"><code>ControlLoopMetrics</code></a></td><td><a href="#struct-controlloopmetricsdata"><code>ControlLoopMetrics</code></a></td><td>Control-loop timing and load metrics.</td></tr>
 <tr><td><a href="#table-textstatus"><code>TextStatus</code></a></td><td><a href="#table-textstatus"><code>TextStatus</code></a></td><td>Human-readable status text.</td></tr>
 <tr><td><a href="#struct-gcsstatusdata"><code>GcsStatus</code></a></td><td><a href="#struct-gcsstatusdata"><code>GcsStatus</code></a></td><td>Compact status aggregate for low-rate ground-control links.</td></tr>
-<tr><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td>Motion-capture samples for one capture timestamp.</td></tr>
-<tr><td><a href="#table-mocapdefinition"><code>MocapDefinition</code></a></td><td><a href="#table-mocapdefinition"><code>MocapDefinition</code></a></td><td>Cached motion-capture object definitions.</td></tr>
+<tr><td><a href="#struct-externalodometrydata"><code>ExternalOdometry</code></a></td><td><a href="#struct-externalodometrydata"><code>ExternalOdometry</code></a></td><td>External pose and twist measurement for estimator input.</td></tr>
+<tr><td><a href="#struct-externalodometrycovariancedata"><code>ExternalOdometryCovariance</code></a></td><td><a href="#struct-externalodometrycovariancedata"><code>ExternalOdometryCovariance</code></a></td><td>Optional external odometry covariance companion.</td></tr>
+<tr><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td>Raw motion-capture marker and rigid-body samples.</td></tr>
+<tr><td><a href="#struct-locksteptickdata"><code>LockstepTick</code></a></td><td><a href="#struct-locksteptickdata"><code>LockstepTick</code></a></td><td>Deterministic simulation barrier tick.</td></tr>
+<tr><td><a href="#struct-lockstepstatusdata"><code>LockstepStatus</code></a></td><td><a href="#struct-lockstepstatusdata"><code>LockstepStatus</code></a></td><td>Deterministic simulation participant status.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2012,8 +2337,10 @@
 <tr><td><code>struct</code></td><td><a href="#struct-vec2f"><code>Vec2f</code></a></td><td>Two-component float vector used for planar rates, flow, and image motion.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-vec3f"><code>Vec3f</code></a></td><td>Three-component float vector used for ENU world vectors and FLU body vectors.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-quaternionf"><code>Quaternionf</code></a></td><td>Unit quaternion in Hamilton convention, component order w, x, y, z. It rotates body-frame FLU vectors into the world ENU frame: v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-rotationmatrix3f"><code>RotationMatrix3f</code></a></td><td>Row-major 3x3 rotation matrix.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-ratetriplet"><code>RateTriplet</code></a></td><td>Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>CovarianceUpperTriangle21f</code></a></td><td>Upper-triangular 6x6 covariance matrix stored row-major as 21 float values. State order is x, y, z translation followed by rotation about x, y, z.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>CovarianceUpperTriangle78f</code></a></td><td>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. For external odometry covariance the tangent-state order is attitude perturbation, velocity, position, angular velocity.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-severity"><code>Severity</code></a></td><td>Text and diagnostic severity levels following RFC 5424 syslog numbering.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-commandresultcode"><code>CommandResultCode</code></a></td><td>Result of command or transfer request execution.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-gnssfixtype"><code>GnssFixType</code></a></td><td>GNSS receiver fix quality.</td></tr>
@@ -2023,7 +2350,6 @@
 <tr><td><code>enum</code></td><td><a href="#enum-missionstate"><code>MissionState</code></a></td><td>Mission execution state.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-geoaltitudeframe"><code>GeoAltitudeFrame</code></a></td><td>Altitude reference frame for geographic commands and mission items.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-localframe"><code>LocalFrame</code></a></td><td>Local coordinate frame selector for local-frame commands.</td></tr>
-<tr><td><code>enum</code></td><td><a href="#enum-referenceframe"><code>ReferenceFrame</code></a></td><td>Reference frame identifiers for odometry and pose products.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-topicid"><code>TopicId</code></a></td><td>Stable numeric identifiers for well-known Synapse topics. Values are contiguous and mirror the SynapseMessage union order in transport.fbs.</td></tr>
 </tbody>
 </table>
@@ -2077,6 +2403,28 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-rotationmatrix3f"><a class="header" href="#struct-rotationmatrix3f"><code>struct</code> RotationMatrix3f</a></h1>
+<p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
+<p>Row-major 3x3 rotation matrix.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>r11</code></td><td><code>float</code></td><td></td><td>Row 1, column 1.</td></tr>
+<tr><td><code>r12</code></td><td><code>float</code></td><td></td><td>Row 1, column 2.</td></tr>
+<tr><td><code>r13</code></td><td><code>float</code></td><td></td><td>Row 1, column 3.</td></tr>
+<tr><td><code>r21</code></td><td><code>float</code></td><td></td><td>Row 2, column 1.</td></tr>
+<tr><td><code>r22</code></td><td><code>float</code></td><td></td><td>Row 2, column 2.</td></tr>
+<tr><td><code>r23</code></td><td><code>float</code></td><td></td><td>Row 2, column 3.</td></tr>
+<tr><td><code>r31</code></td><td><code>float</code></td><td></td><td>Row 3, column 1.</td></tr>
+<tr><td><code>r32</code></td><td><code>float</code></td><td></td><td>Row 3, column 2.</td></tr>
+<tr><td><code>r33</code></td><td><code>float</code></td><td></td><td>Row 3, column 3.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-ratetriplet"><a class="header" href="#struct-ratetriplet"><code>struct</code> RateTriplet</a></h1>
 <p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
 <p>Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.</p>
@@ -2123,6 +2471,97 @@
 <tr><td><code>c18</code></td><td><code>float</code></td><td></td><td>Matrix element (4,4).</td></tr>
 <tr><td><code>c19</code></td><td><code>float</code></td><td></td><td>Matrix element (4,5).</td></tr>
 <tr><td><code>c20</code></td><td><code>float</code></td><td></td><td>Matrix element (5,5).</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-covarianceuppertriangle78f"><a class="header" href="#struct-covarianceuppertriangle78f"><code>struct</code> CovarianceUpperTriangle78f</a></h1>
+<p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
+<p>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. For external odometry covariance the tangent-state order is attitude perturbation, velocity, position, angular velocity.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>c0</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 0.</td></tr>
+<tr><td><code>c1</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 1.</td></tr>
+<tr><td><code>c2</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 2.</td></tr>
+<tr><td><code>c3</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 3.</td></tr>
+<tr><td><code>c4</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 4.</td></tr>
+<tr><td><code>c5</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 5.</td></tr>
+<tr><td><code>c6</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 6.</td></tr>
+<tr><td><code>c7</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 7.</td></tr>
+<tr><td><code>c8</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 8.</td></tr>
+<tr><td><code>c9</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 9.</td></tr>
+<tr><td><code>c10</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 10.</td></tr>
+<tr><td><code>c11</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 11.</td></tr>
+<tr><td><code>c12</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 12.</td></tr>
+<tr><td><code>c13</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 13.</td></tr>
+<tr><td><code>c14</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 14.</td></tr>
+<tr><td><code>c15</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 15.</td></tr>
+<tr><td><code>c16</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 16.</td></tr>
+<tr><td><code>c17</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 17.</td></tr>
+<tr><td><code>c18</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 18.</td></tr>
+<tr><td><code>c19</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 19.</td></tr>
+<tr><td><code>c20</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 20.</td></tr>
+<tr><td><code>c21</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 21.</td></tr>
+<tr><td><code>c22</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 22.</td></tr>
+<tr><td><code>c23</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 23.</td></tr>
+<tr><td><code>c24</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 24.</td></tr>
+<tr><td><code>c25</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 25.</td></tr>
+<tr><td><code>c26</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 26.</td></tr>
+<tr><td><code>c27</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 27.</td></tr>
+<tr><td><code>c28</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 28.</td></tr>
+<tr><td><code>c29</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 29.</td></tr>
+<tr><td><code>c30</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 30.</td></tr>
+<tr><td><code>c31</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 31.</td></tr>
+<tr><td><code>c32</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 32.</td></tr>
+<tr><td><code>c33</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 33.</td></tr>
+<tr><td><code>c34</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 34.</td></tr>
+<tr><td><code>c35</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 35.</td></tr>
+<tr><td><code>c36</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 36.</td></tr>
+<tr><td><code>c37</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 37.</td></tr>
+<tr><td><code>c38</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 38.</td></tr>
+<tr><td><code>c39</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 39.</td></tr>
+<tr><td><code>c40</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 40.</td></tr>
+<tr><td><code>c41</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 41.</td></tr>
+<tr><td><code>c42</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 42.</td></tr>
+<tr><td><code>c43</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 43.</td></tr>
+<tr><td><code>c44</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 44.</td></tr>
+<tr><td><code>c45</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 45.</td></tr>
+<tr><td><code>c46</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 46.</td></tr>
+<tr><td><code>c47</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 47.</td></tr>
+<tr><td><code>c48</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 48.</td></tr>
+<tr><td><code>c49</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 49.</td></tr>
+<tr><td><code>c50</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 50.</td></tr>
+<tr><td><code>c51</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 51.</td></tr>
+<tr><td><code>c52</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 52.</td></tr>
+<tr><td><code>c53</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 53.</td></tr>
+<tr><td><code>c54</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 54.</td></tr>
+<tr><td><code>c55</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 55.</td></tr>
+<tr><td><code>c56</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 56.</td></tr>
+<tr><td><code>c57</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 57.</td></tr>
+<tr><td><code>c58</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 58.</td></tr>
+<tr><td><code>c59</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 59.</td></tr>
+<tr><td><code>c60</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 60.</td></tr>
+<tr><td><code>c61</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 61.</td></tr>
+<tr><td><code>c62</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 62.</td></tr>
+<tr><td><code>c63</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 63.</td></tr>
+<tr><td><code>c64</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 64.</td></tr>
+<tr><td><code>c65</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 65.</td></tr>
+<tr><td><code>c66</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 66.</td></tr>
+<tr><td><code>c67</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 67.</td></tr>
+<tr><td><code>c68</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 68.</td></tr>
+<tr><td><code>c69</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 69.</td></tr>
+<tr><td><code>c70</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 70.</td></tr>
+<tr><td><code>c71</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 71.</td></tr>
+<tr><td><code>c72</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 72.</td></tr>
+<tr><td><code>c73</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 73.</td></tr>
+<tr><td><code>c74</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 74.</td></tr>
+<tr><td><code>c75</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 75.</td></tr>
+<tr><td><code>c76</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 76.</td></tr>
+<tr><td><code>c77</code></td><td><code>float</code></td><td></td><td>Upper-triangular covariance element 77.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2305,25 +2744,6 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="enum-referenceframe"><a class="header" href="#enum-referenceframe"><code>enum</code> ReferenceFrame</a></h1>
-<p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
-<p><strong>Backing type:</strong> <code>ubyte</code></p>
-<p>Reference frame identifiers for odometry and pose products.</p>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
-</thead>
-<tbody>
-<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Frame is not reported.</td></tr>
-<tr><td><code>LocalEnu</code></td><td><code>1</code></td><td>Local ENU frame anchored at the active local origin.</td></tr>
-<tr><td><code>BodyFlu</code></td><td><code>2</code></td><td>Vehicle body FLU frame.</td></tr>
-<tr><td><code>MapEnu</code></td><td><code>3</code></td><td>Persistent map ENU frame.</td></tr>
-<tr><td><code>MocapEnu</code></td><td><code>4</code></td><td>Motion-capture system ENU frame.</td></tr>
-</tbody>
-</table>
-</div>
-<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="enum-topicid"><a class="header" href="#enum-topicid"><code>enum</code> TopicId</a></h1>
 <p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
 <p><strong>Backing type:</strong> <code>ushort</code></p>
@@ -2356,17 +2776,18 @@
 <tr><td><code>AttitudeCommand</code></td><td><code>19</code></td><td>Attitude setpoint with optional body-rate and thrust feed-forward.</td></tr>
 <tr><td><code>RateCommand</code></td><td><code>20</code></td><td>Body-rate setpoint with thrust feed-forward.</td></tr>
 <tr><td><code>LocalPositionCommand</code></td><td><code>21</code></td><td>Local ENU position/velocity/acceleration/yaw setpoint.</td></tr>
-<tr><td><code>VehicleCommand</code></td><td><code>22</code></td><td>Generic command with floating-point arguments.</td></tr>
-<tr><td><code>GeoCommand</code></td><td><code>23</code></td><td>Geographic command with scaled latitude/longitude precision.</td></tr>
-<tr><td><code>CommandResult</code></td><td><code>24</code></td><td>Result and progress for a previously issued command or request.</td></tr>
-<tr><td><code>ActuatorCommand</code></td><td><code>25</code></td><td>Normalized actuator control request.</td></tr>
-<tr><td><code>ActuatorFeedback</code></td><td><code>26</code></td><td>Normalized actuator output feedback.</td></tr>
-<tr><td><code>PwmSignalOutputs</code></td><td><code>27</code></td><td>Raw PWM output pulse widths.</td></tr>
-<tr><td><code>ControlLoopMetrics</code></td><td><code>28</code></td><td>Control-loop timing, overrun, and load telemetry.</td></tr>
-<tr><td><code>TextStatus</code></td><td><code>29</code></td><td>Human-readable status or diagnostic text.</td></tr>
-<tr><td><code>GcsStatus</code></td><td><code>30</code></td><td>Compact vehicle status aggregate for low-rate ground-control links.</td></tr>
-<tr><td><code>MocapFrame</code></td><td><code>31</code></td><td>Motion-capture samples for one capture timestamp.</td></tr>
-<tr><td><code>MocapDefinition</code></td><td><code>32</code></td><td>Cached motion-capture object definitions.</td></tr>
+<tr><td><code>TrajectorySegment</code></td><td><code>22</code></td><td>Fixed-layout Bezier or polynomial trajectory segment setpoint.</td></tr>
+<tr><td><code>ActuatorCommand</code></td><td><code>23</code></td><td>Normalized actuator control request.</td></tr>
+<tr><td><code>ActuatorFeedback</code></td><td><code>24</code></td><td>Normalized actuator output feedback.</td></tr>
+<tr><td><code>PwmSignalOutputs</code></td><td><code>25</code></td><td>Raw PWM output pulse widths.</td></tr>
+<tr><td><code>ControlLoopMetrics</code></td><td><code>26</code></td><td>Control-loop timing, overrun, and load telemetry.</td></tr>
+<tr><td><code>TextStatus</code></td><td><code>27</code></td><td>Human-readable status or diagnostic text.</td></tr>
+<tr><td><code>GcsStatus</code></td><td><code>28</code></td><td>Compact vehicle status aggregate for low-rate ground-control links.</td></tr>
+<tr><td><code>ExternalOdometry</code></td><td><code>29</code></td><td>Fixed-layout external pose and twist measurement for estimator input.</td></tr>
+<tr><td><code>ExternalOdometryCovariance</code></td><td><code>30</code></td><td>Optional fixed-layout covariance companion for external odometry.</td></tr>
+<tr><td><code>MocapFrame</code></td><td><code>31</code></td><td>Raw motion-capture marker and rigid-body samples for logging and tooling.</td></tr>
+<tr><td><code>LockstepTick</code></td><td><code>32</code></td><td>Deterministic simulation barrier telling a receiver which boot time to reach.</td></tr>
+<tr><td><code>LockstepStatus</code></td><td><code>33</code></td><td>Deterministic simulation participant status and tick completion acknowledgement.</td></tr>
 </tbody>
 </table>
 </div>

@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-6ef17dd2.js";
+            window.path_to_searchindex_js = "../../searchindex-a2e6ee70.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-c9744c58.js"></script>
+        <script src="../../toc-446ba7a2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,14 +180,16 @@
                     <main>
                         <h1 id="table-paramgetrequest"><a class="header" href="#table-paramgetrequest"><code>table</code> ParamGetRequest</a></h1>
 <p><a href="../transfer.html">fbs/transfer.fbs</a> / <a href="../../fbs/transfer.fbs">Source schema</a></p>
-<p>Request one parameter by name, or all parameters when name is absent. Served as a Zenoh queryable on the cmd key space.</p>
+<p>Request one parameter by name, or a paged catalog chunk when name is absent. Served as a Zenoh queryable on the cmd key space.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>name</code></td><td><code>string</code></td><td></td><td>Parameter name to fetch; absent or empty requests all parameters.</td></tr>
+<tr><td><code>name</code></td><td><code>string</code></td><td></td><td>Parameter name to fetch; absent or empty requests the catalog page.</td></tr>
+<tr><td><code>offset</code></td><td><code>uint</code></td><td></td><td>First parameter index requested for paged catalog reads.</td></tr>
+<tr><td><code>limit</code></td><td><code>ushort</code></td><td></td><td>Maximum number of parameter values requested.</td></tr>
 </tbody>
 </table>
 </div>
