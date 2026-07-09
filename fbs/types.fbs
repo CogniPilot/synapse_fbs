@@ -13,8 +13,8 @@
 // command, and control payloads are structs so that shared memory, Zenoh
 // values, radio frames, and log messages all carry identical bytes. Little
 // endian byte order is a protocol requirement. Use tables only for
-// FlatBuffers roots, unions, cached definition records, request/reply
-// payloads, or naturally variable-size data.
+// FlatBuffers roots, unions, request/reply payloads, or naturally
+// variable-size data.
 //
 // Field validity uses one schema-defined flags bitmask per message. Sentinel
 // values are never used; zero-means-unavailable is allowed only where zero is
@@ -43,6 +43,19 @@ struct Quaternionf {
   x:float; // Vector X component.
   y:float; // Vector Y component.
   z:float; // Vector Z component.
+}
+
+// Row-major 3x3 rotation matrix.
+struct RotationMatrix3f {
+  r11:float; // Row 1, column 1.
+  r12:float; // Row 1, column 2.
+  r13:float; // Row 1, column 3.
+  r21:float; // Row 2, column 1.
+  r22:float; // Row 2, column 2.
+  r23:float; // Row 2, column 3.
+  r31:float; // Row 3, column 1.
+  r32:float; // Row 3, column 2.
+  r33:float; // Row 3, column 3.
 }
 
 // Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.
@@ -76,6 +89,90 @@ struct CovarianceUpperTriangle21f {
   c18:float; // Matrix element (4,4).
   c19:float; // Matrix element (4,5).
   c20:float; // Matrix element (5,5).
+}
+
+// Upper-triangular 12x12 covariance matrix stored row-major as 78 float
+// values. For external odometry covariance the tangent-state order is
+// attitude perturbation, velocity, position, angular velocity.
+struct CovarianceUpperTriangle78f {
+  c0:float; // Upper-triangular covariance element 0.
+  c1:float; // Upper-triangular covariance element 1.
+  c2:float; // Upper-triangular covariance element 2.
+  c3:float; // Upper-triangular covariance element 3.
+  c4:float; // Upper-triangular covariance element 4.
+  c5:float; // Upper-triangular covariance element 5.
+  c6:float; // Upper-triangular covariance element 6.
+  c7:float; // Upper-triangular covariance element 7.
+  c8:float; // Upper-triangular covariance element 8.
+  c9:float; // Upper-triangular covariance element 9.
+  c10:float; // Upper-triangular covariance element 10.
+  c11:float; // Upper-triangular covariance element 11.
+  c12:float; // Upper-triangular covariance element 12.
+  c13:float; // Upper-triangular covariance element 13.
+  c14:float; // Upper-triangular covariance element 14.
+  c15:float; // Upper-triangular covariance element 15.
+  c16:float; // Upper-triangular covariance element 16.
+  c17:float; // Upper-triangular covariance element 17.
+  c18:float; // Upper-triangular covariance element 18.
+  c19:float; // Upper-triangular covariance element 19.
+  c20:float; // Upper-triangular covariance element 20.
+  c21:float; // Upper-triangular covariance element 21.
+  c22:float; // Upper-triangular covariance element 22.
+  c23:float; // Upper-triangular covariance element 23.
+  c24:float; // Upper-triangular covariance element 24.
+  c25:float; // Upper-triangular covariance element 25.
+  c26:float; // Upper-triangular covariance element 26.
+  c27:float; // Upper-triangular covariance element 27.
+  c28:float; // Upper-triangular covariance element 28.
+  c29:float; // Upper-triangular covariance element 29.
+  c30:float; // Upper-triangular covariance element 30.
+  c31:float; // Upper-triangular covariance element 31.
+  c32:float; // Upper-triangular covariance element 32.
+  c33:float; // Upper-triangular covariance element 33.
+  c34:float; // Upper-triangular covariance element 34.
+  c35:float; // Upper-triangular covariance element 35.
+  c36:float; // Upper-triangular covariance element 36.
+  c37:float; // Upper-triangular covariance element 37.
+  c38:float; // Upper-triangular covariance element 38.
+  c39:float; // Upper-triangular covariance element 39.
+  c40:float; // Upper-triangular covariance element 40.
+  c41:float; // Upper-triangular covariance element 41.
+  c42:float; // Upper-triangular covariance element 42.
+  c43:float; // Upper-triangular covariance element 43.
+  c44:float; // Upper-triangular covariance element 44.
+  c45:float; // Upper-triangular covariance element 45.
+  c46:float; // Upper-triangular covariance element 46.
+  c47:float; // Upper-triangular covariance element 47.
+  c48:float; // Upper-triangular covariance element 48.
+  c49:float; // Upper-triangular covariance element 49.
+  c50:float; // Upper-triangular covariance element 50.
+  c51:float; // Upper-triangular covariance element 51.
+  c52:float; // Upper-triangular covariance element 52.
+  c53:float; // Upper-triangular covariance element 53.
+  c54:float; // Upper-triangular covariance element 54.
+  c55:float; // Upper-triangular covariance element 55.
+  c56:float; // Upper-triangular covariance element 56.
+  c57:float; // Upper-triangular covariance element 57.
+  c58:float; // Upper-triangular covariance element 58.
+  c59:float; // Upper-triangular covariance element 59.
+  c60:float; // Upper-triangular covariance element 60.
+  c61:float; // Upper-triangular covariance element 61.
+  c62:float; // Upper-triangular covariance element 62.
+  c63:float; // Upper-triangular covariance element 63.
+  c64:float; // Upper-triangular covariance element 64.
+  c65:float; // Upper-triangular covariance element 65.
+  c66:float; // Upper-triangular covariance element 66.
+  c67:float; // Upper-triangular covariance element 67.
+  c68:float; // Upper-triangular covariance element 68.
+  c69:float; // Upper-triangular covariance element 69.
+  c70:float; // Upper-triangular covariance element 70.
+  c71:float; // Upper-triangular covariance element 71.
+  c72:float; // Upper-triangular covariance element 72.
+  c73:float; // Upper-triangular covariance element 73.
+  c74:float; // Upper-triangular covariance element 74.
+  c75:float; // Upper-triangular covariance element 75.
+  c76:float; // Upper-triangular covariance element 76.
+  c77:float; // Upper-triangular covariance element 77.
 }
 
 // Text and diagnostic severity levels following RFC 5424 syslog numbering.
@@ -166,15 +263,6 @@ enum LocalFrame:ubyte {
   BodyFlu = 1, // Vehicle body FLU frame.
 }
 
-// Reference frame identifiers for odometry and pose products.
-enum ReferenceFrame:ubyte {
-  Unknown = 0, // Frame is not reported.
-  LocalEnu = 1, // Local ENU frame anchored at the active local origin.
-  BodyFlu = 2, // Vehicle body FLU frame.
-  MapEnu = 3, // Persistent map ENU frame.
-  MocapEnu = 4, // Motion-capture system ENU frame.
-}
-
 namespace synapse.topic;
 
 // Stable numeric identifiers for well-known Synapse topics. Values are
@@ -202,15 +290,16 @@ enum TopicId:ushort {
   AttitudeCommand = 19, // Attitude setpoint with optional body-rate and thrust feed-forward.
   RateCommand = 20, // Body-rate setpoint with thrust feed-forward.
   LocalPositionCommand = 21, // Local ENU position/velocity/acceleration/yaw setpoint.
-  VehicleCommand = 22, // Generic command with floating-point arguments.
-  GeoCommand = 23, // Geographic command with scaled latitude/longitude precision.
-  CommandResult = 24, // Result and progress for a previously issued command or request.
-  ActuatorCommand = 25, // Normalized actuator control request.
-  ActuatorFeedback = 26, // Normalized actuator output feedback.
-  PwmSignalOutputs = 27, // Raw PWM output pulse widths.
-  ControlLoopMetrics = 28, // Control-loop timing, overrun, and load telemetry.
-  TextStatus = 29, // Human-readable status or diagnostic text.
-  GcsStatus = 30, // Compact vehicle status aggregate for low-rate ground-control links.
-  MocapFrame = 31, // Motion-capture samples for one capture timestamp.
-  MocapDefinition = 32, // Cached motion-capture object definitions.
+  TrajectorySegment = 22, // Fixed-layout Bezier or polynomial trajectory segment setpoint.
+  ActuatorCommand = 23, // Normalized actuator control request.
+  ActuatorFeedback = 24, // Normalized actuator output feedback.
+  PwmSignalOutputs = 25, // Raw PWM output pulse widths.
+  ControlLoopMetrics = 26, // Control-loop timing, overrun, and load telemetry.
+  TextStatus = 27, // Human-readable status or diagnostic text.
+  GcsStatus = 28, // Compact vehicle status aggregate for low-rate ground-control links.
+  ExternalOdometry = 29, // Fixed-layout external pose and twist measurement for estimator input.
+  ExternalOdometryCovariance = 30, // Optional fixed-layout covariance companion for external odometry.
+  MocapFrame = 31, // Raw motion-capture marker and rigid-body samples for logging and tooling.
+  LockstepTick = 32, // Deterministic simulation barrier telling a receiver which boot time to reach.
+  LockstepStatus = 33, // Deterministic simulation participant status and tick completion acknowledgement.
 }

@@ -33,6 +33,10 @@
       "key": {{ command.key|tojson }},
       "request_type": {{ command.request_type|tojson }},
       "reply_type": {{ command.reply_type|tojson }},
+      "request_encoding": {{ command.request_encoding|tojson }},
+      "request_size": {{ command.request_size|tojson }},
+      "reply_encoding": {{ command.reply_encoding|tojson }},
+      "reply_size": {{ command.reply_size|tojson }},
       "description": {{ command.description|tojson }}
     }{% if not loop.last %},{% endif %}
 {%- endfor %}

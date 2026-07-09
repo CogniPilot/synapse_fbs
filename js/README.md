@@ -25,7 +25,7 @@ Runtime protocol payloads prioritize fixed memory layout. Telemetry, state,
 command, and control samples are modeled as FlatBuffers structs where possible
 so chip-to-chip shared-memory transports can use the payload layout directly.
 Tables, strings, and vectors are reserved for root wrappers, transfer
-request/reply messages, cached definitions, or naturally variable-size data.
+request/reply messages, or naturally variable-size data.
 Logging uses MCAP with the shipped `.bfbs` reflection schemas.
 
 Unlike the Rust and Python packages, this package does **not** ship generated

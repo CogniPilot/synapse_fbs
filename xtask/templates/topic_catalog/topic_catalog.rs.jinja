@@ -36,6 +36,14 @@ pub struct CommandInfo {
     pub request_type: &'static str,
     /// Fully qualified FlatBuffers reply type.
     pub reply_type: &'static str,
+    /// Canonical request payload encoding: "struct" or "table".
+    pub request_encoding: &'static str,
+    /// Fixed request payload size in bytes when request_encoding is "struct".
+    pub request_size: Option<usize>,
+    /// Canonical reply payload encoding: "struct" or "table".
+    pub reply_encoding: &'static str,
+    /// Fixed reply payload size in bytes when reply_encoding is "struct".
+    pub reply_size: Option<usize>,
     pub description: &'static str,
 }
 
@@ -78,6 +86,10 @@ pub const COMMANDS: &[CommandInfo] = &[
         key: {{ command.key_literal }},
         request_type: {{ command.request_type_literal }},
         reply_type: {{ command.reply_type_literal }},
+        request_encoding: {{ command.request_encoding_literal }},
+        request_size: {{ command.request_size_rust }},
+        reply_encoding: {{ command.reply_encoding_literal }},
+        reply_size: {{ command.reply_size_rust }},
         description: {{ command.description_literal }},
     },
 {%- endfor %}

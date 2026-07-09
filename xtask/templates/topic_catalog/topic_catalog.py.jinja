@@ -32,6 +32,10 @@ class CommandInfo:
     key: str
     request_type: str
     reply_type: str
+    request_encoding: str
+    request_size: Optional[int]
+    reply_encoding: str
+    reply_size: Optional[int]
     description: str
 
 
@@ -70,6 +74,10 @@ COMMANDS = (
         key={{ command.key_literal }},
         request_type={{ command.request_type_literal }},
         reply_type={{ command.reply_type_literal }},
+        request_encoding={{ command.request_encoding_literal }},
+        request_size={{ command.request_size_python }},
+        reply_encoding={{ command.reply_encoding_literal }},
+        reply_size={{ command.reply_size_python }},
         description={{ command.description_literal }},
     ),
 {%- endfor %}

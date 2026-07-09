@@ -23,10 +23,6 @@ pub mod cmd {
     pub use crate::generated::synapse::cmd::*;
 }
 
-pub mod sil {
-    pub use crate::generated::synapse::sil::*;
-}
-
 pub mod schemas;
 pub mod topic_catalog;
 pub mod topic_decode;
