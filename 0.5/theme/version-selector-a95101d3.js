@@ -5,7 +5,7 @@
     { dir: "0.4", label: "0.4" },
     { dir: "0.3", label: "0.3" },
   ];
-  const current = "0.3";
+  const current = "0.5";
   function docsBaseUrl() {
     const script = document.currentScript || document.querySelector('script[src*="version-selector"]');
     if (!script) {

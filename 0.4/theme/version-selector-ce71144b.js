@@ -1,6 +1,7 @@
 (function () {
   const versions = [
     { dir: "main", label: "main (development)" },
+    { dir: "0.5", label: "0.5" },
     { dir: "0.4", label: "0.4" },
     { dir: "0.3", label: "0.3" },
   ];
