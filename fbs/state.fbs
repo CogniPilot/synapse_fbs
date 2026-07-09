@@ -43,14 +43,11 @@ enum LocalPositionFlags:ubyte (bit_flags) {
 }
 
 // Field-validity bits for ExternalOdometryData.flags.
-enum ExternalOdometryFlags:ushort (bit_flags) {
+enum ExternalOdometryFlags:ubyte (bit_flags) {
   PositionValid, // position_enu_m is meaningful.
   AttitudeValid, // attitude is meaningful.
   LinearVelocityValid, // linear_velocity_enu_m_s is meaningful.
   AngularVelocityValid, // angular_velocity_flu_rad_s is meaningful.
-  PoseStddevValid, // Position and attitude standard-deviation fields are meaningful.
-  TwistStddevValid, // Linear and angular velocity standard-deviation fields are meaningful.
-  LatencyValid, // latency_us is meaningful.
   Extrapolated, // State was predicted without a current accepted mocap correction.
   OutlierRejected, // A current mocap update was rejected by innovation gates.
   Degraded, // State is usable but tracking quality or uncertainty is degraded.
@@ -162,40 +159,29 @@ struct OdometryEstimateData {
 }
 
 // External pose and twist measurement for estimator input. Pose is expressed
-// in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. The
-// timestamp is the estimate timestamp; the last accepted mocap capture
-// timestamp is carried separately for dropout handling.
+// in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU.
+// This is the compact high-rate path; uncertainty and estimator diagnostics
+// are opt-in companion topics.
 struct ExternalOdometryData {
   timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
-  last_mocap_timestamp_us:ulong; // Last accepted mocap measurement timestamp in monotonic boot time.
-  latency_us:uint; // Producer-estimated estimate-to-publication latency or state age.
-  extrapolation_us:uint; // Time since last accepted mocap correction.
-  sequence:uint; // Producer sequence for loss/reorder detection.
   position_enu_m:synapse.types.Vec3f; // Measured local/world position in ENU.
   attitude:synapse.types.Quaternionf; // Measured orientation rotating body FLU vectors into ENU.
   linear_velocity_enu_m_s:synapse.types.Vec3f; // Measured linear velocity in ENU.
   angular_velocity_flu_rad_s:synapse.types.RateTriplet; // Measured angular velocity in body FLU.
-  position_stddev_enu_m:synapse.types.Vec3f; // One-sigma position uncertainty in ENU.
-  attitude_stddev_rad:synapse.types.Vec3f; // One-sigma roll, pitch, and yaw uncertainty in radians.
-  linear_velocity_stddev_enu_m_s:synapse.types.Vec3f; // One-sigma linear velocity uncertainty in ENU.
-  angular_velocity_stddev_flu_rad_s:synapse.types.RateTriplet; // One-sigma angular velocity uncertainty in body FLU.
-  tracking_quality_pct:ubyte; // Tracking or solve quality from 0 to 100.
+  flags:ExternalOdometryFlags; // Bitmask of ExternalOdometryFlags bits.
   status:ExternalOdometryStatus; // Producer state quality and extrapolation status.
-  frames_since_last_mocap_count:ushort; // Prediction-only frame count since the last accepted mocap correction.
-  flags:ushort; // Bitmask of ExternalOdometryFlags bits.
   source_id:ubyte; // External source instance identifier.
   id:ubyte; // Tracked rigid-body instance identifier; also the instance segment of the Zenoh key.
 }
 
 // Optional covariance companion for ExternalOdometryData. Publish this only when
 // consumers subscribe to the covariance topic or request estimator diagnostics;
-// the high-rate external odometry topic carries diagonal stddevs. The
-// covariance is over the 12D tangent state [theta, velocity, position,
-// angular_velocity], where theta is the attitude perturbation in the body-FLU
-// tangent and velocity/position are ENU.
+// the high-rate external odometry topic carries only pose/twist. The covariance
+// is over the 12D tangent state [theta, velocity, position, angular_velocity],
+// where theta is the attitude perturbation in the body-FLU tangent and
+// velocity/position are ENU.
 struct ExternalOdometryCovarianceData {
   timestamp_us:ulong; // Estimate timestamp matching ExternalOdometryData.timestamp_us.
-  sequence:uint; // Producer sequence matching ExternalOdometryData.sequence.
   covariance:synapse.types.CovarianceUpperTriangle78f; // Upper-triangular covariance for the 12D tangent state.
   source_id:ubyte; // External source instance identifier.
   id:ubyte; // Tracked rigid-body instance identifier.

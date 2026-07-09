@@ -184,13 +184,14 @@ Schema and protocol requirements:
   without per-frame strings.
 - The estimator input must be a fixed-layout external odometry topic, not a
   variable-size capture-system frame table.
-- The odometry payload must include timestamp, sequence, source id,
-  rigid-body id, position, attitude, validity flags, optional linear/angular
-  velocity, and compact diagonal uncertainty.
+- The odometry payload must include timestamp, source id, rigid-body id,
+  position, attitude, linear velocity, angular velocity, validity flags, and
+  compact producer status. It must not carry default uncertainty fields in the
+  high-rate control path.
 - Derived mocap state estimation uses a 12D tangent state, not a default
   acceleration-augmented state: attitude perturbation, velocity, position, and
-  body angular velocity. Full covariance is optional and uses a separate
-  covariance topic so high-rate consumers can ignore it.
+  body angular velocity. Uncertainty is optional and uses a separate covariance
+  topic so high-rate consumers can ignore it.
 - Frame identifiers are not carried in high-rate payloads: pose and linear
   velocity are ENU, angular velocity is body FLU, and bridges transform before
   publishing.
