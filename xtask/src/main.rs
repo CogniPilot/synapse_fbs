@@ -23,6 +23,7 @@ const SCHEMAS: &[&str] = &[
     "fbs/trajectory.fbs",
     "fbs/transport.fbs",
     "fbs/transfer.fbs",
+    "fbs/firmware.fbs",
     "fbs/all.fbs",
 ];
 
@@ -77,6 +78,48 @@ const COMMANDS: &[(u16, &str, &str, &str, &str)] = &[
         "synapse.cmd.TrajectorySetRequest",
         "synapse.cmd.TrajectorySetReply",
         "Replace or patch a trajectory in bounded chunks.",
+    ),
+    (
+        7,
+        "firmware_info",
+        "synapse.cmd.FirmwareInfoRequest",
+        "synapse.cmd.FirmwareInfoReply",
+        "Fetch firmware/update capabilities.",
+    ),
+    (
+        8,
+        "firmware_status",
+        "synapse.cmd.FirmwareStatusRequest",
+        "synapse.cmd.FirmwareStatusReply",
+        "Fetch firmware update state/progress.",
+    ),
+    (
+        9,
+        "firmware_prepare",
+        "synapse.cmd.FirmwarePrepareRequest",
+        "synapse.cmd.FirmwarePrepareReply",
+        "Prepare a maintenance-mode firmware update.",
+    ),
+    (
+        10,
+        "firmware_chunk",
+        "synapse.cmd.FirmwareChunkRequest",
+        "synapse.cmd.FirmwareChunkReply",
+        "Transfer one staged firmware image chunk.",
+    ),
+    (
+        11,
+        "firmware_commit",
+        "synapse.cmd.FirmwareCommitRequest",
+        "synapse.cmd.FirmwareCommitReply",
+        "Commit a staged image for bootloader test boot.",
+    ),
+    (
+        12,
+        "firmware_abort",
+        "synapse.cmd.FirmwareAbortRequest",
+        "synapse.cmd.FirmwareAbortReply",
+        "Abort a staged firmware update.",
     ),
 ];
 
@@ -396,6 +439,9 @@ if (commandByName('mission_set')?.key !== 'synapse/v1/cmd/mission_set') throw ne
 if (commandByName('param_get')?.requestType !== 'synapse.cmd.ParamGetRequest') throw new Error('bad command type');
 if (commandByName('param_get')?.requestEncoding !== 'table') throw new Error('bad command encoding');
 if (commandByName('param_get')?.requestSize !== null) throw new Error('bad command size');
+if (commandByName('firmware_prepare')?.key !== 'synapse/v1/cmd/firmware_prepare') throw new Error('bad firmware command key');
+if (commandByName('firmware_prepare')?.requestType !== 'synapse.cmd.FirmwarePrepareRequest') throw new Error('bad firmware command type');
+if (topicByKey('synapse/v1/topic/firmware_progress')?.id !== 34) throw new Error('bad firmware progress topic');
 console.log('catalog js helpers ok');
 "#;
         run(Command::new("node")
@@ -424,6 +470,9 @@ assert tc.command_by_name("mission_set").key == "synapse/v1/cmd/mission_set"
 assert tc.command_by_name("param_get").request_type == "synapse.cmd.ParamGetRequest"
 assert tc.command_by_name("param_get").request_encoding == "table"
 assert tc.command_by_name("param_get").request_size is None
+assert tc.command_by_name("firmware_prepare").key == "synapse/v1/cmd/firmware_prepare"
+assert tc.command_by_name("firmware_prepare").request_type == "synapse.cmd.FirmwarePrepareRequest"
+assert tc.topic_by_key("synapse/v1/topic/firmware_progress").id == 34
 print("catalog python helpers ok")
 "#;
         run(Command::new(&python)
@@ -529,6 +578,15 @@ int main(void) {
     assert(strcmp(command->request_encoding, "table") == 0 &&
            command->request_size == 0);
 
+    command = synapse_command_by_name("firmware_prepare");
+    assert(command != NULL && command->id == 9 &&
+           strcmp(command->key, "synapse/v1/cmd/firmware_prepare") == 0 &&
+           strcmp(command->request_type,
+                  "synapse.cmd.FirmwarePrepareRequest") == 0);
+
+    topic = synapse_topic_by_key("synapse/v1/topic/firmware_progress");
+    assert(topic != NULL && topic->id == 34 && !topic->fixed_layout);
+
     printf("catalog c helpers ok\n");
     return 0;
 }
@@ -633,9 +691,113 @@ fn main() {
     assert_eq!(command.request_encoding, "table");
     assert_eq!(command.request_size, None);
 
+    let command = command_by_name("firmware_prepare").unwrap();
+    assert_eq!(command.id, 9);
+    assert_eq!(command.key, "synapse/v1/cmd/firmware_prepare");
+    assert_eq!(command.request_type, "synapse.cmd.FirmwarePrepareRequest");
+    let progress = topic_by_key("synapse/v1/topic/firmware_progress").unwrap();
+    assert_eq!(progress.id, 34);
+    assert!(!progress.fixed_layout);
+
     println!("catalog rust helpers ok");
 }
 "#;
+
+/// Generated-binding round trips for the firmware tables used by the GCS and
+/// receiver service. Every release build therefore verifies the field order
+/// and public Rust API without checking generated sources into the repository.
+const RUST_FIRMWARE_ROUNDTRIP_TEST: &str = r##"use flatbuffers::FlatBufferBuilder;
+use synapse_fbs::{
+    cmd::{FirmwarePrepareRequest, FirmwarePrepareRequestArgs, FirmwareUpdateState},
+    topic::{FirmwareProgress, FirmwareProgressArgs},
+    types::CommandResultCode,
+};
+
+#[test]
+fn firmware_prepare_request_round_trips() {
+    let mut builder = FlatBufferBuilder::new();
+    let update_id = builder.create_string("update-42");
+    let target = builder.create_string("cubs2");
+    let board_id = builder.create_string("mr_vmu_tropic");
+    let version = builder.create_string("candidate-1");
+    let image_hash = "a".repeat(64);
+    let selective_hash = "b".repeat(64);
+    let image_sha256 = builder.create_string(&image_hash);
+    let selective_sha256 = builder.create_string(&selective_hash);
+    let signature = builder.create_vector(&[0x10_u8, 0x20, 0x30, 0x40]);
+    let manifest = builder.create_string(r#"{"format":"bin"}"#);
+    let request = FirmwarePrepareRequest::create(
+        &mut builder,
+        &FirmwarePrepareRequestArgs {
+            update_id: Some(update_id),
+            target: Some(target),
+            board_id: Some(board_id),
+            version: Some(version),
+            image_size: 4096,
+            image_sha256: Some(image_sha256),
+            selective_sha256: Some(selective_sha256),
+            requested_chunk_size: 512,
+            chunk_count: 8,
+            signature: Some(signature),
+            manifest: Some(manifest),
+        },
+    );
+    builder.finish(request, None);
+
+    let decoded = flatbuffers::root::<FirmwarePrepareRequest>(builder.finished_data()).unwrap();
+    assert_eq!(decoded.update_id(), Some("update-42"));
+    assert_eq!(decoded.target(), Some("cubs2"));
+    assert_eq!(decoded.board_id(), Some("mr_vmu_tropic"));
+    assert_eq!(decoded.version(), Some("candidate-1"));
+    assert_eq!(decoded.image_size(), 4096);
+    assert_eq!(decoded.image_sha256(), Some(image_hash.as_str()));
+    assert_eq!(decoded.selective_sha256(), Some(selective_hash.as_str()));
+    assert_eq!(decoded.requested_chunk_size(), 512);
+    assert_eq!(decoded.chunk_count(), 8);
+    assert_eq!(
+        decoded.signature().unwrap().iter().collect::<Vec<_>>(),
+        [0x10, 0x20, 0x30, 0x40]
+    );
+    assert_eq!(decoded.manifest(), Some(r#"{"format":"bin"}"#));
+}
+
+#[test]
+fn firmware_progress_round_trips() {
+    let mut builder = FlatBufferBuilder::new();
+    let update_id = builder.create_string("update-42");
+    let message = builder.create_string("chunk accepted");
+    let progress = FirmwareProgress::create(
+        &mut builder,
+        &FirmwareProgressArgs {
+            timestamp_us: 123_456,
+            update_id: Some(update_id),
+            state: FirmwareUpdateState::Receiving,
+            result: CommandResultCode::InProgress,
+            received_bytes: 512,
+            total_bytes: 4096,
+            received_chunks: 1,
+            total_chunks: 8,
+            progress_pct: 12,
+            message: Some(message),
+            result_detail: -7,
+        },
+    );
+    builder.finish(progress, None);
+
+    let decoded = flatbuffers::root::<FirmwareProgress>(builder.finished_data()).unwrap();
+    assert_eq!(decoded.timestamp_us(), 123_456);
+    assert_eq!(decoded.update_id(), Some("update-42"));
+    assert_eq!(decoded.state(), FirmwareUpdateState::Receiving);
+    assert_eq!(decoded.result(), CommandResultCode::InProgress);
+    assert_eq!(decoded.received_bytes(), 512);
+    assert_eq!(decoded.total_bytes(), 4096);
+    assert_eq!(decoded.received_chunks(), 1);
+    assert_eq!(decoded.total_chunks(), 8);
+    assert_eq!(decoded.progress_pct(), 12);
+    assert_eq!(decoded.message(), Some("chunk accepted"));
+    assert_eq!(decoded.result_detail(), -7);
+}
+"##;
 
 fn check_release_version(tools: &Tools, release_name: &str) -> Result<()> {
     // Only enforce for tag builds: GITHUB_REF_NAME is the branch name on
@@ -1242,10 +1404,17 @@ fn write_rust_topic_decode(
 fn check_rust_package(package_root: &Path) -> Result<()> {
     println!("checking Rust crate");
 
+    let tests_dir = package_root.join("tests");
+    fs::create_dir_all(&tests_dir)?;
+    write_file(
+        &tests_dir.join("firmware_roundtrip.rs"),
+        RUST_FIRMWARE_ROUNDTRIP_TEST,
+    )?;
+
     let target_dir = package_root.join("target");
     run(Command::new("cargo")
         .env("CARGO_TARGET_DIR", &target_dir)
-        .arg("check")
+        .arg("test")
         .arg("--manifest-path")
         .arg(package_root.join("Cargo.toml")))?;
 
@@ -1374,8 +1543,11 @@ from synapse import topic_catalog
 from synapse.types.Vec3f import Vec3f
 from synapse.topic.GnssFixData import GnssFixData
 from synapse.cmd.ParamValue import ParamValue
+from synapse.cmd.FirmwarePrepareRequest import FirmwarePrepareRequest
+from synapse.topic.FirmwareProgress import FirmwareProgress
 assert metadata.version("flatbuffers") == "{}"
 assert Vec3f is not None and GnssFixData is not None and ParamValue is not None
+assert FirmwarePrepareRequest is not None and FirmwareProgress is not None
 assert topic_catalog.key_for_topic("VehicleHealth") == "synapse/v1/topic/vehicle_health"
 assert topic_catalog.topic_by_id(1).payload_type == "VehicleHealthData"
 parsed = topic_catalog.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
@@ -1383,6 +1555,8 @@ assert parsed is not None and parsed.namespace == "cub1"
 assert parsed.topic.name == "InertialSample" and parsed.instance == 0
 assert topic_catalog.topic_by_key("cub1/synapse/v1/topic/vehicle_health").id == 1
 assert topic_catalog.command_by_name("param_get").key == "synapse/v1/cmd/param_get"
+assert topic_catalog.command_by_name("firmware_prepare").key == "synapse/v1/cmd/firmware_prepare"
+assert topic_catalog.topic_by_key("synapse/v1/topic/firmware_progress").id == 34
 assert topic_catalog.topic_by_name("GnssFix").payload_size is not None
 "#,
         tools.flatbuffers_version
@@ -1436,6 +1610,8 @@ const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
 if (!parsed || parsed.namespace !== 'cub1' || parsed.topic.name !== 'InertialSample' || parsed.instance !== 0) throw new Error('bad parseKey helper');
 if (topicByKey('cub1/synapse/v1/topic/vehicle_health')?.id !== 1) throw new Error('bad namespaced key lookup');
 if (commandByName('param_get')?.key !== 'synapse/v1/cmd/param_get') throw new Error('bad command helper');
+if (commandByName('firmware_prepare')?.key !== 'synapse/v1/cmd/firmware_prepare') throw new Error('bad firmware command helper');
+if (topicByKey('synapse/v1/topic/firmware_progress')?.id !== 34) throw new Error('bad firmware progress helper');
 console.log('synapse-fbs js package ok');
 "#;
 
@@ -2667,6 +2843,18 @@ fn lint_allowlisted(name: &str) -> bool {
         "sensors_present_ext",
         "sensors_enabled_ext",
         "sensors_health_ext",
+        "max_image_size",
+        "max_chunk_size",
+        "received_bytes",
+        "total_bytes",
+        "received_chunks",
+        "total_chunks",
+        "image_size",
+        "requested_chunk_size",
+        "accepted_chunk_size",
+        "chunk_index",
+        "data",
+        "signature",
     ];
     if EXACT.contains(&name) {
         return true;

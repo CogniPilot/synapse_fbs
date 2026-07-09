@@ -122,8 +122,10 @@ companion data, not part of the default 240 Hz path.
 
 **Commands are queryables, not topics.** A GCS issues
 `get("cub1/synapse/v1/cmd/mission_get", payload)` and receives the matching
-reply table. Parameter, mission, and trajectory transfer all use bounded
-request/reply tables in `fbs/transfer.fbs`. Streaming setpoints
+reply table. Parameter, mission, trajectory, and firmware transfer all use
+bounded request/reply tables. Firmware services use the canonical
+`synapse/v1/cmd/firmware_*` keys, with optional progress published on
+`synapse/v1/topic/firmware_progress`. Streaming setpoints
 (`AttitudeCommand`, `RateCommand`, `LocalPositionCommand`,
 `TrajectorySegment`) remain pub/sub topics.
 
@@ -278,8 +280,10 @@ sizes are computed and checked on every build.
   segments.
 - `fbs/telemetry.fbs`: compact ground-control status aggregate.
 - `fbs/transport.fbs`: optional multiplexed frame and message union.
-- `fbs/transfer.fbs`: parameter, mission, and trajectory queryable
+- `fbs/transfer.fbs`: parameter, mission, trajectory, and firmware queryable
   request/reply messages.
+- `fbs/firmware.fbs`: maintenance-gated firmware capability, staged transfer,
+  commit, abort, status, and progress messages.
 - `fbs/mocap.fbs`: raw motion-capture marker and 6DOF frame data.
 - `fbs/{optical_flow,sim}.fbs`: focused support schemas.
 - `fbs/all.fbs`: aggregate include used by package generation.

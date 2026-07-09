@@ -313,3 +313,38 @@ Success criteria:
   metadata alone.
 - Invalid keys are rejected consistently across Rust, Python, JavaScript, and C
   helpers.
+
+## UC-011: Maintenance-Gated Firmware Update
+
+A ground station stages and activates a firmware image without exposing image
+writes through flight-control topics.
+
+Constraints:
+
+- Updates are permitted only while producer-defined maintenance gates hold.
+- Images are larger than a practical command payload and must be chunked.
+- Chunks may be retried, duplicated, or arrive after an interrupted transfer.
+- The receiver must verify target compatibility and image integrity before
+  activation.
+
+Schema and protocol requirements:
+
+- Capability, status, prepare, chunk, commit, and abort operations are bounded
+  queryable commands under canonical `synapse/v1/cmd/firmware_*` keys.
+- An update id and chunk index make identical chunk retries idempotent; a
+  conflicting retry must be rejected.
+- Prepare and commit carry full-image integrity metadata, while each chunk
+  carries its own integrity value.
+- Replies provide a command result, state, diagnostic detail, and progress.
+- `FirmwareProgress` is an optional table topic for UI and logging; command
+  replies and status queries remain authoritative.
+- Controller tuning uses `ParamSetRequest`; it does not require a
+  firmware- or gain-specific parameter schema.
+
+Success criteria:
+
+- A receiver can safely resume, reject, abort, or complete a staged update.
+- Generated catalogs expose every firmware command and the optional progress
+  topic without hand-maintained routing names.
+- Firmware transfer and ordinary control traffic remain separate protocol
+  surfaces.
