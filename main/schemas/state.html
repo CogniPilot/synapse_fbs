@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a2e6ee70.js";
+            window.path_to_searchindex_js = "../searchindex-5943ecc8.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-446ba7a2.js"></script>
@@ -202,8 +202,8 @@
 <tr><td><code>struct</code></td><td><a href="state/LocalPositionEstimateData.html"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/GlobalPositionEstimateData.html"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/OdometryEstimateData.html"><code>OdometryEstimateData</code></a></td><td>Combined pose, twist, covariance, and estimator metadata.</td></tr>
-<tr><td><code>struct</code></td><td><a href="state/ExternalOdometryData.html"><code>ExternalOdometryData</code></a></td><td>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. The timestamp is the estimate timestamp; the last accepted mocap capture timestamp is carried separately for dropout handling.</td></tr>
-<tr><td><code>struct</code></td><td><a href="state/ExternalOdometryCovarianceData.html"><code>ExternalOdometryCovarianceData</code></a></td><td>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries diagonal stddevs. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/ExternalOdometryData.html"><code>ExternalOdometryData</code></a></td><td>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. This is the compact high-rate path; uncertainty and estimator diagnostics are opt-in companion topics.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/ExternalOdometryCovarianceData.html"><code>ExternalOdometryCovarianceData</code></a></td><td>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries only pose/twist. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/EstimatorHealthData.html"><code>EstimatorHealthData</code></a></td><td>Estimator health and innovation-test summary. The flags field is deliberately producer-defined: estimator status models differ between implementations and are standardized via discovery records, not the schema.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/MissionProgressData.html"><code>MissionProgressData</code></a></td><td>Mission progress and mission database identifiers.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/NavigationTargetData.html"><code>NavigationTargetData</code></a></td><td>Navigation controller target and tracking-error summary. Angles follow REP-0103: zero east, positive counter-clockwise, range -18000 to 18000.</td></tr>
@@ -275,7 +275,7 @@
         <script src="../book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../theme/version-selector-306aff15.js"></script>
+        <script src="../theme/version-selector-66b9cfc5.js"></script>
 
 
 
