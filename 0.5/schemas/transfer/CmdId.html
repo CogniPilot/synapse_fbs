@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-d4961a39.js";
+            window.path_to_searchindex_js = "../../searchindex-2ccb2ae9.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-446ba7a2.js"></script>
+        <script src="../../toc-0b0ecf9a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -195,6 +195,12 @@
 <tr><td><code>MissionSet</code></td><td><code>4</code></td><td>Replace or patch a GPS mission in bounded chunks.</td></tr>
 <tr><td><code>TrajectoryGet</code></td><td><code>5</code></td><td>Fetch a paged trajectory segment chunk.</td></tr>
 <tr><td><code>TrajectorySet</code></td><td><code>6</code></td><td>Replace or patch a trajectory in bounded chunks.</td></tr>
+<tr><td><code>FirmwareInfo</code></td><td><code>7</code></td><td>Fetch firmware/update capabilities.</td></tr>
+<tr><td><code>FirmwareStatus</code></td><td><code>8</code></td><td>Fetch firmware update state/progress.</td></tr>
+<tr><td><code>FirmwarePrepare</code></td><td><code>9</code></td><td>Prepare a maintenance-mode firmware update.</td></tr>
+<tr><td><code>FirmwareChunk</code></td><td><code>10</code></td><td>Transfer one staged firmware image chunk.</td></tr>
+<tr><td><code>FirmwareCommit</code></td><td><code>11</code></td><td>Commit a staged image for bootloader test boot.</td></tr>
+<tr><td><code>FirmwareAbort</code></td><td><code>12</code></td><td>Abort a staged firmware update.</td></tr>
 </tbody>
 </table>
 </div>

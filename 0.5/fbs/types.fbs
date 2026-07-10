@@ -302,4 +302,5 @@ enum TopicId:ushort {
   MocapFrame = 31, // Raw motion-capture marker and rigid-body samples for logging and tooling.
   LockstepTick = 32, // Deterministic simulation barrier telling a receiver which boot time to reach.
   LockstepStatus = 33, // Deterministic simulation participant status and tick completion acknowledgement.
+  FirmwareProgress = 34, // Firmware image transfer, verification, and activation progress.
 }

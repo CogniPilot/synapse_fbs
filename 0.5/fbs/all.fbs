@@ -3,5 +3,6 @@ include "telemetry.fbs";
 include "trajectory.fbs";
 include "transfer.fbs";
 include "sim.fbs";
+include "firmware.fbs";
 
 namespace synapse;
