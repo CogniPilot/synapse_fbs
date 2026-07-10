@@ -41,7 +41,7 @@ table FirmwareInfoReply {
   active_version:string; // Currently active firmware version or build identifier.
   bootloader:string; // Bootloader or update mechanism identifier.
   state:FirmwareUpdateState; // Current firmware update state.
-  maintenance_flags:FirmwareMaintenanceFlags; // Maintenance gates currently satisfied by the producer.
+  maintenance_flags:ushort; // Bitmask of FirmwareMaintenanceFlags bits.
   max_image_size:ulong; // Maximum accepted image size in bytes.
   max_chunk_size:uint; // Maximum accepted chunk payload size in bytes.
   message:string; // Human-readable diagnostic text.
