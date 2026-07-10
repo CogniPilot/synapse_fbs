@@ -364,7 +364,7 @@ consumers. Prefer `find_package` for projects that download, extract, or
 install the release archive as part of their dependency setup:
 
 ```cmake
-find_package(synapse_fbs 0.5.0 CONFIG REQUIRED)
+find_package(synapse_fbs 0.5.1 CONFIG REQUIRED)
 
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
@@ -380,7 +380,7 @@ remains the simplest direct-from-release path:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.5.0)
+set(SYNAPSE_FBS_VERSION 0.5.1)
 
 FetchContent_Declare(
   synapse_fbs
@@ -453,7 +453,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a semantic version tag such as `v0.5.0` publishes a GitHub Release and
+Pushing a semantic version tag such as `v0.5.1` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
@@ -478,7 +478,7 @@ directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes schema documentation to the `gh-pages` branch used
 by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.5.0` updates `/0.5/`. Only the latest patch
+matching minor-version docs, so `v0.5.1` updates `/0.5/`. Only the latest patch
 for each published minor line is kept on GitHub Pages. Exact historical docs can
 be rebuilt from the corresponding tag.
 
