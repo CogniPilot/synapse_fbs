@@ -15,6 +15,12 @@ enum CmdId:ushort {
   MissionSet = 4, // Replace or patch a GPS mission in bounded chunks.
   TrajectoryGet = 5, // Fetch a paged trajectory segment chunk.
   TrajectorySet = 6, // Replace or patch a trajectory in bounded chunks.
+  FirmwareInfo = 7, // Fetch firmware/update capabilities.
+  FirmwareStatus = 8, // Fetch firmware update state/progress.
+  FirmwarePrepare = 9, // Prepare a maintenance-mode firmware update.
+  FirmwareChunk = 10, // Transfer one staged firmware image chunk.
+  FirmwareCommit = 11, // Commit a staged image for bootloader test boot.
+  FirmwareAbort = 12, // Abort a staged firmware update.
 }
 
 // Value type carried by a ParamValue record.
