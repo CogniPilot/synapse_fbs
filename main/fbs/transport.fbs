@@ -7,6 +7,7 @@ include "mocap.fbs";
 include "telemetry.fbs";
 include "sim.fbs";
 include "trajectory.fbs";
+include "firmware.fbs";
 
 namespace synapse.topic;
 
@@ -54,6 +55,7 @@ union SynapseMessage {
   MocapFrame, // Raw motion-capture marker and rigid-body samples.
   LockstepTick, // Deterministic simulation barrier tick.
   LockstepStatus, // Deterministic simulation participant status.
+  FirmwareProgress, // Firmware image transfer, verification, and activation progress.
 }
 
 // Fixed-layout header carried by the optional multiplexed Frame transport.

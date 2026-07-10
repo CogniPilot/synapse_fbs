@@ -1,0 +1,168 @@
+include "types.fbs";
+
+namespace synapse.cmd;
+
+// Firmware update state reported by the update service. Update commands are
+// accepted only while the producer is in a safe maintenance state; normal
+// flight-control topics must not accept image writes.
+enum FirmwareUpdateState:ubyte {
+  Unknown = 0, // Firmware update state is not known or not reported.
+  FlightLocked = 1, // Update commands are rejected because the vehicle is not in maintenance mode.
+  MaintenanceReady = 2, // Safe to prepare an update.
+  Receiving = 3, // Image chunks are being staged.
+  Verifying = 4, // Staged image hash/signature is being checked.
+  ReadyToCommit = 5, // Full image is staged and ready for commit.
+  Committed = 6, // Image was committed for bootloader test boot.
+  Complete = 7, // New image is confirmed.
+  Failed = 8, // Update failed before the new image was confirmed.
+  Aborted = 9, // Update was cancelled and staged image data should be discarded.
+}
+
+// Optional safety flags explaining which maintenance gates are currently true.
+enum FirmwareMaintenanceFlags:ushort (bit_flags) {
+  Disarmed, // Vehicle is disarmed.
+  OnGround, // Vehicle is known to be on the ground.
+  MotorsDisabled, // Motor or actuator outputs are inhibited.
+  NoActiveMission, // No autonomous mission is actively executing.
+  AdequateBattery, // Battery level is adequate for maintenance actions.
+  MaintenanceEnabled, // Firmware update maintenance mode is explicitly enabled.
+}
+
+// Query target firmware/update capabilities.
+table FirmwareInfoRequest {
+  target:string; // Firmware target, board, or component selector; empty means default.
+}
+
+// Reply to FirmwareInfoRequest.
+table FirmwareInfoReply {
+  result:synapse.types.CommandResultCode; // Result of the capability query.
+  target:string; // Firmware target, board, or component selected by the producer.
+  board_id:string; // Hardware board identifier for compatibility checks.
+  active_version:string; // Currently active firmware version or build identifier.
+  bootloader:string; // Bootloader or update mechanism identifier.
+  state:FirmwareUpdateState; // Current firmware update state.
+  maintenance_flags:FirmwareMaintenanceFlags; // Maintenance gates currently satisfied by the producer.
+  max_image_size:ulong; // Maximum accepted image size in bytes.
+  max_chunk_size:uint; // Maximum accepted chunk payload size in bytes.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}
+
+// Query the status of one update, or the current update when update_id is empty.
+table FirmwareStatusRequest {
+  update_id:string; // Update identifier to query, or empty for the current update.
+}
+
+// Reply to FirmwareStatusRequest.
+table FirmwareStatusReply {
+  result:synapse.types.CommandResultCode; // Result of the status query.
+  update_id:string; // Update identifier this status describes.
+  state:FirmwareUpdateState; // Current firmware update state.
+  received_bytes:ulong; // Bytes successfully staged for this update.
+  total_bytes:ulong; // Expected total image size in bytes.
+  received_chunks:uint; // Chunks successfully staged for this update.
+  total_chunks:uint; // Expected total chunk count.
+  progress_pct:ubyte; // Completion progress from 0 to 100.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}
+
+// Prepare to receive a firmware image. The producer must reject this unless
+// the vehicle is in maintenance mode and the image metadata is compatible.
+table FirmwarePrepareRequest {
+  update_id:string; // Client-generated identifier for this firmware update.
+  target:string; // Firmware target, board, or component selector.
+  board_id:string; // Expected hardware board identifier.
+  version:string; // Candidate firmware version or build identifier.
+  image_size:ulong; // Candidate image size in bytes.
+  image_sha256:string; // Lowercase hexadecimal SHA-256 hash of the full candidate image.
+  selective_sha256:string; // Lowercase hexadecimal SHA-256 hash after omitting producer-authorized mutable regions.
+  requested_chunk_size:uint; // Requested chunk payload size in bytes.
+  chunk_count:uint; // Number of chunks the client will send.
+  signature:[ubyte]; // Optional signature or authentication token for the image.
+  manifest:string; // Optional UTF-8 JSON manifest for policy-specific metadata.
+}
+
+// Reply to FirmwarePrepareRequest.
+table FirmwarePrepareReply {
+  result:synapse.types.CommandResultCode; // Result of the prepare request.
+  update_id:string; // Update identifier accepted or rejected by the producer.
+  state:FirmwareUpdateState; // Firmware update state after prepare handling.
+  accepted_chunk_size:uint; // Chunk payload size the producer accepts in bytes.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}
+
+// One image chunk. Chunks are idempotent: resending the same update_id,
+// chunk_index, offset, data, and chunk_sha256 must be safe.
+table FirmwareChunkRequest {
+  update_id:string; // Update identifier returned by prepare.
+  chunk_index:uint; // Zero-based chunk index.
+  offset:ulong; // Byte offset of this chunk within the image.
+  data:[ubyte]; // Raw firmware image bytes for this chunk.
+  chunk_sha256:string; // Lowercase hexadecimal SHA-256 hash of this chunk's data bytes.
+  final_chunk:bool; // True when this is the last chunk for the image.
+}
+
+// Reply to FirmwareChunkRequest.
+table FirmwareChunkReply {
+  result:synapse.types.CommandResultCode; // Result of the chunk request.
+  update_id:string; // Update identifier this reply describes.
+  state:FirmwareUpdateState; // Firmware update state after chunk handling.
+  chunk_index:uint; // Chunk index this reply acknowledges.
+  received_bytes:ulong; // Bytes successfully staged for this update.
+  received_chunks:uint; // Chunks successfully staged for this update.
+  progress_pct:ubyte; // Completion progress from 0 to 100.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}
+
+// Verify and commit the staged image for bootloader test boot.
+table FirmwareCommitRequest {
+  update_id:string; // Update identifier whose staged image should be committed.
+  image_sha256:string; // Expected lowercase hexadecimal SHA-256 hash of the full staged image.
+}
+
+// Reply to FirmwareCommitRequest.
+table FirmwareCommitReply {
+  result:synapse.types.CommandResultCode; // Result of the commit request.
+  update_id:string; // Update identifier this reply describes.
+  state:FirmwareUpdateState; // Firmware update state after commit handling.
+  reboot_required:bool; // True when a reboot is required to activate the image.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}
+
+// Abort the current update and discard staged image data.
+table FirmwareAbortRequest {
+  update_id:string; // Update identifier to abort.
+  reason:string; // Human-readable reason for aborting the update.
+}
+
+// Reply to FirmwareAbortRequest.
+table FirmwareAbortReply {
+  result:synapse.types.CommandResultCode; // Result of the abort request.
+  update_id:string; // Update identifier this reply describes.
+  state:FirmwareUpdateState; // Firmware update state after abort handling.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}
+
+namespace synapse.topic;
+
+// Optional payload for synapse/v1/topic/firmware_progress. Command replies
+// and FirmwareStatusReply remain authoritative; this topic supports UI and
+// logging updates while a long transfer is running.
+table FirmwareProgress {
+  timestamp_us:ulong; // Progress publication timestamp in monotonic boot time.
+  update_id:string; // Update identifier this progress sample describes.
+  state:synapse.cmd.FirmwareUpdateState; // Current firmware update state.
+  result:synapse.types.CommandResultCode; // Current command result or progress result.
+  received_bytes:ulong; // Bytes successfully staged for this update.
+  total_bytes:ulong; // Expected total image size in bytes.
+  received_chunks:uint; // Chunks successfully staged for this update.
+  total_chunks:uint; // Expected total chunk count.
+  progress_pct:ubyte; // Completion progress from 0 to 100.
+  message:string; // Human-readable diagnostic text.
+  result_detail:int; // Producer-defined extended result or error detail.
+}

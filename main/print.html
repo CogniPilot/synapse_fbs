@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-5943ecc8.js";
+            window.path_to_searchindex_js = "searchindex-b751e2ee.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-446ba7a2.js"></script>
+        <script src="toc-0b0ecf9a.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -218,6 +218,7 @@
 <ul>
 <li><a href="#fbsallfbs">fbs/all.fbs</a></li>
 <li><a href="#fbscontrolfbs">fbs/control.fbs</a></li>
+<li><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a></li>
 <li><a href="#fbsmocapfbs">fbs/mocap.fbs</a></li>
 <li><a href="#fbsoptical_flowfbs">fbs/optical_flow.fbs</a></li>
 <li><a href="#fbssensorsfbs">fbs/sensors.fbs</a></li>
@@ -233,7 +234,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fbsallfbs"><a class="header" href="#fbsallfbs"><code>fbs/all.fbs</code></a></h1>
 <p><strong>Namespace:</strong> <code>synapse</code></p>
-<p><strong>Includes:</strong> <a href="#fbstransportfbs"><code>transport.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a>, <a href="#fbstransferfbs"><code>transfer.fbs</code></a>, <a href="#fbssimfbs"><code>sim.fbs</code></a></p>
+<p><strong>Includes:</strong> <a href="#fbstransportfbs"><code>transport.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a>, <a href="#fbstransferfbs"><code>transfer.fbs</code></a>, <a href="#fbssimfbs"><code>sim.fbs</code></a>, <a href="#fbsfirmwarefbs"><code>firmware.fbs</code></a></p>
 <p><a href="fbs/all.fbs">Source schema</a></p>
 <p>This schema file does not define public entities.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -630,6 +631,329 @@
 <tr><td><code>latency_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Time from scheduled release to completion or publication.</td></tr>
 <tr><td><code>overrun_count</code></td><td><code>uint</code></td><td></td><td>Cumulative count of missed deadlines.</td></tr>
 <tr><td><code>load_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Loop load as deci-percent, where 1000 means 100%.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="fbsfirmwarefbs"><a class="header" href="#fbsfirmwarefbs"><code>fbs/firmware.fbs</code></a></h1>
+<p><strong>Namespace:</strong> <code>synapse.topic</code></p>
+<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a></p>
+<p><a href="fbs/firmware.fbs">Source schema</a></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Kind</th><th>Name</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>enum</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td>Firmware update state reported by the update service. Update commands are accepted only while the producer is in a safe maintenance state; normal flight-control topics must not accept image writes.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-firmwaremaintenanceflags"><code>FirmwareMaintenanceFlags</code></a></td><td>Optional safety flags explaining which maintenance gates are currently true.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwareinforequest"><code>FirmwareInfoRequest</code></a></td><td>Query target firmware/update capabilities.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwareinforeply"><code>FirmwareInfoReply</code></a></td><td>Reply to FirmwareInfoRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarestatusrequest"><code>FirmwareStatusRequest</code></a></td><td>Query the status of one update, or the current update when update_id is empty.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarestatusreply"><code>FirmwareStatusReply</code></a></td><td>Reply to FirmwareStatusRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarepreparerequest"><code>FirmwarePrepareRequest</code></a></td><td>Prepare to receive a firmware image. The producer must reject this unless the vehicle is in maintenance mode and the image metadata is compatible.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarepreparereply"><code>FirmwarePrepareReply</code></a></td><td>Reply to FirmwarePrepareRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarechunkrequest"><code>FirmwareChunkRequest</code></a></td><td>One image chunk. Chunks are idempotent: resending the same update_id, chunk_index, offset, data, and chunk_sha256 must be safe.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarechunkreply"><code>FirmwareChunkReply</code></a></td><td>Reply to FirmwareChunkRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarecommitrequest"><code>FirmwareCommitRequest</code></a></td><td>Verify and commit the staged image for bootloader test boot.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwarecommitreply"><code>FirmwareCommitReply</code></a></td><td>Reply to FirmwareCommitRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwareabortrequest"><code>FirmwareAbortRequest</code></a></td><td>Abort the current update and discard staged image data.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwareabortreply"><code>FirmwareAbortReply</code></a></td><td>Reply to FirmwareAbortRequest.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-firmwareprogress"><code>FirmwareProgress</code></a></td><td>Optional payload for synapse/v1/topic/firmware_progress. Command replies and FirmwareStatusReply remain authoritative; this topic supports UI and logging updates while a long transfer is running.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-firmwareupdatestate"><a class="header" href="#enum-firmwareupdatestate"><code>enum</code> FirmwareUpdateState</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Firmware update state reported by the update service. Update commands are accepted only while the producer is in a safe maintenance state; normal flight-control topics must not accept image writes.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Firmware update state is not known or not reported.</td></tr>
+<tr><td><code>FlightLocked</code></td><td><code>1</code></td><td>Update commands are rejected because the vehicle is not in maintenance mode.</td></tr>
+<tr><td><code>MaintenanceReady</code></td><td><code>2</code></td><td>Safe to prepare an update.</td></tr>
+<tr><td><code>Receiving</code></td><td><code>3</code></td><td>Image chunks are being staged.</td></tr>
+<tr><td><code>Verifying</code></td><td><code>4</code></td><td>Staged image hash/signature is being checked.</td></tr>
+<tr><td><code>ReadyToCommit</code></td><td><code>5</code></td><td>Full image is staged and ready for commit.</td></tr>
+<tr><td><code>Committed</code></td><td><code>6</code></td><td>Image was committed for bootloader test boot.</td></tr>
+<tr><td><code>Complete</code></td><td><code>7</code></td><td>New image is confirmed.</td></tr>
+<tr><td><code>Failed</code></td><td><code>8</code></td><td>Update failed before the new image was confirmed.</td></tr>
+<tr><td><code>Aborted</code></td><td><code>9</code></td><td>Update was cancelled and staged image data should be discarded.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-firmwaremaintenanceflags"><a class="header" href="#enum-firmwaremaintenanceflags"><code>enum</code> FirmwareMaintenanceFlags</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ushort (bit_flags)</code></p>
+<p>Optional safety flags explaining which maintenance gates are currently true.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Disarmed</code></td><td></td><td>Vehicle is disarmed.</td></tr>
+<tr><td><code>OnGround</code></td><td></td><td>Vehicle is known to be on the ground.</td></tr>
+<tr><td><code>MotorsDisabled</code></td><td></td><td>Motor or actuator outputs are inhibited.</td></tr>
+<tr><td><code>NoActiveMission</code></td><td></td><td>No autonomous mission is actively executing.</td></tr>
+<tr><td><code>AdequateBattery</code></td><td></td><td>Battery level is adequate for maintenance actions.</td></tr>
+<tr><td><code>MaintenanceEnabled</code></td><td></td><td>Firmware update maintenance mode is explicitly enabled.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwareinforequest"><a class="header" href="#table-firmwareinforequest"><code>table</code> FirmwareInfoRequest</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Query target firmware/update capabilities.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>target</code></td><td><code>string</code></td><td></td><td>Firmware target, board, or component selector; empty means default.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwareinforeply"><a class="header" href="#table-firmwareinforeply"><code>table</code> FirmwareInfoReply</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Reply to FirmwareInfoRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Result of the capability query.</td></tr>
+<tr><td><code>target</code></td><td><code>string</code></td><td></td><td>Firmware target, board, or component selected by the producer.</td></tr>
+<tr><td><code>board_id</code></td><td><code>string</code></td><td></td><td>Hardware board identifier for compatibility checks.</td></tr>
+<tr><td><code>active_version</code></td><td><code>string</code></td><td></td><td>Currently active firmware version or build identifier.</td></tr>
+<tr><td><code>bootloader</code></td><td><code>string</code></td><td></td><td>Bootloader or update mechanism identifier.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Current firmware update state.</td></tr>
+<tr><td><code>maintenance_flags</code></td><td><a href="#enum-firmwaremaintenanceflags"><code>FirmwareMaintenanceFlags</code></a></td><td>bitmask</td><td>Maintenance gates currently satisfied by the producer.</td></tr>
+<tr><td><code>max_image_size</code></td><td><code>ulong</code></td><td></td><td>Maximum accepted image size in bytes.</td></tr>
+<tr><td><code>max_chunk_size</code></td><td><code>uint</code></td><td></td><td>Maximum accepted chunk payload size in bytes.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarestatusrequest"><a class="header" href="#table-firmwarestatusrequest"><code>table</code> FirmwareStatusRequest</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Query the status of one update, or the current update when update_id is empty.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier to query, or empty for the current update.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarestatusreply"><a class="header" href="#table-firmwarestatusreply"><code>table</code> FirmwareStatusReply</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Reply to FirmwareStatusRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Result of the status query.</td></tr>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this status describes.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Current firmware update state.</td></tr>
+<tr><td><code>received_bytes</code></td><td><code>ulong</code></td><td></td><td>Bytes successfully staged for this update.</td></tr>
+<tr><td><code>total_bytes</code></td><td><code>ulong</code></td><td></td><td>Expected total image size in bytes.</td></tr>
+<tr><td><code>received_chunks</code></td><td><code>uint</code></td><td></td><td>Chunks successfully staged for this update.</td></tr>
+<tr><td><code>total_chunks</code></td><td><code>uint</code></td><td></td><td>Expected total chunk count.</td></tr>
+<tr><td><code>progress_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Completion progress from 0 to 100.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarepreparerequest"><a class="header" href="#table-firmwarepreparerequest"><code>table</code> FirmwarePrepareRequest</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Prepare to receive a firmware image. The producer must reject this unless the vehicle is in maintenance mode and the image metadata is compatible.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Client-generated identifier for this firmware update.</td></tr>
+<tr><td><code>target</code></td><td><code>string</code></td><td></td><td>Firmware target, board, or component selector.</td></tr>
+<tr><td><code>board_id</code></td><td><code>string</code></td><td></td><td>Expected hardware board identifier.</td></tr>
+<tr><td><code>version</code></td><td><code>string</code></td><td></td><td>Candidate firmware version or build identifier.</td></tr>
+<tr><td><code>image_size</code></td><td><code>ulong</code></td><td></td><td>Candidate image size in bytes.</td></tr>
+<tr><td><code>image_sha256</code></td><td><code>string</code></td><td></td><td>Lowercase hexadecimal SHA-256 hash of the full candidate image.</td></tr>
+<tr><td><code>selective_sha256</code></td><td><code>string</code></td><td></td><td>Lowercase hexadecimal SHA-256 hash after omitting producer-authorized mutable regions.</td></tr>
+<tr><td><code>requested_chunk_size</code></td><td><code>uint</code></td><td></td><td>Requested chunk payload size in bytes.</td></tr>
+<tr><td><code>chunk_count</code></td><td><code>uint</code></td><td></td><td>Number of chunks the client will send.</td></tr>
+<tr><td><code>signature</code></td><td><code>[ubyte]</code></td><td></td><td>Optional signature or authentication token for the image.</td></tr>
+<tr><td><code>manifest</code></td><td><code>string</code></td><td></td><td>Optional UTF-8 JSON manifest for policy-specific metadata.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarepreparereply"><a class="header" href="#table-firmwarepreparereply"><code>table</code> FirmwarePrepareReply</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Reply to FirmwarePrepareRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Result of the prepare request.</td></tr>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier accepted or rejected by the producer.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Firmware update state after prepare handling.</td></tr>
+<tr><td><code>accepted_chunk_size</code></td><td><code>uint</code></td><td></td><td>Chunk payload size the producer accepts in bytes.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarechunkrequest"><a class="header" href="#table-firmwarechunkrequest"><code>table</code> FirmwareChunkRequest</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>One image chunk. Chunks are idempotent: resending the same update_id, chunk_index, offset, data, and chunk_sha256 must be safe.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier returned by prepare.</td></tr>
+<tr><td><code>chunk_index</code></td><td><code>uint</code></td><td></td><td>Zero-based chunk index.</td></tr>
+<tr><td><code>offset</code></td><td><code>ulong</code></td><td></td><td>Byte offset of this chunk within the image.</td></tr>
+<tr><td><code>data</code></td><td><code>[ubyte]</code></td><td></td><td>Raw firmware image bytes for this chunk.</td></tr>
+<tr><td><code>chunk_sha256</code></td><td><code>string</code></td><td></td><td>Lowercase hexadecimal SHA-256 hash of this chunk’s data bytes.</td></tr>
+<tr><td><code>final_chunk</code></td><td><code>bool</code></td><td></td><td>True when this is the last chunk for the image.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarechunkreply"><a class="header" href="#table-firmwarechunkreply"><code>table</code> FirmwareChunkReply</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Reply to FirmwareChunkRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Result of the chunk request.</td></tr>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this reply describes.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Firmware update state after chunk handling.</td></tr>
+<tr><td><code>chunk_index</code></td><td><code>uint</code></td><td></td><td>Chunk index this reply acknowledges.</td></tr>
+<tr><td><code>received_bytes</code></td><td><code>ulong</code></td><td></td><td>Bytes successfully staged for this update.</td></tr>
+<tr><td><code>received_chunks</code></td><td><code>uint</code></td><td></td><td>Chunks successfully staged for this update.</td></tr>
+<tr><td><code>progress_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Completion progress from 0 to 100.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarecommitrequest"><a class="header" href="#table-firmwarecommitrequest"><code>table</code> FirmwareCommitRequest</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Verify and commit the staged image for bootloader test boot.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier whose staged image should be committed.</td></tr>
+<tr><td><code>image_sha256</code></td><td><code>string</code></td><td></td><td>Expected lowercase hexadecimal SHA-256 hash of the full staged image.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwarecommitreply"><a class="header" href="#table-firmwarecommitreply"><code>table</code> FirmwareCommitReply</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Reply to FirmwareCommitRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Result of the commit request.</td></tr>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this reply describes.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Firmware update state after commit handling.</td></tr>
+<tr><td><code>reboot_required</code></td><td><code>bool</code></td><td></td><td>True when a reboot is required to activate the image.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwareabortrequest"><a class="header" href="#table-firmwareabortrequest"><code>table</code> FirmwareAbortRequest</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Abort the current update and discard staged image data.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier to abort.</td></tr>
+<tr><td><code>reason</code></td><td><code>string</code></td><td></td><td>Human-readable reason for aborting the update.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwareabortreply"><a class="header" href="#table-firmwareabortreply"><code>table</code> FirmwareAbortReply</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Reply to FirmwareAbortRequest.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Result of the abort request.</td></tr>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this reply describes.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Firmware update state after abort handling.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-firmwareprogress"><a class="header" href="#table-firmwareprogress"><code>table</code> FirmwareProgress</a></h1>
+<p><a href="#fbsfirmwarefbs">fbs/firmware.fbs</a> / <a href="fbs/firmware.fbs">Source schema</a></p>
+<p>Optional payload for synapse/v1/topic/firmware_progress. Command replies and FirmwareStatusReply remain authoritative; this topic supports UI and logging updates while a long transfer is running.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Progress publication timestamp in monotonic boot time.</td></tr>
+<tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this progress sample describes.</td></tr>
+<tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>synapse.cmd.FirmwareUpdateState</code></a></td><td></td><td>Current firmware update state.</td></tr>
+<tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Current command result or progress result.</td></tr>
+<tr><td><code>received_bytes</code></td><td><code>ulong</code></td><td></td><td>Bytes successfully staged for this update.</td></tr>
+<tr><td><code>total_bytes</code></td><td><code>ulong</code></td><td></td><td>Expected total image size in bytes.</td></tr>
+<tr><td><code>received_chunks</code></td><td><code>uint</code></td><td></td><td>Chunks successfully staged for this update.</td></tr>
+<tr><td><code>total_chunks</code></td><td><code>uint</code></td><td></td><td>Expected total chunk count.</td></tr>
+<tr><td><code>progress_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Completion progress from 0 to 100.</td></tr>
+<tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
+<tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1856,6 +2180,12 @@
 <tr><td><code>MissionSet</code></td><td><code>4</code></td><td>Replace or patch a GPS mission in bounded chunks.</td></tr>
 <tr><td><code>TrajectoryGet</code></td><td><code>5</code></td><td>Fetch a paged trajectory segment chunk.</td></tr>
 <tr><td><code>TrajectorySet</code></td><td><code>6</code></td><td>Replace or patch a trajectory in bounded chunks.</td></tr>
+<tr><td><code>FirmwareInfo</code></td><td><code>7</code></td><td>Fetch firmware/update capabilities.</td></tr>
+<tr><td><code>FirmwareStatus</code></td><td><code>8</code></td><td>Fetch firmware update state/progress.</td></tr>
+<tr><td><code>FirmwarePrepare</code></td><td><code>9</code></td><td>Prepare a maintenance-mode firmware update.</td></tr>
+<tr><td><code>FirmwareChunk</code></td><td><code>10</code></td><td>Transfer one staged firmware image chunk.</td></tr>
+<tr><td><code>FirmwareCommit</code></td><td><code>11</code></td><td>Commit a staged image for bootloader test boot.</td></tr>
+<tr><td><code>FirmwareAbort</code></td><td><code>12</code></td><td>Abort a staged firmware update.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2198,7 +2528,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fbstransportfbs"><a class="header" href="#fbstransportfbs"><code>fbs/transport.fbs</code></a></h1>
 <p><strong>Namespace:</strong> <code>synapse.topic</code></p>
-<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbssensorsfbs"><code>sensors.fbs</code></a>, <a href="#fbsstatefbs"><code>state.fbs</code></a>, <a href="#fbscontrolfbs"><code>control.fbs</code></a>, <a href="#fbsoptical_flowfbs"><code>optical_flow.fbs</code></a>, <a href="#fbsmocapfbs"><code>mocap.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbssimfbs"><code>sim.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a></p>
+<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a>, <a href="#fbssensorsfbs"><code>sensors.fbs</code></a>, <a href="#fbsstatefbs"><code>state.fbs</code></a>, <a href="#fbscontrolfbs"><code>control.fbs</code></a>, <a href="#fbsoptical_flowfbs"><code>optical_flow.fbs</code></a>, <a href="#fbsmocapfbs"><code>mocap.fbs</code></a>, <a href="#fbstelemetryfbs"><code>telemetry.fbs</code></a>, <a href="#fbssimfbs"><code>sim.fbs</code></a>, <a href="#fbstrajectoryfbs"><code>trajectory.fbs</code></a>, <a href="#fbsfirmwarefbs"><code>firmware.fbs</code></a></p>
 <p><a href="fbs/transport.fbs">Source schema</a></p>
 <div class="table-wrapper">
 <table>
@@ -2272,6 +2602,7 @@
 <tr><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td>Raw motion-capture marker and rigid-body samples.</td></tr>
 <tr><td><a href="#struct-locksteptickdata"><code>LockstepTick</code></a></td><td><a href="#struct-locksteptickdata"><code>LockstepTick</code></a></td><td>Deterministic simulation barrier tick.</td></tr>
 <tr><td><a href="#struct-lockstepstatusdata"><code>LockstepStatus</code></a></td><td><a href="#struct-lockstepstatusdata"><code>LockstepStatus</code></a></td><td>Deterministic simulation participant status.</td></tr>
+<tr><td><a href="#table-firmwareprogress"><code>FirmwareProgress</code></a></td><td><a href="#table-firmwareprogress"><code>FirmwareProgress</code></a></td><td>Firmware image transfer, verification, and activation progress.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2774,6 +3105,7 @@
 <tr><td><code>MocapFrame</code></td><td><code>31</code></td><td>Raw motion-capture marker and rigid-body samples for logging and tooling.</td></tr>
 <tr><td><code>LockstepTick</code></td><td><code>32</code></td><td>Deterministic simulation barrier telling a receiver which boot time to reach.</td></tr>
 <tr><td><code>LockstepStatus</code></td><td><code>33</code></td><td>Deterministic simulation participant status and tick completion acknowledgement.</td></tr>
+<tr><td><code>FirmwareProgress</code></td><td><code>34</code></td><td>Firmware image transfer, verification, and activation progress.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2817,7 +3149,7 @@
         <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="theme/version-selector-66b9cfc5.js"></script>
+        <script src="theme/version-selector-de650870.js"></script>
 
         <script>
         window.addEventListener('load', function() {
