@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b751e2ee.js";
+            window.path_to_searchindex_js = "searchindex-c1600f68.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-0b0ecf9a.js"></script>
@@ -737,7 +737,7 @@
 <tr><td><code>active_version</code></td><td><code>string</code></td><td></td><td>Currently active firmware version or build identifier.</td></tr>
 <tr><td><code>bootloader</code></td><td><code>string</code></td><td></td><td>Bootloader or update mechanism identifier.</td></tr>
 <tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>FirmwareUpdateState</code></a></td><td></td><td>Current firmware update state.</td></tr>
-<tr><td><code>maintenance_flags</code></td><td><a href="#enum-firmwaremaintenanceflags"><code>FirmwareMaintenanceFlags</code></a></td><td>bitmask</td><td>Maintenance gates currently satisfied by the producer.</td></tr>
+<tr><td><code>maintenance_flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of FirmwareMaintenanceFlags bits.</td></tr>
 <tr><td><code>max_image_size</code></td><td><code>ulong</code></td><td></td><td>Maximum accepted image size in bytes.</td></tr>
 <tr><td><code>max_chunk_size</code></td><td><code>uint</code></td><td></td><td>Maximum accepted chunk payload size in bytes.</td></tr>
 <tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
