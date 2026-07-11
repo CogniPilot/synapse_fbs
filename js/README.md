@@ -55,7 +55,7 @@ import { keyForTopic, topicById, parseKey } from '@cognipilot/synapse-fbs';
 
 const key = keyForTopic('VehicleHealth');
 const payloadType = topicById(1)?.payloadType;
-const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+const parsed = parseKey('cub1/imu/0');
 ```
 
 Individual assets are also directly importable via subpath exports:

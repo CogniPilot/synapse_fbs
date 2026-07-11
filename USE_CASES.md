@@ -330,7 +330,7 @@ Constraints:
 Schema and protocol requirements:
 
 - Capability, status, prepare, chunk, commit, and abort operations are bounded
-  queryable commands under canonical `synapse/v1/cmd/firmware_*` keys.
+  queryable commands under canonical `cmd/firmware_*` keys.
 - An update id and chunk index make identical chunk retries idempotent; a
   conflicting retry must be rejected.
 - Prepare and commit carry full-image integrity metadata, while each chunk

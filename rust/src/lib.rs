@@ -7,7 +7,6 @@
 
 /// Version of the synapse_fbs release this crate was generated from.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 #[allow(warnings)]
 pub mod generated;
 
@@ -26,5 +25,6 @@ pub mod cmd {
 pub mod schemas;
 pub mod topic_catalog;
 pub mod topic_decode;
+pub mod value_contract;
 
 pub use generated::synapse;

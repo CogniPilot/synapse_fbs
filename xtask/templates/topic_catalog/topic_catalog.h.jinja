@@ -11,20 +11,21 @@
 extern "C" {
 #endif
 
-#define SYNAPSE_TOPIC_KEY_PREFIX {{ key_prefix_literal }}
 #define SYNAPSE_CMD_KEY_PREFIX {{ cmd_key_prefix_literal }}
 #define SYNAPSE_META_KEY_PREFIX {{ meta_key_prefix_literal }}
 #define SYNAPSE_LIVELINESS_KEY_PREFIX {{ liveliness_key_prefix_literal }}
+#define SYNAPSE_SCHEMA_SET_HASH {{ schema_set_hash_literal }}
 
 typedef struct synapse_topic_info {
     uint16_t id;
     const char *name;
-    const char *key;
-    const char *key_suffix;
+    const char *key; /* canonical short key: [<namespace>/]<key>[/<instance>] */
     const char *root_table;
     const char *payload_type;
     size_t payload_size; /* zero when the topic has no fixed-layout payload */
     const char *schema_file;
+    const char *wire_type; /* fully qualified FlatBuffers value type */
+    const char *schema_hash; /* SHA-256 of the transitive wire schema */
     bool fixed_layout;
     bool multi_instance;
     const char *scope;
@@ -37,7 +38,9 @@ typedef struct synapse_command_info {
     const char *name;
     const char *key;
     const char *request_type; /* fully qualified FlatBuffers type */
+    const char *request_schema_hash; /* SHA-256 of the transitive request schema */
     const char *reply_type;   /* fully qualified FlatBuffers type */
+    const char *reply_schema_hash; /* SHA-256 of the transitive reply schema */
     const char *request_encoding;
     size_t request_size; /* zero when request_encoding is table */
     const char *reply_encoding;
@@ -51,11 +54,12 @@ static const synapse_topic_info_t synapse_topics[] = {
         {{ topic.id }},
         {{ topic.name_literal }},
         {{ topic.key_literal }},
-        {{ topic.key_suffix_literal }},
         {{ topic.root_table_literal }},
         {{ topic.payload_type_c }},
         {{ topic.payload_size_c }},
         {{ topic.schema_file_literal }},
+        {{ topic.wire_type_literal }},
+        {{ topic.schema_hash_literal }},
         {{ topic.fixed_layout_c }},
         {{ topic.multi_instance_c }},
         {{ topic.scope_literal }},
@@ -75,7 +79,9 @@ static const synapse_command_info_t synapse_commands[] = {
         {{ command.name_literal }},
         {{ command.key_literal }},
         {{ command.request_type_literal }},
+        {{ command.request_schema_hash_literal }},
         {{ command.reply_type_literal }},
+        {{ command.reply_schema_hash_literal }},
         {{ command.request_encoding_literal }},
         {{ command.request_size_c }},
         {{ command.reply_encoding_literal }},
@@ -109,14 +115,28 @@ static inline const synapse_topic_info_t *synapse_topic_by_name(const char *name
     return NULL;
 }
 
+static inline const synapse_topic_info_t *synapse_topic_by_key_segment(
+    const char *segment, size_t length) {
+    for (size_t i = 0; i < synapse_topics_count; ++i) {
+        if (strlen(synapse_topics[i].key) == length &&
+            strncmp(synapse_topics[i].key, segment, length) == 0) {
+            return &synapse_topics[i];
+        }
+    }
+    return NULL;
+}
+
 /*
- * Parse a possibly namespaced topic key expression such as
- * "cub1/synapse/v1/topic/inertial_sample/0". Leading and trailing slashes
- * are ignored. On success returns the catalog entry and writes the namespace
+ * Parse a possibly namespaced topic key expression such as "cub1/odom",
+ * "qualisys/cub1/external_pose", or "cub1/imu/0". The topic key is the last
+ * segment, or the second-to-last when an instance segment follows; everything
+ * before it is the deployment namespace. Leading and trailing slashes are
+ * ignored. On success returns the catalog entry and writes the namespace
  * substring (start pointer into `key` and length, empty when absent) and the
  * instance segment (-1 when absent). Out parameters may be NULL. Instance
- * segments are 1 to 9 ASCII digits; this grammar is identical in the Rust,
- * Python, JavaScript, and C catalog helpers.
+ * segments are 1 to 9 ASCII digits, and topic keys never consist solely of
+ * digits; this grammar is identical in the Rust, Python, JavaScript, and C
+ * catalog helpers.
  */
 static inline const synapse_topic_info_t *synapse_topic_parse_key(
     const char *key, const char **namespace_start, size_t *namespace_len,
@@ -131,60 +151,46 @@ static inline const synapse_topic_info_t *synapse_topic_parse_key(
     while (end > key && end[-1] == '/') {
         --end;
     }
-
-    static const char anchored[] = SYNAPSE_TOPIC_KEY_PREFIX "/";
-    const size_t anchored_len = sizeof(anchored) - 1;
-
-    /* Find the canonical prefix at a segment boundary. */
-    const char *anchor = key;
-    while ((size_t)(end - anchor) <= anchored_len ||
-           strncmp(anchor, anchored, anchored_len) != 0) {
-        const char *next = (const char *)memchr(anchor, '/', (size_t)(end - anchor));
-        if (next == NULL) {
-            return NULL;
-        }
-        anchor = next + 1;
-    }
-
-    const char *suffix = anchor + anchored_len;
-    const char *suffix_end = (const char *)memchr(suffix, '/', (size_t)(end - suffix));
-    size_t suffix_len =
-        suffix_end == NULL ? (size_t)(end - suffix) : (size_t)(suffix_end - suffix);
-    if (suffix_len == 0) {
+    if (end == key) {
         return NULL;
     }
 
-    const synapse_topic_info_t *topic = NULL;
-    for (size_t i = 0; i < synapse_topics_count; ++i) {
-        if (strlen(synapse_topics[i].key_suffix) == suffix_len &&
-            strncmp(synapse_topics[i].key_suffix, suffix, suffix_len) == 0) {
-            topic = &synapse_topics[i];
-            break;
-        }
+    /* Last segment: a topic key, or instance digits preceded by one. */
+    const char *last = end;
+    while (last > key && last[-1] != '/') {
+        --last;
     }
-    if (topic == NULL) {
-        return NULL;
-    }
-
+    const char *name_start = last;
     int32_t parsed_instance = -1;
-    if (suffix_end != NULL) {
-        const char *segment = suffix_end + 1;
-        size_t segment_len = (size_t)(end - segment);
-        if (segment_len == 0 || segment_len > 9) {
+    const synapse_topic_info_t *topic =
+        synapse_topic_by_key_segment(last, (size_t)(end - last));
+    if (topic == NULL) {
+        size_t digits = (size_t)(end - last);
+        if (digits == 0 || digits > 9 || last == key) {
             return NULL;
         }
         int32_t value = 0;
-        for (size_t i = 0; i < segment_len; ++i) {
-            if (segment[i] < '0' || segment[i] > '9') {
+        for (size_t i = 0; i < digits; ++i) {
+            if (last[i] < '0' || last[i] > '9') {
                 return NULL;
             }
-            value = value * 10 + (segment[i] - '0');
+            value = value * 10 + (last[i] - '0');
+        }
+        const char *name_end = last - 1; /* the '/' before the instance */
+        name_start = name_end;
+        while (name_start > key && name_start[-1] != '/') {
+            --name_start;
+        }
+        topic = synapse_topic_by_key_segment(name_start,
+                                             (size_t)(name_end - name_start));
+        if (topic == NULL) {
+            return NULL;
         }
         parsed_instance = value;
     }
 
     if (namespace_start != NULL || namespace_len != NULL) {
-        size_t length = (size_t)(anchor - key);
+        size_t length = (size_t)(name_start - key);
         while (length > 0 && key[length - 1] == '/') {
             --length;
         }
@@ -209,8 +215,7 @@ static inline const synapse_topic_info_t *synapse_topic_by_key(const char *key) 
         ++key;
     }
     for (size_t i = 0; i < synapse_topics_count; ++i) {
-        if (strcmp(synapse_topics[i].key, key) == 0 ||
-            strcmp(synapse_topics[i].key_suffix, key) == 0) {
+        if (strcmp(synapse_topics[i].key, key) == 0) {
             return &synapse_topics[i];
         }
     }
