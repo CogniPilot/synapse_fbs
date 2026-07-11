@@ -2,11 +2,12 @@ export interface TopicInfo {
   readonly id: number;
   readonly name: string;
   readonly key: string;
-  readonly keySuffix: string;
   readonly rootTable: string;
   readonly payloadType: string | null;
   readonly payloadSize: number | null;
   readonly schemaFile: string;
+  readonly wireType: string;
+  readonly schemaHash: string;
   readonly fixedLayout: boolean;
   readonly multiInstance: boolean;
   readonly scope: string;
@@ -19,7 +20,9 @@ export interface CommandInfo {
   readonly name: string;
   readonly key: string;
   readonly requestType: string;
+  readonly requestSchemaHash: string;
   readonly replyType: string;
+  readonly replySchemaHash: string;
   readonly requestEncoding: string;
   readonly requestSize: number | null;
   readonly replyEncoding: string;
@@ -33,10 +36,10 @@ export interface ParsedTopicKey {
   readonly instance: number | null;
 }
 
-export const topicKeyPrefix: string;
 export const cmdKeyPrefix: string;
 export const metaKeyPrefix: string;
 export const livelinessKeyPrefix: string;
+export const schemaSetHash: string;
 
 export const topicCatalog: readonly TopicInfo[];
 export const commandCatalog: readonly CommandInfo[];

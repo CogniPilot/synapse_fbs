@@ -2,10 +2,10 @@
 from dataclasses import dataclass
 from typing import Optional, Union
 
-TOPIC_KEY_PREFIX = {{ key_prefix_literal }}
 CMD_KEY_PREFIX = {{ cmd_key_prefix_literal }}
 META_KEY_PREFIX = {{ meta_key_prefix_literal }}
 LIVELINESS_KEY_PREFIX = {{ liveliness_key_prefix_literal }}
+SCHEMA_SET_HASH = {{ schema_set_hash_literal }}
 
 
 @dataclass(frozen=True)
@@ -13,11 +13,12 @@ class TopicInfo:
     id: int
     name: str
     key: str
-    key_suffix: str
     root_table: str
     payload_type: Optional[str]
     payload_size: Optional[int]
     schema_file: str
+    wire_type: str
+    schema_hash: str
     fixed_layout: bool
     multi_instance: bool
     scope: str
@@ -31,7 +32,9 @@ class CommandInfo:
     name: str
     key: str
     request_type: str
+    request_schema_hash: str
     reply_type: str
+    reply_schema_hash: str
     request_encoding: str
     request_size: Optional[int]
     reply_encoding: str
@@ -52,11 +55,12 @@ TOPICS = (
         id={{ topic.id }},
         name={{ topic.name_literal }},
         key={{ topic.key_literal }},
-        key_suffix={{ topic.key_suffix_literal }},
         root_table={{ topic.root_table_literal }},
         payload_type={{ topic.payload_type_python }},
         payload_size={{ topic.payload_size_python }},
         schema_file={{ topic.schema_file_literal }},
+        wire_type={{ topic.wire_type_literal }},
+        schema_hash={{ topic.schema_hash_literal }},
         fixed_layout={{ topic.fixed_layout_python }},
         multi_instance={{ topic.multi_instance_python }},
         scope={{ topic.scope_literal }},
@@ -73,7 +77,9 @@ COMMANDS = (
         name={{ command.name_literal }},
         key={{ command.key_literal }},
         request_type={{ command.request_type_literal }},
+        request_schema_hash={{ command.request_schema_hash_literal }},
         reply_type={{ command.reply_type_literal }},
+        reply_schema_hash={{ command.reply_schema_hash_literal }},
         request_encoding={{ command.request_encoding_literal }},
         request_size={{ command.request_size_python }},
         reply_encoding={{ command.reply_encoding_literal }},
@@ -86,7 +92,6 @@ COMMANDS = (
 _TOPIC_BY_ID = {topic.id: topic for topic in TOPICS}
 _TOPIC_BY_NAME = {topic.name: topic for topic in TOPICS}
 _TOPIC_BY_KEY = {topic.key: topic for topic in TOPICS}
-_TOPIC_BY_SUFFIX = {topic.key_suffix: topic for topic in TOPICS}
 _COMMAND_BY_NAME = {command.name: command for command in COMMANDS}
 
 
@@ -116,41 +121,34 @@ def topic_by_name(name: str) -> Optional[TopicInfo]:
 def parse_key(key: str) -> Optional[ParsedTopicKey]:
     """Parse a possibly namespaced topic key expression.
 
-    Accepts keys such as ``cub1/synapse/v1/topic/inertial_sample/0`` and
-    returns the deployment namespace, the catalog topic, and the optional
-    sensor instance segment.
+    Accepts keys such as ``cub1/odom``, ``qualisys/cub1/external_pose``, and
+    ``cub1/imu/0``. The topic key is the last segment, or the second-to-last
+    when an instance segment follows; everything before it is the deployment
+    namespace, which may be empty or contain multiple segments.
     """
     trimmed = _normalize_key(key)
-    anchored = TOPIC_KEY_PREFIX + "/"
-    if trimmed.startswith(anchored):
-        position = 0
-    else:
-        offset = trimmed.find("/" + anchored)
-        if offset < 0:
-            return None
-        position = offset + 1
-
-    namespace = trimmed[:position].rstrip("/")
-    rest = trimmed[position + len(anchored):]
-    segments = rest.split("/") if rest else []
-    if not segments or not segments[0]:
+    if not trimmed:
         return None
-    topic = _TOPIC_BY_SUFFIX.get(segments[0])
+    rest, _, last = trimmed.rpartition("/")
+    topic = _TOPIC_BY_KEY.get(last)
+    if topic is not None:
+        return ParsedTopicKey(namespace=rest.rstrip("/"), topic=topic, instance=None)
+
+    # Topic keys never consist solely of digits, so a trailing instance
+    # segment is unambiguous.
+    instance = _parse_instance(last)
+    if instance is None:
+        return None
+    namespace, _, name = rest.rpartition("/")
+    topic = _TOPIC_BY_KEY.get(name)
     if topic is None:
         return None
-    instance: Optional[int] = None
-    if len(segments) > 1:
-        if len(segments) > 2:
-            return None
-        instance = _parse_instance(segments[1])
-        if instance is None:
-            return None
-    return ParsedTopicKey(namespace=namespace, topic=topic, instance=instance)
+    return ParsedTopicKey(namespace=namespace.rstrip("/"), topic=topic, instance=instance)
 
 
 def topic_by_key(key: str) -> Optional[TopicInfo]:
     normalized = str(key).lstrip("/")
-    direct = _TOPIC_BY_KEY.get(normalized) or _TOPIC_BY_SUFFIX.get(normalized)
+    direct = _TOPIC_BY_KEY.get(normalized)
     if direct is not None:
         return direct
     parsed = parse_key(normalized)

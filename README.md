@@ -16,7 +16,7 @@ release artifacts from the pinned Linux toolchain in `flake.nix`.
 
 - Schema docs: <https://cognipilot.github.io/synapse_fbs/>
 - Main-branch schema docs: <https://cognipilot.github.io/synapse_fbs/main/>
-- Latest 0.5 schema docs: <https://cognipilot.github.io/synapse_fbs/0.5/>
+- Latest 0.6 schema docs: <https://cognipilot.github.io/synapse_fbs/0.6/>
 - Design use cases: [USE_CASES.md](USE_CASES.md)
 - GitHub releases: <https://github.com/CogniPilot/synapse_fbs/releases>
 - Rust crate: <https://crates.io/crates/synapse_fbs>
@@ -77,40 +77,106 @@ modes, vehicle types) remain producer-defined.
 
 Synapse is designed to work naturally with Zenoh.
 
-**Keys.** Canonical key expressions are:
+**Keys.** Keys are for humans: short, typable, and free of protocol
+ceremony. Canonical key expressions are:
 
-```
-synapse/v1/topic/<topic_name>[/<instance>]   # pub/sub topics
-synapse/v1/cmd/<command_name>                # queryable commands/transfers
-synapse/v1/meta/...                          # reserved: schema metadata
-synapse/v1/live/...                          # reserved: liveliness tokens
+```text
+[<namespace>/]<topic_key>[/<instance>]   # pub/sub topics, e.g. cub1/odom
+[<namespace>/]cmd/<command_name>         # queryable commands/transfers
+[<namespace>/]meta/...                   # reserved: schema metadata
+[<namespace>/]live/...                   # reserved: liveliness tokens
 ```
 
-The `v1` segment is the schema-major compatibility signal — bare-struct
-consumers have no other version indicator, and future breaking revisions run
-side by side as `v2`. Multi-instance sensor topics (`inertial_sample`,
-`gnss_fix`, `power_status`) append an instance segment so subscribers can
-select one sensor without decoding payloads.
+Every topic has a curated short key (`health`, `imu`, `gnss`, `odom`,
+`external_pose`, ...) recorded in the generated catalog. The topic key is the
+last segment — or second-to-last when an instance segment follows — and
+everything before it is the deployment namespace, which may be empty or
+arbitrarily nested. `cmd`, `meta`, and `live` are reserved segments no topic
+key may use, and topic keys never consist solely of digits, so keys parse
+unambiguously from the tail. Keys carry no protocol or version tag because
+they are convention only: the authoritative wire compatibility signal is the
+mandatory Zenoh value contract described below, and consumers never infer a
+payload type from the key. Multi-instance sensor topics (`imu`, `gnss`,
+`power`) append an instance segment so subscribers can select one sensor
+without decoding payloads.
 
 **Multi-vehicle deployments** prepend a namespace from configuration (never
-hardcoded in firmware):
+hardcoded in firmware). Namespace segments are short lowercase `snake_case`
+names, and the producer owns the namespace it publishes under. Recommended
+examples:
 
+```text
+health                       # bench: one vehicle, no namespace
+cub1/health                  # fleet vehicle "cub1"
+cub1/odom                    # cub1 odometry estimate
+cub1/imu/0                   # first IMU instance on cub1
+cub2/imu/1                   # second IMU instance on cub2
+cub1/cmd/mission_set         # mission upload addressed to cub1
+qualisys/mocap               # raw frames from the "qualisys" mocap system
+qualisys/cub1/external_pose  # qualisys measurement of cub1's pose
+cub1/external_pose           # bridge output in cub1's own namespace
+sim/tick                     # simulator lockstep tick
+field_lab/cub1/health        # nested site/vehicle namespaces
 ```
-cub1/synapse/v1/topic/vehicle_health
-cub2/synapse/v1/topic/inertial_sample/0
+
+Infrastructure sources publish under their own namespace — a mocap system
+owns `qualisys/...`, a simulator owns `sim/...` — and per-tracked-vehicle
+outputs nest a vehicle sub-namespace (`qualisys/cub1/external_pose`). Bridges
+write estimator inputs into the namespace of the vehicle that consumes them
+(`cub1/external_pose`), so a vehicle's estimator and control stack never
+subscribe outside their own namespace.
+
+A ground station subscribes to `*/health` for every vehicle at one namespace
+level, or `**/health` for arbitrary nesting, and learns which vehicle a
+sample came from by the key it arrived on — the namespace replaces
+per-message system identifiers. The catalog helpers in every language parse
+namespaced keys back into namespace, topic, and instance.
+
+**Required value contract.** Every Synapse Zenoh value carries an encoding and
+schema string. Metadata-free values are invalid. The canonical form is:
+
+```text
+<media-type>;type=<wire-type>;schema=sha256-128:<per-message-schema-hash>
 ```
 
-A ground station subscribes to `*/synapse/v1/topic/vehicle_health` for every
-vehicle at one namespace level, or `**/...` for arbitrary nesting, and learns
-which vehicle a sample came from by the key it arrived on — the namespace
-replaces per-message system identifiers. The catalog helpers in every language
-parse namespaced keys back into namespace, topic, and instance.
+For example:
 
-**Encoding.** The canonical value for a fixed-layout topic is the bare payload
-struct bytes; the key identifies the type and the catalog records the exact
-byte size. Variable-size topics (`TextStatus`, `MocapFrame`) and generic
-bridges use the thin FlatBuffers root tables; the catalog `encoding` field
-says which applies per topic.
+```text
+application/x-synapse-struct;type=synapse.topic.ExternalOdometryData;schema=sha256-128:<32 hex digits>
+```
+
+Fixed-layout topics use `application/x-synapse-struct`; root-table topics use
+`application/x-flatbuffers`. The hash is the first 128 bits of SHA-256 and
+covers only the named wire type and the
+types it transitively references; unrelated schema changes do not invalidate
+it. Consumers require an exact match and refuse to decode a mismatch. Live
+tools throttle repeated mismatch warnings so high-rate publishers cannot flood
+logs. The key describes semantic ownership and remains free to use
+deployment-friendly names.
+
+The generated Rust, Python, JavaScript, C, and JSON topic catalogs expose
+`wire_type` and `schema_hash` on every topic, and request/reply types with
+their schema hashes on every command. The current-contract dictionary at
+`compatibility/wire-schema.toml` maps every accepted wire-type name — topic
+payloads and command request/reply tables alike — to its exact hash. CI
+rejects reuse of a name with a changed schema; make a new wire type and topic
+for a breaking change. Unknown and retired types are immediately
+incompatible. Reviewed additions and removals are applied with
+`xtask update-compatibility`.
+
+**Constrained-link profile.** Long-range and low-bandwidth links may omit the
+per-value Zenoh metadata only when both endpoints are explicitly configured
+with the same generated topic catalog. They compare `SCHEMA_SET_HASH` once
+while establishing the link and refuse a mismatch; frames then carry the
+numeric topic id and payload. The set hash covers the full catalog contract
+the link then relies on — topic ids, topic keys, instance-key grammar,
+encodings, wire types with their transitive schema hashes, and command ids
+with their request/reply contracts — so agreement implies both endpoints
+route, decode, and restore every frame identically. A receiving gateway must
+restore the canonical value encoding before forwarding onto a normal Zenoh
+network. Public Zenoh subscribers never accept metadata-free values or infer a
+contract from a key. This keeps the strict default while avoiding repeated
+schema strings on a controlled radio link.
 
 **Mocap has raw and estimator paths.** `MocapFrame` preserves source-like raw
 marker and 6DOF rigid-body samples for logging and bridge processing.
@@ -121,20 +187,18 @@ publishing. Uncertainty and full 12D tangent-state covariance are opt-in
 companion data, not part of the default 240 Hz path.
 
 **Commands are queryables, not topics.** A GCS issues
-`get("cub1/synapse/v1/cmd/mission_get", payload)` and receives the matching
-reply table. Parameter, mission, trajectory, and firmware transfer all use
-bounded request/reply tables. Firmware services use the canonical
-`synapse/v1/cmd/firmware_*` keys, with optional progress published on
-`synapse/v1/topic/firmware_progress`. Streaming setpoints
+`get("cub1/cmd/mission_get", payload)` and receives the matching reply table.
+Parameter, mission, trajectory, and firmware transfer all use bounded
+request/reply tables. Firmware services use the canonical `cmd/firmware_*`
+keys, with optional progress published on `fw`. Streaming setpoints
 (`AttitudeCommand`, `RateCommand`, `LocalPositionCommand`,
 `TrajectorySegment`) remain pub/sub topics.
 
 **Lockstep simulation uses topics.** A simulator publishes `LockstepTick` on
-`synapse/v1/topic/lockstep_tick`; each participant publishes
-`LockstepStatus` on `synapse/v1/topic/lockstep_status/<id>`. Strict lockstep
-waits for a matching `run_id` and completed status sequence before publishing
-the next tick. Use Zenoh liveliness tokens under `synapse/v1/live/...` for
-endpoint presence; the status topic is the protocol acknowledgement, not
+`tick`; each participant publishes `LockstepStatus` on `tick_status/<id>`.
+Strict lockstep waits for a matching `run_id` and completed status sequence
+before publishing the next tick. Use Zenoh liveliness tokens under `live/...`
+for endpoint presence; the status topic is the protocol acknowledgement, not
 discovery.
 
 ## Topic Catalog
@@ -151,8 +215,8 @@ JavaScript:
 ```js
 import { keyForTopic, topicById, parseKey } from '@cognipilot/synapse-fbs';
 
-const key = keyForTopic('VehicleHealth');
-const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+const key = keyForTopic('VehicleHealth'); // 'health'
+const parsed = parseKey('cub1/imu/0');
 // parsed.namespace === 'cub1', parsed.topic.name === 'InertialSample',
 // parsed.instance === 0
 ```
@@ -162,15 +226,15 @@ Python:
 ```py
 from synapse import topic_catalog
 
-key = topic_catalog.key_for_topic("VehicleHealth")
-parsed = topic_catalog.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
+key = topic_catalog.key_for_topic("VehicleHealth")  # "health"
+parsed = topic_catalog.parse_key("cub1/imu/0")
 ```
 
 Rust:
 
 ```rust
-let key = synapse_fbs::topic_catalog::key_for_topic("VehicleHealth");
-let parsed = synapse_fbs::topic_catalog::parse_key("cub1/synapse/v1/topic/inertial_sample/0");
+let key = synapse_fbs::topic_catalog::key_for_topic("VehicleHealth"); // "health"
+let parsed = synapse_fbs::topic_catalog::parse_key("cub1/imu/0");
 ```
 
 C and C++ archives include `topics.json` and `include/synapse/topic_catalog.h`:
@@ -178,10 +242,11 @@ C and C++ archives include `topics.json` and `include/synapse/topic_catalog.h`:
 ```c
 #include <synapse/topic_catalog.h>
 
+const char *namespace_start;
 size_t namespace_len;
 int32_t instance;
-const synapse_topic_info_t *topic =
-    synapse_topic_parse_key("cub1/synapse/v1/topic/gnss_fix", &namespace_len, &instance);
+const synapse_topic_info_t *topic = synapse_topic_parse_key(
+    "cub1/gnss", &namespace_start, &namespace_len, &instance);
 ```
 
 ## Serial Links
@@ -243,8 +308,10 @@ simulation, and operator workflows. The planned flatros2 path generates a
 `synapse_msgs` package of fixed-size ROS mirrors from these schemas, uses
 `rclcpp::TypeAdapter` so nodes work on the generated structs directly, and
 drives a data-driven bridge from `topics.json` plus the `.bfbs` reflection
-schemas. ROS 2's Zenoh RMW derives its keys from topic and type names, so
-Synapse keys and the ROS graph share one router without collisions.
+schemas. ROS 2's Zenoh RMW prefixes its keys with the numeric domain id and
+appends type-name and type-hash segments, while Synapse keys end in a catalog
+topic key under non-numeric namespaces, so the two key shapes share one
+router without collisions.
 
 ## Schema Design Priorities
 
@@ -318,7 +385,7 @@ otherwise.
 Add the published crate to `Cargo.toml`:
 
 ```toml
-synapse_fbs = "0.4"
+synapse_fbs = "0.6"
 ```
 
 After a local `xtask` build, use the staged crate directly:
@@ -364,7 +431,7 @@ consumers. Prefer `find_package` for projects that download, extract, or
 install the release archive as part of their dependency setup:
 
 ```cmake
-find_package(synapse_fbs 0.5.1 CONFIG REQUIRED)
+find_package(synapse_fbs 0.6.0 CONFIG REQUIRED)
 
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
@@ -380,7 +447,7 @@ remains the simplest direct-from-release path:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.5.1)
+set(SYNAPSE_FBS_VERSION 0.6.0)
 
 FetchContent_Declare(
   synapse_fbs
@@ -439,7 +506,7 @@ through CMake `FetchContent`.
 Generate the static schema documentation locally:
 
 ```sh
-nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.5 --out-dir target/xtask/docs
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.6 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -453,7 +520,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a semantic version tag such as `v0.5.1` publishes a GitHub Release and
+Pushing a semantic version tag such as `v0.6.0` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
@@ -478,7 +545,7 @@ directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes schema documentation to the `gh-pages` branch used
 by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.5.1` updates `/0.5/`. Only the latest patch
+matching minor-version docs, so `v0.6.0` updates `/0.6/`. Only the latest patch
 for each published minor line is kept on GitHub Pages. Exact historical docs can
 be rebuilt from the corresponding tag.
 

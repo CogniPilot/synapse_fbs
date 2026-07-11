@@ -8,6 +8,7 @@ use std::{
 
 use minijinja::{AutoEscape, Environment, Value, context};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -27,10 +28,58 @@ const SCHEMAS: &[&str] = &[
     "fbs/all.fbs",
 ];
 
-const TOPIC_KEY_PREFIX: &str = "synapse/v1/topic";
-const CMD_KEY_PREFIX: &str = "synapse/v1/cmd";
-const META_KEY_PREFIX: &str = "synapse/v1/meta";
-const LIVELINESS_KEY_PREFIX: &str = "synapse/v1/live";
+const CMD_KEY_PREFIX: &str = "cmd";
+const META_KEY_PREFIX: &str = "meta";
+const LIVELINESS_KEY_PREFIX: &str = "live";
+
+/// Key segments reserved for non-topic key spaces; topic keys must not
+/// collide with them.
+const RESERVED_KEY_SEGMENTS: &[&str] = &[CMD_KEY_PREFIX, META_KEY_PREFIX, LIVELINESS_KEY_PREFIX];
+
+/// Curated short key for every TopicId member. Keys are the human API:
+/// `[<namespace>/]<key>[/<instance>]`, for example `cub1/odom`,
+/// `qualisys/cub1/external_pose`, or `cub1/imu/0`. Everything before the key
+/// is the deployment namespace; the payload contract comes from the value
+/// metadata, never the key. Keys are lowercase snake_case, must start with a
+/// letter, and must not use a reserved segment. Renaming a key is a breaking
+/// catalog change caught by the schema-set hash.
+/// (TopicId member, key)
+const TOPIC_KEYS: &[(&str, &str)] = &[
+    ("VehicleHealth", "health"),
+    ("TimeReference", "time"),
+    ("RadioControl", "rc"),
+    ("ManualControlCommand", "manual"),
+    ("InertialSample", "imu"),
+    ("AirData", "air"),
+    ("PowerStatus", "power"),
+    ("GnssFix", "gnss"),
+    ("OpticalFlow", "flow"),
+    ("OpticalFlowVelocity", "flow_vel"),
+    ("AttitudeEstimate", "att"),
+    ("LocalPositionEstimate", "local_pos"),
+    ("GlobalPositionEstimate", "global_pos"),
+    ("OdometryEstimate", "odom"),
+    ("EstimatorHealth", "est_health"),
+    ("MissionProgress", "mission"),
+    ("NavigationTarget", "nav"),
+    ("HomeReference", "home"),
+    ("AttitudeCommand", "att_sp"),
+    ("RateCommand", "rates_sp"),
+    ("LocalPositionCommand", "pos_sp"),
+    ("TrajectorySegment", "traj"),
+    ("ActuatorCommand", "act_cmd"),
+    ("ActuatorFeedback", "act_fb"),
+    ("PwmSignalOutputs", "pwm"),
+    ("ControlLoopMetrics", "loop"),
+    ("TextStatus", "text"),
+    ("GcsStatus", "gcs"),
+    ("ExternalOdometry", "external_pose"),
+    ("ExternalOdometryCovariance", "external_pose_cov"),
+    ("MocapFrame", "mocap"),
+    ("LockstepTick", "tick"),
+    ("LockstepStatus", "tick_status"),
+    ("FirmwareProgress", "fw"),
+];
 
 /// Queryable command and transfer services on the cmd key space. Ids mirror
 /// the CmdId enum in fbs/transfer.fbs so non-Zenoh request/reply transports
@@ -208,8 +257,9 @@ fn main() -> Result<()> {
         "js" => js(&root),
         "docs" => docs(&root, &options),
         "check" => check(&root),
+        "update-compatibility" => update_compatibility(&root),
         _ => fail(format!(
-            "unknown command '{command}'. expected: ci, js, docs, or check"
+            "unknown command '{command}'. expected: ci, js, docs, check, or update-compatibility"
         )),
     }
 }
@@ -219,6 +269,8 @@ fn check(root: &Path) -> Result<()> {
     validate_schema_docs(&docs)?;
     validate_protocol(&docs)?;
     let topics = topic_entries(&docs)?;
+    let commands = command_entries(&docs)?;
+    check_schema_compatibility(root, &topics, &commands)?;
 
     let templates = Templates::new(root)?;
     let check_dir = root.join("target/xtask/check");
@@ -310,6 +362,170 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
         &root.join("target/xtask/docs"),
     )?;
 
+    Ok(())
+}
+
+const WIRE_SCHEMA_COMPATIBILITY_PATH: &str = "compatibility/wire-schema.toml";
+
+#[derive(serde::Deserialize, serde::Serialize)]
+struct WireSchemaCompatibility {
+    wire_types: BTreeMap<String, String>,
+}
+
+/// Every wire type an endpoint may decode: topic payloads plus command
+/// request and reply types, each mapped to its transitive schema hash.
+fn wire_type_compatibility(
+    topics: &[TopicEntry],
+    commands: &[CommandEntry],
+) -> BTreeMap<String, String> {
+    let mut wire_types: BTreeMap<String, String> = topics
+        .iter()
+        .map(|topic| (topic.wire_type.clone(), topic.schema_hash.clone()))
+        .collect();
+    for command in commands {
+        wire_types.insert(
+            command.request_type.clone(),
+            command.request_schema_hash.clone(),
+        );
+        wire_types.insert(
+            command.reply_type.clone(),
+            command.reply_schema_hash.clone(),
+        );
+    }
+    wire_types
+}
+
+/// Hash the full catalog contract a constrained link relies on after the
+/// one-time handshake: topic id and key routing, payload interpretation
+/// (encoding, wire type, transitive schema hash, instance key grammar), and
+/// command ids with their request/reply contracts. Policy and documentation
+/// fields (scope, descriptions) are deliberately excluded. Endpoints that
+/// agree on this hash agree on how every frame is routed, decoded, and
+/// restored to canonical Zenoh form.
+fn schema_set_hash(topics: &[TopicEntry], commands: &[CommandEntry]) -> String {
+    let mut canonical = String::from("synapse-schema-set-v3\n");
+    let mut sorted_topics: Vec<&TopicEntry> = topics.iter().collect();
+    sorted_topics.sort_by_key(|topic| topic.id);
+    for topic in sorted_topics {
+        canonical.push_str(&format!(
+            "topic\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            topic.id,
+            topic.key,
+            if topic.multi_instance { 1 } else { 0 },
+            topic.encoding,
+            topic.wire_type,
+            topic.schema_hash,
+        ));
+    }
+    let mut sorted_commands: Vec<&CommandEntry> = commands.iter().collect();
+    sorted_commands.sort_by_key(|command| command.id);
+    for command in sorted_commands {
+        canonical.push_str(&format!(
+            "cmd\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+            command.id,
+            command.name,
+            command.request_encoding,
+            command.request_type,
+            command.request_schema_hash,
+            command.reply_encoding,
+            command.reply_type,
+            command.reply_schema_hash,
+        ));
+    }
+    let digest = Sha256::digest(canonical.as_bytes());
+    digest[..16]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn parse_wire_schema_compatibility(path: &Path) -> Result<BTreeMap<String, String>> {
+    let content = fs::read_to_string(path).map_err(|err| {
+        io::Error::other(format!(
+            "cannot read {}: {err}; run xtask update-compatibility to establish the compatibility baseline",
+            path.display()
+        ))
+    })?;
+    let manifest: WireSchemaCompatibility = toml::from_str(&content)
+        .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
+    for (wire_type, hash) in &manifest.wire_types {
+        if hash.len() != 32 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return fail(format!(
+                "{} has an invalid 128-bit truncated SHA-256 for {wire_type}",
+                path.display(),
+            ));
+        }
+    }
+    Ok(manifest.wire_types)
+}
+
+fn check_schema_compatibility(
+    root: &Path,
+    topics: &[TopicEntry],
+    commands: &[CommandEntry],
+) -> Result<()> {
+    let path = root.join(WIRE_SCHEMA_COMPATIBILITY_PATH);
+    let expected = parse_wire_schema_compatibility(&path)?;
+    let actual = wire_type_compatibility(topics, commands);
+    let mut problems = Vec::new();
+    for (wire_type, new_hash) in &actual {
+        match expected.get(wire_type) {
+            Some(old_hash) if new_hash != old_hash => problems.push(format!(
+                "BREAKING: {wire_type} changed from {old_hash} to {new_hash}; introduce a new wire type and topic instead"
+            )),
+            None => problems.push(format!(
+                "NEW: {wire_type} ({new_hash}); review it, then run xtask update-compatibility"
+            )),
+            _ => {}
+        }
+    }
+    for wire_type in expected.keys() {
+        if !actual.contains_key(wire_type) {
+            problems.push(format!(
+                "REMOVED: {wire_type}; run xtask update-compatibility after reviewing the removal"
+            ));
+        }
+    }
+    if problems.is_empty() {
+        return Ok(());
+    }
+    fail(format!(
+        "topic schema compatibility check failed:\n{}",
+        problems.join("\n")
+    ))
+}
+
+fn update_compatibility(root: &Path) -> Result<()> {
+    let docs = parse_schema_docs(root)?;
+    validate_schema_docs(&docs)?;
+    validate_protocol(&docs)?;
+    let topics = topic_entries(&docs)?;
+    let commands = command_entries(&docs)?;
+    let actual = wire_type_compatibility(&topics, &commands);
+    let path = root.join(WIRE_SCHEMA_COMPATIBILITY_PATH);
+    let existing = if path.is_file() {
+        parse_wire_schema_compatibility(&path)?
+    } else {
+        BTreeMap::new()
+    };
+    for (wire_type, new_hash) in &actual {
+        if let Some(old_hash) = existing.get(wire_type)
+            && new_hash != old_hash
+        {
+            return fail(format!(
+                "refusing to rewrite published {wire_type}: {old_hash} -> {new_hash}; introduce a new wire type and topic"
+            ));
+        }
+    }
+    let output = format!(
+        "# Current Synapse wire-type allowlist. Generated by xtask update-compatibility.\n# Unknown types and hashes are incompatible and must not be decoded.\n{}",
+        toml::to_string_pretty(&WireSchemaCompatibility { wire_types: actual })?
+    );
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    write_file(&path, &output)?;
+    println!("updated {}", path.display());
     Ok(())
 }
 
@@ -425,23 +641,27 @@ fn read_tools(_root: &Path) -> Result<Tools> {
 /// available locally; each check is skipped when its tool is missing.
 fn smoke_catalog_helpers(check_dir: &Path) -> Result<()> {
     if command_succeeds(Command::new("node").arg("--version")) {
-        let script = r#"import { parseKey, keyForTopic, topicByKey, commandByName } from './topic_catalog.js';
-const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+        let script = r#"import { parseKey, keyForTopic, topicByKey, commandByName, schemaSetHash } from './topic_catalog.js';
+if (!/^[0-9a-f]{32}$/.test(schemaSetHash)) throw new Error('bad schema-set hash');
+const parsed = parseKey('cub1/imu/0');
 if (!parsed || parsed.namespace !== 'cub1' || parsed.topic.name !== 'InertialSample' || parsed.instance !== 0) throw new Error('bad parseKey');
-if (parseKey('synapse/v1/topic/vehicle_health')?.namespace !== '') throw new Error('bad empty namespace');
-if (parseKey('cub1/synapse/v1/topic/nope') !== undefined) throw new Error('unknown suffix should fail');
-if (parseKey('synapse/v1/topic/vehicle_health/')?.topic.name !== 'VehicleHealth') throw new Error('trailing slash should parse');
-if (parseKey('synapse/v1/topic/inertial_sample/+1') !== undefined) throw new Error('signed instance should fail');
-if (parseKey('synapse/v1/topic/inertial_sample/4294967296') !== undefined) throw new Error('oversized instance should fail');
-if (keyForTopic('VehicleHealth') !== 'synapse/v1/topic/vehicle_health') throw new Error('bad key helper');
-if (topicByKey('/synapse/v1/topic/gnss_fix')?.name !== 'GnssFix') throw new Error('bad topicByKey');
-if (commandByName('mission_set')?.key !== 'synapse/v1/cmd/mission_set') throw new Error('bad command helper');
+if (parseKey('health')?.namespace !== '') throw new Error('bad empty namespace');
+if (parseKey('qualisys/cub1/external_pose')?.namespace !== 'qualisys/cub1') throw new Error('bad nested namespace');
+if (parseKey('cub1/nope') !== undefined) throw new Error('unknown key should fail');
+if (parseKey('health/')?.topic.name !== 'VehicleHealth') throw new Error('trailing slash should parse');
+if (parseKey('imu/+1') !== undefined) throw new Error('signed instance should fail');
+if (parseKey('imu/4294967296') !== undefined) throw new Error('oversized instance should fail');
+if (keyForTopic('VehicleHealth') !== 'health') throw new Error('bad key helper');
+if (topicByKey('/gnss')?.name !== 'GnssFix') throw new Error('bad topicByKey');
+if (commandByName('mission_set')?.key !== 'cmd/mission_set') throw new Error('bad command helper');
 if (commandByName('param_get')?.requestType !== 'synapse.cmd.ParamGetRequest') throw new Error('bad command type');
 if (commandByName('param_get')?.requestEncoding !== 'table') throw new Error('bad command encoding');
 if (commandByName('param_get')?.requestSize !== null) throw new Error('bad command size');
-if (commandByName('firmware_prepare')?.key !== 'synapse/v1/cmd/firmware_prepare') throw new Error('bad firmware command key');
+if (!/^[0-9a-f]{32}$/.test(commandByName('param_get')?.requestSchemaHash)) throw new Error('bad command request hash');
+if (!/^[0-9a-f]{32}$/.test(commandByName('param_get')?.replySchemaHash)) throw new Error('bad command reply hash');
+if (commandByName('firmware_prepare')?.key !== 'cmd/firmware_prepare') throw new Error('bad firmware command key');
 if (commandByName('firmware_prepare')?.requestType !== 'synapse.cmd.FirmwarePrepareRequest') throw new Error('bad firmware command type');
-if (topicByKey('synapse/v1/topic/firmware_progress')?.id !== 34) throw new Error('bad firmware progress topic');
+if (topicByKey('fw')?.id !== 34) throw new Error('bad firmware progress topic');
 console.log('catalog js helpers ok');
 "#;
         run(Command::new("node")
@@ -455,24 +675,28 @@ console.log('catalog js helpers ok');
         let code = r#"import sys
 sys.path.insert(0, ".")
 import topic_catalog as tc
-parsed = tc.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
+assert len(tc.SCHEMA_SET_HASH) == 32
+parsed = tc.parse_key("cub1/imu/0")
 assert parsed is not None and parsed.namespace == "cub1"
 assert parsed.topic.name == "InertialSample" and parsed.instance == 0
-assert tc.parse_key("synapse/v1/topic/vehicle_health").namespace == ""
-assert tc.parse_key("cub1/synapse/v1/topic/nope") is None
-assert tc.parse_key("synapse/v1/topic/vehicle_health/").topic.name == "VehicleHealth"
-assert tc.parse_key("synapse/v1/topic/inertial_sample/+1") is None
-assert tc.parse_key("synapse/v1/topic/inertial_sample/4294967296") is None
-assert tc.parse_key("synapse/v1/topic/inertial_sample/٢") is None
-assert tc.key_for_topic("VehicleHealth") == "synapse/v1/topic/vehicle_health"
-assert tc.topic_by_key("/synapse/v1/topic/gnss_fix").name == "GnssFix"
-assert tc.command_by_name("mission_set").key == "synapse/v1/cmd/mission_set"
+assert tc.parse_key("health").namespace == ""
+assert tc.parse_key("qualisys/cub1/external_pose").namespace == "qualisys/cub1"
+assert tc.parse_key("cub1/nope") is None
+assert tc.parse_key("health/").topic.name == "VehicleHealth"
+assert tc.parse_key("imu/+1") is None
+assert tc.parse_key("imu/4294967296") is None
+assert tc.parse_key("imu/٢") is None
+assert tc.key_for_topic("VehicleHealth") == "health"
+assert tc.topic_by_key("/gnss").name == "GnssFix"
+assert tc.command_by_name("mission_set").key == "cmd/mission_set"
 assert tc.command_by_name("param_get").request_type == "synapse.cmd.ParamGetRequest"
 assert tc.command_by_name("param_get").request_encoding == "table"
 assert tc.command_by_name("param_get").request_size is None
-assert tc.command_by_name("firmware_prepare").key == "synapse/v1/cmd/firmware_prepare"
+assert len(tc.command_by_name("param_get").request_schema_hash) == 32
+assert len(tc.command_by_name("param_get").reply_schema_hash) == 32
+assert tc.command_by_name("firmware_prepare").key == "cmd/firmware_prepare"
 assert tc.command_by_name("firmware_prepare").request_type == "synapse.cmd.FirmwarePrepareRequest"
-assert tc.topic_by_key("synapse/v1/topic/firmware_progress").id == 34
+assert tc.topic_by_key("fw").id == 34
 print("catalog python helpers ok")
 "#;
         run(Command::new(&python)
@@ -535,41 +759,42 @@ const C_CATALOG_TEST: &str = r#"#include "topic_catalog.h"
 #include <stdio.h>
 
 int main(void) {
+    assert(strlen(SYNAPSE_SCHEMA_SET_HASH) == 32);
     const char *ns = NULL;
     size_t ns_len = 0;
     int32_t instance = -2;
 
     const synapse_topic_info_t *topic = synapse_topic_parse_key(
-        "cub1/synapse/v1/topic/inertial_sample/0", &ns, &ns_len, &instance);
+        "cub1/imu/0", &ns, &ns_len, &instance);
     assert(topic != NULL && strcmp(topic->name, "InertialSample") == 0);
     assert(ns_len == 4 && strncmp(ns, "cub1", ns_len) == 0);
     assert(instance == 0);
 
     topic = synapse_topic_parse_key(
-        "/cub1/synapse/v1/topic/gnss_fix", &ns, &ns_len, &instance);
+        "/cub1/gnss", &ns, &ns_len, &instance);
     assert(topic != NULL && strcmp(topic->name, "GnssFix") == 0);
     assert(ns_len == 4 && strncmp(ns, "cub1", ns_len) == 0);
     assert(instance == -1);
 
     topic = synapse_topic_parse_key(
-        "synapse/v1/topic/vehicle_health/", NULL, NULL, NULL);
+        "qualisys/cub1/external_pose", &ns, &ns_len, &instance);
+    assert(topic != NULL && strcmp(topic->name, "ExternalOdometry") == 0);
+    assert(ns_len == 13 && strncmp(ns, "qualisys/cub1", ns_len) == 0);
+    assert(instance == -1);
+
+    topic = synapse_topic_parse_key("health/", NULL, NULL, NULL);
     assert(topic != NULL && strcmp(topic->name, "VehicleHealth") == 0);
 
-    topic = synapse_topic_parse_key(
-        "synapse/v1/topic/vehicle_health", &ns, &ns_len, &instance);
+    topic = synapse_topic_parse_key("health", &ns, &ns_len, &instance);
     assert(topic != NULL && ns_len == 0 && instance == -1);
 
+    assert(synapse_topic_parse_key("imu/+1", NULL, NULL, NULL) == NULL);
     assert(synapse_topic_parse_key(
-        "synapse/v1/topic/inertial_sample/+1", NULL, NULL, NULL) == NULL);
-    assert(synapse_topic_parse_key(
-        "synapse/v1/topic/inertial_sample/4294967296", NULL, NULL, NULL) == NULL);
-    assert(synapse_topic_parse_key(
-        "cub1/synapse/v1/topic/nope", NULL, NULL, NULL) == NULL);
-    assert(synapse_topic_parse_key(
-        "synapse/v1/topic/inertial_sample/0/extra", NULL, NULL, NULL) == NULL);
+        "imu/4294967296", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key("cub1/nope", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key("imu/0/extra", NULL, NULL, NULL) == NULL);
 
-    const synapse_topic_info_t *by_key =
-        synapse_topic_by_key("cub1/synapse/v1/topic/vehicle_health");
+    const synapse_topic_info_t *by_key = synapse_topic_by_key("cub1/health");
     assert(by_key != NULL && by_key->id == 1);
 
     const synapse_command_info_t *command = synapse_command_by_name("param_get");
@@ -577,14 +802,16 @@ int main(void) {
            strcmp(command->request_type, "synapse.cmd.ParamGetRequest") == 0);
     assert(strcmp(command->request_encoding, "table") == 0 &&
            command->request_size == 0);
+    assert(strlen(command->request_schema_hash) == 32 &&
+           strlen(command->reply_schema_hash) == 32);
 
     command = synapse_command_by_name("firmware_prepare");
     assert(command != NULL && command->id == 9 &&
-           strcmp(command->key, "synapse/v1/cmd/firmware_prepare") == 0 &&
+           strcmp(command->key, "cmd/firmware_prepare") == 0 &&
            strcmp(command->request_type,
                   "synapse.cmd.FirmwarePrepareRequest") == 0);
 
-    topic = synapse_topic_by_key("synapse/v1/topic/firmware_progress");
+    topic = synapse_topic_by_key("fw");
     assert(topic != NULL && topic->id == 34 && !topic->fixed_layout);
 
     printf("catalog c helpers ok\n");
@@ -665,37 +892,41 @@ int main(void) {
 const RUST_CATALOG_TEST: &str = r#"include!("topic_catalog.rs");
 
 fn main() {
-    let parsed = parse_key("cub1/synapse/v1/topic/inertial_sample/0").unwrap();
+    assert_eq!(SCHEMA_SET_HASH.len(), 32);
+    let parsed = parse_key("cub1/imu/0").unwrap();
     assert_eq!(parsed.namespace, "cub1");
     assert_eq!(parsed.topic.name, "InertialSample");
     assert_eq!(parsed.instance, Some(0));
 
-    let parsed = parse_key("/cub1/synapse/v1/topic/gnss_fix").unwrap();
+    let parsed = parse_key("/cub1/gnss").unwrap();
     assert_eq!(parsed.namespace, "cub1");
     assert_eq!(parsed.instance, None);
 
-    assert_eq!(
-        parse_key("synapse/v1/topic/vehicle_health/").unwrap().topic.name,
-        "VehicleHealth"
-    );
-    assert_eq!(parse_key("synapse/v1/topic/vehicle_health").unwrap().namespace, "");
-    assert!(parse_key("synapse/v1/topic/inertial_sample/+1").is_none());
-    assert!(parse_key("synapse/v1/topic/inertial_sample/4294967296").is_none());
-    assert!(parse_key("cub1/synapse/v1/topic/nope").is_none());
-    assert!(parse_key("synapse/v1/topic/inertial_sample/0/extra").is_none());
+    let parsed = parse_key("qualisys/cub1/external_pose").unwrap();
+    assert_eq!(parsed.namespace, "qualisys/cub1");
+    assert_eq!(parsed.topic.name, "ExternalOdometry");
 
-    assert_eq!(topic_by_key("cub1/synapse/v1/topic/vehicle_health").unwrap().id, 1);
+    assert_eq!(parse_key("health/").unwrap().topic.name, "VehicleHealth");
+    assert_eq!(parse_key("health").unwrap().namespace, "");
+    assert!(parse_key("imu/+1").is_none());
+    assert!(parse_key("imu/4294967296").is_none());
+    assert!(parse_key("cub1/nope").is_none());
+    assert!(parse_key("imu/0/extra").is_none());
+
+    assert_eq!(topic_by_key("cub1/health").unwrap().id, 1);
     let command = command_by_name("param_get").unwrap();
     assert_eq!(command.id, 1);
     assert_eq!(command.request_type, "synapse.cmd.ParamGetRequest");
     assert_eq!(command.request_encoding, "table");
     assert_eq!(command.request_size, None);
+    assert_eq!(command.request_schema_hash.len(), 32);
+    assert_eq!(command.reply_schema_hash.len(), 32);
 
     let command = command_by_name("firmware_prepare").unwrap();
     assert_eq!(command.id, 9);
-    assert_eq!(command.key, "synapse/v1/cmd/firmware_prepare");
+    assert_eq!(command.key, "cmd/firmware_prepare");
     assert_eq!(command.request_type, "synapse.cmd.FirmwarePrepareRequest");
-    let progress = topic_by_key("synapse/v1/topic/firmware_progress").unwrap();
+    let progress = topic_by_key("fw").unwrap();
     assert_eq!(progress.id, 34);
     assert!(!progress.fixed_layout);
 
@@ -1071,6 +1302,8 @@ fn generate_bindings(
     validate_schema_docs(&docs)?;
     validate_protocol(&docs)?;
     let topics = topic_entries(&docs)?;
+    let commands = command_entries(&docs)?;
+    check_schema_compatibility(root, &topics, &commands)?;
     write_package_topic_catalogs(templates, packages, &docs, &topics)?;
 
     // The Rust crate ships the wire contract itself: schema sources, compiled
@@ -1166,64 +1399,66 @@ fn write_c_topic_catalogs(
 }
 
 fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Value> {
-    let mut layouts = BTreeMap::new();
-    let mut commands = Vec::new();
-    for (id, name, request_type, reply_type, description) in COMMANDS {
-        let key = format!("{CMD_KEY_PREFIX}/{name}");
-        let request_meta = command_payload_metadata(docs, request_type, &mut layouts)?;
-        let reply_meta = command_payload_metadata(docs, reply_type, &mut layouts)?;
-        commands.push(CommandTemplateEntry {
-            id: *id,
-            name: (*name).to_string(),
-            key: key.clone(),
-            request_type: (*request_type).to_string(),
-            reply_type: (*reply_type).to_string(),
-            request_encoding: request_meta.encoding,
-            request_size: request_meta.size,
-            reply_encoding: reply_meta.encoding,
-            reply_size: reply_meta.size,
-            description: (*description).to_string(),
-            name_literal: source_string_literal(name),
-            key_literal: source_string_literal(&key),
-            request_type_literal: source_string_literal(request_type),
-            reply_type_literal: source_string_literal(reply_type),
-            request_encoding_literal: source_string_literal(request_meta.encoding),
-            request_size_c: request_meta
-                .size
+    let command_entries = command_entries(docs)?;
+    let commands = command_entries
+        .iter()
+        .map(|command| CommandTemplateEntry {
+            id: command.id,
+            name: command.name.clone(),
+            key: command.key.clone(),
+            request_type: command.request_type.clone(),
+            reply_type: command.reply_type.clone(),
+            request_schema_hash: command.request_schema_hash.clone(),
+            reply_schema_hash: command.reply_schema_hash.clone(),
+            request_encoding: command.request_encoding,
+            request_size: command.request_size,
+            reply_encoding: command.reply_encoding,
+            reply_size: command.reply_size,
+            description: command.description.clone(),
+            name_literal: source_string_literal(&command.name),
+            key_literal: source_string_literal(&command.key),
+            request_type_literal: source_string_literal(&command.request_type),
+            reply_type_literal: source_string_literal(&command.reply_type),
+            request_schema_hash_literal: source_string_literal(&command.request_schema_hash),
+            reply_schema_hash_literal: source_string_literal(&command.reply_schema_hash),
+            request_encoding_literal: source_string_literal(command.request_encoding),
+            request_size_c: command
+                .request_size
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "0".to_string()),
-            request_size_python: request_meta
-                .size
+            request_size_python: command
+                .request_size
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "None".to_string()),
-            request_size_rust: request_meta
-                .size
+            request_size_rust: command
+                .request_size
                 .map(|value| format!("Some({value})"))
                 .unwrap_or_else(|| "None".to_string()),
-            reply_encoding_literal: source_string_literal(reply_meta.encoding),
-            reply_size_c: reply_meta
-                .size
+            reply_encoding_literal: source_string_literal(command.reply_encoding),
+            reply_size_c: command
+                .reply_size
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "0".to_string()),
-            reply_size_python: reply_meta
-                .size
+            reply_size_python: command
+                .reply_size
                 .map(|value| value.to_string())
                 .unwrap_or_else(|| "None".to_string()),
-            reply_size_rust: reply_meta
-                .size
+            reply_size_rust: command
+                .reply_size
                 .map(|value| format!("Some({value})"))
                 .unwrap_or_else(|| "None".to_string()),
-            description_literal: source_string_literal(description),
-        });
-    }
+            description_literal: source_string_literal(&command.description),
+        })
+        .collect();
 
+    let set_hash = schema_set_hash(topics, &command_entries);
     Ok(Value::from_serialize(TopicCatalogContext {
         version: 2,
-        key_prefix: TOPIC_KEY_PREFIX,
+        schema_set_hash: set_hash.clone(),
+        schema_set_hash_literal: source_string_literal(&set_hash),
         cmd_key_prefix: CMD_KEY_PREFIX,
         meta_key_prefix: META_KEY_PREFIX,
         liveliness_key_prefix: LIVELINESS_KEY_PREFIX,
-        key_prefix_literal: source_string_literal(TOPIC_KEY_PREFIX),
         cmd_key_prefix_literal: source_string_literal(CMD_KEY_PREFIX),
         meta_key_prefix_literal: source_string_literal(META_KEY_PREFIX),
         liveliness_key_prefix_literal: source_string_literal(LIVELINESS_KEY_PREFIX),
@@ -1282,11 +1517,12 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
                     id: topic.id,
                     name: topic.name.clone(),
                     key: topic.key.clone(),
-                    key_suffix: topic.key_suffix.clone(),
                     root_table: topic.root_table.clone(),
                     payload_type: topic.payload_type.clone(),
                     payload_size: topic.payload_size,
                     schema_file: topic.schema_file.clone(),
+                    wire_type: topic.wire_type.clone(),
+                    schema_hash: topic.schema_hash.clone(),
                     fixed_layout: topic.fixed_layout,
                     multi_instance: topic.multi_instance,
                     scope: topic.scope,
@@ -1294,7 +1530,6 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
                     description: topic.description.clone(),
                     name_literal: source_string_literal(&topic.name),
                     key_literal: source_string_literal(&topic.key),
-                    key_suffix_literal: source_string_literal(&topic.key_suffix),
                     root_table_literal: source_string_literal(&topic.root_table),
                     payload_type_c,
                     payload_type_python,
@@ -1307,6 +1542,8 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
                     root_table_qualified_literal,
                     payload_type_qualified_literal,
                     schema_file_literal: source_string_literal(&topic.schema_file),
+                    wire_type_literal: source_string_literal(&topic.wire_type),
+                    schema_hash_literal: source_string_literal(&topic.schema_hash),
                     fixed_layout_python: if topic.fixed_layout { "True" } else { "False" },
                     fixed_layout_c: if topic.fixed_layout { "true" } else { "false" },
                     multi_instance_python: if topic.multi_instance {
@@ -1548,15 +1785,15 @@ from synapse.topic.FirmwareProgress import FirmwareProgress
 assert metadata.version("flatbuffers") == "{}"
 assert Vec3f is not None and GnssFixData is not None and ParamValue is not None
 assert FirmwarePrepareRequest is not None and FirmwareProgress is not None
-assert topic_catalog.key_for_topic("VehicleHealth") == "synapse/v1/topic/vehicle_health"
+assert topic_catalog.key_for_topic("VehicleHealth") == "health"
 assert topic_catalog.topic_by_id(1).payload_type == "VehicleHealthData"
-parsed = topic_catalog.parse_key("cub1/synapse/v1/topic/inertial_sample/0")
+parsed = topic_catalog.parse_key("cub1/imu/0")
 assert parsed is not None and parsed.namespace == "cub1"
 assert parsed.topic.name == "InertialSample" and parsed.instance == 0
-assert topic_catalog.topic_by_key("cub1/synapse/v1/topic/vehicle_health").id == 1
-assert topic_catalog.command_by_name("param_get").key == "synapse/v1/cmd/param_get"
-assert topic_catalog.command_by_name("firmware_prepare").key == "synapse/v1/cmd/firmware_prepare"
-assert topic_catalog.topic_by_key("synapse/v1/topic/firmware_progress").id == 34
+assert topic_catalog.topic_by_key("cub1/health").id == 1
+assert topic_catalog.command_by_name("param_get").key == "cmd/param_get"
+assert topic_catalog.command_by_name("firmware_prepare").key == "cmd/firmware_prepare"
+assert topic_catalog.topic_by_key("fw").id == 34
 assert topic_catalog.topic_by_name("GnssFix").payload_size is not None
 "#,
         tools.flatbuffers_version
@@ -1604,14 +1841,14 @@ for (const name of schemaFiles) {
 if (!existsSync(join(fbsDir, 'transport.fbs'))) throw new Error('missing fbsDir');
 if (!existsSync(join(bfbsDir, 'transport.bfbs'))) throw new Error('missing reflection schema');
 if (!existsSync(join(fbsDir, '..', 'topics.json'))) throw new Error('missing topic catalog');
-if (keyForTopic('VehicleHealth') !== 'synapse/v1/topic/vehicle_health') throw new Error('bad topic key helper');
+if (keyForTopic('VehicleHealth') !== 'health') throw new Error('bad topic key helper');
 if (topicById(1)?.payloadType !== 'VehicleHealthData') throw new Error('bad topic id helper');
-const parsed = parseKey('cub1/synapse/v1/topic/inertial_sample/0');
+const parsed = parseKey('cub1/imu/0');
 if (!parsed || parsed.namespace !== 'cub1' || parsed.topic.name !== 'InertialSample' || parsed.instance !== 0) throw new Error('bad parseKey helper');
-if (topicByKey('cub1/synapse/v1/topic/vehicle_health')?.id !== 1) throw new Error('bad namespaced key lookup');
-if (commandByName('param_get')?.key !== 'synapse/v1/cmd/param_get') throw new Error('bad command helper');
-if (commandByName('firmware_prepare')?.key !== 'synapse/v1/cmd/firmware_prepare') throw new Error('bad firmware command helper');
-if (topicByKey('synapse/v1/topic/firmware_progress')?.id !== 34) throw new Error('bad firmware progress helper');
+if (topicByKey('cub1/health')?.id !== 1) throw new Error('bad namespaced key lookup');
+if (commandByName('param_get')?.key !== 'cmd/param_get') throw new Error('bad command helper');
+if (commandByName('firmware_prepare')?.key !== 'cmd/firmware_prepare') throw new Error('bad firmware command helper');
+if (topicByKey('fw')?.id !== 34) throw new Error('bad firmware progress helper');
 console.log('synapse-fbs js package ok');
 "#;
 
@@ -1936,13 +2173,14 @@ struct TopicEntry {
     id: u16,
     name: String,
     key: String,
-    key_suffix: String,
     root_table: String,
     root_table_namespace: String,
     payload_type: Option<String>,
     payload_type_namespace: Option<String>,
     payload_size: Option<usize>,
     schema_file: String,
+    wire_type: String,
+    schema_hash: String,
     fixed_layout: bool,
     multi_instance: bool,
     scope: &'static str,
@@ -1956,14 +2194,33 @@ struct CommandPayloadMetadata {
     size: Option<usize>,
 }
 
+/// One queryable command service with its full wire contract: request and
+/// reply types each carry the same transitive schema hash topics use, so the
+/// compatibility allowlist and the schema-set hash cover command payloads.
+#[derive(Clone, Debug)]
+struct CommandEntry {
+    id: u16,
+    name: String,
+    key: String,
+    request_type: String,
+    request_schema_hash: String,
+    request_encoding: &'static str,
+    request_size: Option<usize>,
+    reply_type: String,
+    reply_schema_hash: String,
+    reply_encoding: &'static str,
+    reply_size: Option<usize>,
+    description: String,
+}
+
 #[derive(Clone, Debug, Serialize)]
 struct TopicCatalogContext {
     version: u8,
-    key_prefix: &'static str,
+    schema_set_hash: String,
+    schema_set_hash_literal: String,
     cmd_key_prefix: &'static str,
     meta_key_prefix: &'static str,
     liveliness_key_prefix: &'static str,
-    key_prefix_literal: String,
     cmd_key_prefix_literal: String,
     meta_key_prefix_literal: String,
     liveliness_key_prefix_literal: String,
@@ -1976,11 +2233,12 @@ struct TopicTemplateEntry {
     id: u16,
     name: String,
     key: String,
-    key_suffix: String,
     root_table: String,
     payload_type: Option<String>,
     payload_size: Option<usize>,
     schema_file: String,
+    wire_type: String,
+    schema_hash: String,
     fixed_layout: bool,
     multi_instance: bool,
     scope: &'static str,
@@ -1988,7 +2246,6 @@ struct TopicTemplateEntry {
     description: String,
     name_literal: String,
     key_literal: String,
-    key_suffix_literal: String,
     root_table_literal: String,
     payload_type_c: String,
     payload_type_python: String,
@@ -2001,6 +2258,8 @@ struct TopicTemplateEntry {
     root_table_qualified_literal: String,
     payload_type_qualified_literal: String,
     schema_file_literal: String,
+    wire_type_literal: String,
+    schema_hash_literal: String,
     fixed_layout_python: &'static str,
     fixed_layout_c: &'static str,
     multi_instance_python: &'static str,
@@ -2017,6 +2276,8 @@ struct CommandTemplateEntry {
     key: String,
     request_type: String,
     reply_type: String,
+    request_schema_hash: String,
+    reply_schema_hash: String,
     request_encoding: &'static str,
     request_size: Option<usize>,
     reply_encoding: &'static str,
@@ -2026,6 +2287,8 @@ struct CommandTemplateEntry {
     key_literal: String,
     request_type_literal: String,
     reply_type_literal: String,
+    request_schema_hash_literal: String,
+    reply_schema_hash_literal: String,
     request_encoding_literal: String,
     request_size_c: String,
     request_size_python: String,
@@ -2243,6 +2506,7 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
 }
 
 fn validate_schema_docs(docs: &SchemaDoc) -> Result<()> {
+    validate_canonicalizable(docs)?;
     let mut missing = Vec::new();
 
     for file in &docs.files {
@@ -2280,6 +2544,126 @@ fn validate_schema_docs(docs: &SchemaDoc) -> Result<()> {
     }
 }
 
+/// The wire-schema hash is only as strong as the canonical form's coverage,
+/// so every schema construct must be one the canonicalizer models. The only
+/// FlatBuffers attribute it models is `(bit_flags)` on enums (captured via
+/// the enum value type); any other attribute could change wire layout or
+/// semantics without changing the hash, and is rejected here.
+fn validate_canonicalizable(docs: &SchemaDoc) -> Result<()> {
+    let mut problems = Vec::new();
+    let has_parens = |text: &str| text.contains('(') || text.contains(')');
+
+    for file in &docs.files {
+        for entity in &file.entities {
+            if has_parens(&entity.name) {
+                problems.push(format!(
+                    "{}: {} declaration {} carries an attribute the schema canonicalizer does not model",
+                    file.name,
+                    entity.kind.as_str(),
+                    entity.name
+                ));
+            }
+            if let Some(value_type) = entity.value_type.as_deref()
+                && has_parens(value_type)
+                && !(entity.kind == SchemaEntityKind::Enum
+                    && value_type.split_once('(').is_some_and(|(base, attribute)| {
+                        !base.trim().is_empty() && attribute.trim() == "bit_flags)"
+                    }))
+            {
+                problems.push(format!(
+                    "{}: {} {} value type '{value_type}' carries an attribute the schema canonicalizer does not model (only enum (bit_flags) is supported)",
+                    file.name,
+                    entity.kind.as_str(),
+                    entity.name
+                ));
+            }
+            for member in &entity.members {
+                let attributed = has_parens(&member.name)
+                    || member.type_name.as_deref().is_some_and(has_parens)
+                    || member.value.as_deref().is_some_and(has_parens);
+                if attributed {
+                    problems.push(format!(
+                        "{}: {} {} member {} carries an attribute the schema canonicalizer does not model",
+                        file.name,
+                        entity.kind.as_str(),
+                        entity.name,
+                        member.name
+                    ));
+                }
+            }
+        }
+    }
+
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(format!(
+            "schema uses constructs outside the hashed wire contract; extend wire_schema_hash before allowing them:\n{}",
+            problems.join("\n")
+        ))
+    }
+}
+
+/// Check TOPIC_KEYS is a valid, exhaustive map for the TopicId enum: one
+/// well-formed, unique, non-reserved key per topic and no stale entries.
+fn validate_topic_keys(topic_enum: &SchemaEntityDoc) -> Result<()> {
+    let mut problems = Vec::new();
+    let members: BTreeSet<&str> = topic_enum
+        .members
+        .iter()
+        .map(|member| member.name.as_str())
+        .filter(|name| *name != "Unknown")
+        .collect();
+
+    let mut seen_names = BTreeSet::new();
+    let mut seen_keys = BTreeSet::new();
+    for (name, key) in TOPIC_KEYS {
+        if !seen_names.insert(*name) {
+            problems.push(format!("TOPIC_KEYS lists {name} more than once"));
+        }
+        if !seen_keys.insert(*key) {
+            problems.push(format!("topic key '{key}' is used more than once"));
+        }
+        if !members.contains(name) {
+            problems.push(format!("TOPIC_KEYS entry {name} is not a TopicId member"));
+        }
+        if RESERVED_KEY_SEGMENTS.contains(key) {
+            problems.push(format!("topic key '{key}' is a reserved key segment"));
+        }
+        let well_formed = key.starts_with(|c: char| c.is_ascii_lowercase())
+            && key
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+        if !well_formed {
+            problems.push(format!(
+                "topic key '{key}' must be lowercase snake_case starting with a letter"
+            ));
+        }
+    }
+    for member in &members {
+        if !seen_names.contains(member) {
+            problems.push(format!("TopicId {member} has no TOPIC_KEYS entry"));
+        }
+    }
+
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(format!(
+            "topic key table is invalid:\n{}",
+            problems.join("\n")
+        ))
+    }
+}
+
+fn topic_key(member: &str) -> Result<&'static str> {
+    TOPIC_KEYS
+        .iter()
+        .find(|(name, _)| *name == member)
+        .map(|(_, key)| *key)
+        .ok_or_else(|| io::Error::other(format!("TopicId {member} has no TOPIC_KEYS entry")).into())
+}
+
 fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
     let topic_enum = docs
         .files
@@ -2287,6 +2671,7 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
         .flat_map(|file| &file.entities)
         .find(|entity| entity.kind == SchemaEntityKind::Enum && entity.name == "TopicId")
         .ok_or_else(|| io::Error::other("TopicId enum not found"))?;
+    validate_topic_keys(topic_enum)?;
 
     let mut topics = Vec::new();
     let mut layouts = BTreeMap::new();
@@ -2346,18 +2731,27 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
             "any"
         };
         let encoding = if fixed_layout { "struct" } else { "table" };
-        let key_suffix = snake_case(&member.name);
+        let wire_entity = if fixed_layout {
+            payload_entity
+                .map(|(_, entity)| entity)
+                .expect("fixed-layout topic has a payload entity")
+        } else {
+            root_table
+        };
+        let wire_type = qualified_name(&wire_entity.namespace, &wire_entity.name);
+        let schema_hash = wire_schema_hash(docs, wire_entity)?;
         topics.push(TopicEntry {
             id,
             name: member.name.clone(),
-            key: format!("{TOPIC_KEY_PREFIX}/{key_suffix}"),
-            key_suffix,
+            key: topic_key(&member.name)?.to_string(),
             root_table: root_table.name.clone(),
             root_table_namespace: root_table.namespace.clone(),
             payload_type,
             payload_type_namespace,
             payload_size,
             schema_file: schema_file.name.clone(),
+            wire_type,
+            schema_hash,
             fixed_layout,
             multi_instance,
             scope,
@@ -2367,6 +2761,97 @@ fn topic_entries(docs: &SchemaDoc) -> Result<Vec<TopicEntry>> {
     }
 
     Ok(topics)
+}
+
+/// Hash the exact transitive FlatBuffers contract reachable from one wire
+/// type. Comments, source files, and unrelated declarations are deliberately
+/// excluded so documentation and unrelated message changes do not invalidate
+/// compatible values.
+fn wire_schema_hash(docs: &SchemaDoc, root: &SchemaEntityDoc) -> Result<String> {
+    let mut reachable = BTreeMap::<String, &SchemaEntityDoc>::new();
+    let mut pending = vec![root];
+    while let Some(entity) = pending.pop() {
+        let qualified = qualified_name(&entity.namespace, &entity.name);
+        if reachable.insert(qualified, entity).is_some() {
+            continue;
+        }
+        if let Some(value_type) = entity.value_type.as_deref()
+            && let Some(referenced) = resolve_schema_type(docs, &entity.namespace, value_type)
+        {
+            pending.push(referenced);
+        }
+        for member in &entity.members {
+            if let Some(type_name) = member.type_name.as_deref()
+                && let Some(referenced) = resolve_schema_type(docs, &entity.namespace, type_name)
+            {
+                pending.push(referenced);
+            }
+        }
+    }
+
+    let mut canonical = String::from("synapse-flatbuffers-wire-schema-v1\n");
+    for (qualified, entity) in reachable {
+        canonical.push_str("entity\t");
+        canonical.push_str(entity.kind.as_str());
+        canonical.push('\t');
+        canonical.push_str(&qualified);
+        canonical.push('\t');
+        canonical.push_str(entity.value_type.as_deref().unwrap_or(""));
+        canonical.push('\n');
+        for member in &entity.members {
+            canonical.push_str("member\t");
+            canonical.push_str(&member.name);
+            canonical.push('\t');
+            canonical.push_str(member.type_name.as_deref().unwrap_or(""));
+            canonical.push('\t');
+            if let Some(type_name) = member.type_name.as_deref()
+                && let Some(target) = resolve_schema_type(docs, &entity.namespace, type_name)
+            {
+                canonical.push_str(&qualified_name(&target.namespace, &target.name));
+            }
+            canonical.push('\t');
+            canonical.push_str(member.value.as_deref().unwrap_or(""));
+            canonical.push('\n');
+        }
+    }
+    let digest = Sha256::digest(canonical.as_bytes());
+    Ok(digest[..16]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
+}
+
+fn resolve_schema_type<'a>(
+    docs: &'a SchemaDoc,
+    namespace: &str,
+    type_name: &str,
+) -> Option<&'a SchemaEntityDoc> {
+    let atom = type_name
+        .trim()
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .split(':')
+        .next()
+        .unwrap_or(type_name)
+        .trim();
+    if scalar_layout(atom).is_some() || matches!(atom, "string") {
+        return None;
+    }
+    let qualified = if atom.contains('.') || namespace.is_empty() {
+        atom.to_string()
+    } else {
+        format!("{namespace}.{atom}")
+    };
+    docs.files
+        .iter()
+        .flat_map(|file| &file.entities)
+        .find(|entity| qualified_name(&entity.namespace, &entity.name) == qualified)
+        .or_else(|| {
+            docs.files
+                .iter()
+                .flat_map(|file| &file.entities)
+                .find(|entity| entity.name == type_lookup_name(atom))
+        })
 }
 
 fn command_payload_metadata(
@@ -2399,6 +2884,47 @@ fn command_payload_metadata(
             entity.name
         )),
     }
+}
+
+/// Resolve the COMMANDS table against the parsed schemas, computing each
+/// request and reply type's payload metadata and transitive schema hash.
+fn command_entries(docs: &SchemaDoc) -> Result<Vec<CommandEntry>> {
+    let mut layouts = BTreeMap::new();
+    let mut commands = Vec::new();
+    for (id, name, request_type, reply_type, description) in COMMANDS {
+        let request_meta = command_payload_metadata(docs, request_type, &mut layouts)?;
+        let reply_meta = command_payload_metadata(docs, reply_type, &mut layouts)?;
+        commands.push(CommandEntry {
+            id: *id,
+            name: (*name).to_string(),
+            key: format!("{CMD_KEY_PREFIX}/{name}"),
+            request_type: (*request_type).to_string(),
+            request_schema_hash: command_schema_hash(docs, request_type)?,
+            request_encoding: request_meta.encoding,
+            request_size: request_meta.size,
+            reply_type: (*reply_type).to_string(),
+            reply_schema_hash: command_schema_hash(docs, reply_type)?,
+            reply_encoding: reply_meta.encoding,
+            reply_size: reply_meta.size,
+            description: (*description).to_string(),
+        });
+    }
+    Ok(commands)
+}
+
+fn command_schema_hash(docs: &SchemaDoc, type_name: &str) -> Result<String> {
+    let Some((_, entity)) = find_schema_entity(docs, &type_lookup_name(type_name)) else {
+        return fail(format!(
+            "command type {type_name} does not resolve to a schema entity"
+        ));
+    };
+    let qualified = qualified_name(&entity.namespace, &entity.name);
+    if qualified != type_name {
+        return fail(format!(
+            "command type {type_name} resolves to {qualified}; declare the fully qualified name"
+        ));
+    }
+    wire_schema_hash(docs, entity)
 }
 
 fn round_up(value: usize, align: usize) -> usize {
@@ -3341,8 +3867,8 @@ fn render_book_index(docs: &SchemaDoc, version: &str, version_dir_name: &str) ->
     md.push_str("- **Stable topic identifiers:** `TopicId` is available for bridges, logs, serial frames, or compact routing tables, while Zenoh deployments can use key expressions as the primary discriminator.\n");
     md.push_str("- **No transport checksums in payloads:** Zenoh, UDP, TCP, and link layers can provide their own integrity behavior, so Synapse payloads stay portable across middleware and shared memory.\n");
     md.push_str("- **Schema assets in every release:** npm, Python, Rust, C, and C++ artifacts carry generated bindings or schema assets so Zenoh tools, web dashboards, firmware bridges, and scripts can decode the same messages.\n\n");
-    md.push_str("Canonical keys use `synapse/v1/topic/<topic_name>[/<instance>]`; the `v1` segment is the schema-major compatibility signal, and multi-instance sensor topics append an instance segment so subscribers can select one sensor without decoding payloads. Deployments prepend vehicle, swarm, or site namespaces (for example `cub1/synapse/v1/topic/gnss_fix`); namespace prefixes come from deployment configuration and are never hardcoded in firmware. The package helpers parse namespaced keys and look up topics by `TopicId`, name, key, or key suffix. Commands and transfers are Zenoh queryables under `synapse/v1/cmd/...`; `synapse/v1/meta/...` and `synapse/v1/live/...` are reserved for schema metadata and liveliness.\n\n");
-    md.push_str("Lockstep simulation is modeled as pub/sub state, not query/reply RPC. A simulator publishes `LockstepTick` on `synapse/v1/topic/lockstep_tick`, and each participant publishes `LockstepStatus` on `synapse/v1/topic/lockstep_status/<id>`. Strict lockstep waits for a matching `run_id` and completed status sequence before sending the next tick. Use liveliness tokens under `synapse/v1/live/...` for endpoint presence; the status topic is the protocol acknowledgement, not discovery.\n\n");
+    md.push_str("Canonical keys use `[<namespace>/]<key>[/<instance>]` with short curated topic keys, for example `cub1/odom`, `qualisys/cub1/external_pose`, or `cub1/imu/0`. Multi-instance sensor topics append an instance segment so subscribers can select one sensor without decoding payloads. Deployments prepend vehicle, swarm, or site namespaces from configuration, never hardcoded in firmware; the mandatory per-value contract metadata, not the key, is the compatibility signal. The package helpers parse namespaced keys and look up topics by `TopicId`, name, or key. Commands and transfers are Zenoh queryables under the reserved `cmd/` segment; `meta/` and `live/` are reserved for schema metadata and liveliness.\n\n");
+    md.push_str("Lockstep simulation is modeled as pub/sub state, not query/reply RPC. A simulator publishes `LockstepTick` on `tick`, and each participant publishes `LockstepStatus` on `tick_status/<id>`. Strict lockstep waits for a matching `run_id` and completed status sequence before sending the next tick. Use liveliness tokens under `live/...` for endpoint presence; the status topic is the protocol acknowledgement, not discovery.\n\n");
     md.push_str("## Topic Catalog\n\n");
     md.push_str("The generated topic catalog is included as `topics.json` in schema-asset archives and as language helpers where the package has a public API. It records `TopicId`, canonical key expression, FlatBuffers root table, fixed-layout payload type and size, schema file, topic encoding, command request/reply encoding, and descriptions from schema comments.\n\n");
     md.push_str("Use the catalog when writing Zenoh publishers/subscribers, serial frame routers, log readers, gateways, and ROS bridge nodes. That keeps topic routing synchronized with the schema instead of duplicating key strings and numeric IDs in application code.\n\n");

@@ -1,7 +1,7 @@
 {
   "version": {{ version }},
+  "schema_set_hash": {{ schema_set_hash|tojson }},
   "key_prefixes": {
-    "topic": {{ key_prefix|tojson }},
     "cmd": {{ cmd_key_prefix|tojson }},
     "meta": {{ meta_key_prefix|tojson }},
     "liveliness": {{ liveliness_key_prefix|tojson }}
@@ -12,11 +12,12 @@
       "id": {{ topic.id }},
       "name": {{ topic.name|tojson }},
       "key": {{ topic.key|tojson }},
-      "key_suffix": {{ topic.key_suffix|tojson }},
       "root_table": {{ topic.root_table|tojson }},
       "payload_type": {{ topic.payload_type|tojson }},
       "payload_size": {{ topic.payload_size|tojson }},
       "schema_file": {{ topic.schema_file|tojson }},
+      "wire_type": {{ topic.wire_type|tojson }},
+      "schema_hash": {{ topic.schema_hash|tojson }},
       "fixed_layout": {{ topic.fixed_layout|tojson }},
       "multi_instance": {{ topic.multi_instance|tojson }},
       "scope": {{ topic.scope|tojson }},
@@ -32,7 +33,9 @@
       "name": {{ command.name|tojson }},
       "key": {{ command.key|tojson }},
       "request_type": {{ command.request_type|tojson }},
+      "request_schema_hash": {{ command.request_schema_hash|tojson }},
       "reply_type": {{ command.reply_type|tojson }},
+      "reply_schema_hash": {{ command.reply_schema_hash|tojson }},
       "request_encoding": {{ command.request_encoding|tojson }},
       "request_size": {{ command.request_size|tojson }},
       "reply_encoding": {{ command.reply_encoding|tojson }},
