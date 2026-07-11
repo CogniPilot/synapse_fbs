@@ -1,0 +1,51 @@
+namespace synapse.topic;
+
+// Control bits for lockstep tick messages.
+enum LockstepTickFlags:ushort (bit_flags) {
+  Reset, // Receiver should reset its lockstep state before applying this tick.
+  Final, // This tick is the final tick in the current lockstep run.
+}
+
+// Participant state for lockstep status messages.
+enum LockstepStatusState:ubyte {
+  Unknown = 0, // Participant state is not reported.
+  Ready = 1, // Participant is initialized and ready to accept lockstep ticks.
+  Running = 2, // Participant accepted a tick and is advancing to the target time.
+  Completed = 3, // Participant reached the target boot time for sequence.
+  ResetAck = 4, // Participant reset its lockstep state in response to a Reset tick.
+  MissedTick = 5, // Participant observed a sequence gap or superseded tick.
+  Error = 6, // Participant cannot continue without external recovery.
+}
+
+// Deterministic simulation barrier from a simulator to a controller or device
+// under test. The receiver advances its monotonic boot clock until
+// target_boot_time_us, runs work made ready by that time, then waits for the
+// next tick.
+struct LockstepTickData {
+  target_boot_time_us:ulong; // Target receiver monotonic boot time for this step.
+  run_id:uint; // Lockstep run identifier; changes when the simulator restarts the run.
+  sequence:uint; // Monotonic tick sequence used to pair status with this tick.
+  flags:ushort; // Bitmask of LockstepTickFlags bits.
+}
+
+// Deterministic simulation status from a controller or device under test back
+// to the simulator. The simulator waits for a matching completed sequence
+// before publishing the next tick when strict lockstep is required.
+struct LockstepStatusData {
+  timestamp_us:ulong; // Receiver monotonic boot time reached when this status was sampled.
+  run_id:uint; // Lockstep run identifier copied from the accepted tick.
+  sequence:uint; // Most recent lockstep tick sequence accepted or completed.
+  result_detail:ushort; // Compact participant-defined detail for MissedTick or Error states.
+  state:LockstepStatusState; // Participant state for this sequence.
+  id:ubyte; // Lockstep participant instance identifier; also the instance segment of the Zenoh key.
+}
+
+// FlatBuffers root wrapper for LockstepTickData.
+table LockstepTick {
+  data:LockstepTickData; // Fixed-layout lockstep tick payload.
+}
+
+// FlatBuffers root wrapper for LockstepStatusData.
+table LockstepStatus {
+  data:LockstepStatusData; // Fixed-layout lockstep status payload.
+}
