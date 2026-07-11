@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-06e2e66e.js";
+            window.path_to_searchindex_js = "searchindex-b9176271.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0b0ecf9a.js"></script>
+        <script src="toc-cc9f6bc5.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -972,7 +972,9 @@
 <tr><td><code>enum</code></td><td><a href="#enum-mocaprawflags"><code>MocapRawFlags</code></a></td><td>Validity and source-detail bits for raw mocap samples.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a></td><td>Raw 3D marker sample. The bridge converts coordinates into ENU meters while preserving the source marker id and residual.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-mocaprigidbodydata"><code>MocapRigidBodyData</code></a></td><td>Raw 6DOF rigid-body sample. The bridge converts coordinates into ENU meters while preserving the source rotation matrix and residual.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-mocaprigidbodyposedata"><code>MocapRigidBodyPoseData</code></a></td><td>Raw 6DOF rigid-body pose with the preferred Synapse quaternion attitude.</td></tr>
 <tr><td><code>table</code></td><td><a href="#table-mocapframe"><code>MocapFrame</code></a></td><td>Raw mocap frame for logging, debugging, and bridge-level processing. This is intentionally table-encoded; estimators should consume ExternalOdometry.</td></tr>
+<tr><td><code>table</code></td><td><a href="#table-mocapposeframe"><code>MocapPoseFrame</code></a></td><td>Raw mocap frame using quaternion attitude for rigid bodies. This supersedes MocapFrame for new publishers while the matrix-based wire type remains available for compatibility with existing recordings and consumers.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1050,6 +1052,23 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-mocaprigidbodyposedata"><a class="header" href="#struct-mocaprigidbodyposedata"><code>struct</code> MocapRigidBodyPoseData</a></h1>
+<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
+<p>Raw 6DOF rigid-body pose with the preferred Synapse quaternion attitude.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Rigid-body position and body-FLU-to-ENU quaternion attitude.</td></tr>
+<tr><td><code>residual_mm</code></td><td><code>float</code></td><td>millimeters</td><td>Source 6DOF solve residual in millimeters.</td></tr>
+<tr><td><code>id</code></td><td><code>int</code></td><td></td><td>Rigid-body definition index from the mocap source.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MocapRawFlags bits.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="table-mocapframe"><a class="header" href="#table-mocapframe"><code>table</code> MocapFrame</a></h1>
 <p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
 <p>Raw mocap frame for logging, debugging, and bridge-level processing. This is intentionally table-encoded; estimators should consume ExternalOdometry.</p>
@@ -1068,6 +1087,28 @@
 <tr><td><code>markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
 <tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
 <tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#struct-mocaprigidbodydata"><code>MocapRigidBodyData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body samples.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="table-mocapposeframe"><a class="header" href="#table-mocapposeframe"><code>table</code> MocapPoseFrame</a></h1>
+<p><a href="#fbsmocapfbs">fbs/mocap.fbs</a> / <a href="fbs/mocap.fbs">Source schema</a></p>
+<p>Raw mocap frame using quaternion attitude for rigid bodies. This supersedes MocapFrame for new publishers while the matrix-based wire type remains available for compatibility with existing recordings and consumers.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Marker timestamp in monotonic boot time.</td></tr>
+<tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Source frame number.</td></tr>
+<tr><td><code>drop_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame drop rate in deci-percent.</td></tr>
+<tr><td><code>out_of_sync_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame out-of-sync rate in deci-percent.</td></tr>
+<tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>Mocap source instance identifier.</td></tr>
+<tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of MocapRawFlags bits describing the frame as a whole.</td></tr>
+<tr><td><code>markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
+<tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
+<tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#struct-mocaprigidbodyposedata"><code>MocapRigidBodyPoseData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body pose samples.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1490,6 +1531,8 @@
 <tr><td><code>enum</code></td><td><a href="#enum-localpositionflags"><code>LocalPositionFlags</code></a></td><td>Field-validity bits for LocalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-externalodometryflags"><code>ExternalOdometryFlags</code></a></td><td>Field-validity bits for ExternalOdometryData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-externalodometrystatus"><code>ExternalOdometryStatus</code></a></td><td>Quality/status state for external odometry producer output.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-odometryflags"><code>OdometryFlags</code></a></td><td>Field-validity and estimator-state bits for OdometryData and OdometryWithCovarianceData.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-odometrystatus"><code>OdometryStatus</code></a></td><td>Quality/status state for a producer-side odometry estimate.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-globalpositionflags"><code>GlobalPositionFlags</code></a></td><td>Field-validity bits for GlobalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-homereferenceflags"><code>HomeReferenceFlags</code></a></td><td>Field-validity bits for HomeReferenceData.flags.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-vehiclehealthdata"><code>VehicleHealthData</code></a></td><td>Vehicle-wide state summary for operator displays and failsafe supervision.</td></tr>
@@ -1498,6 +1541,13 @@
 <tr><td><code>struct</code></td><td><a href="#struct-localpositionestimatedata"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-globalpositionestimatedata"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-odometryestimatedata"><code>OdometryEstimateData</code></a></td><td>Combined pose, twist, covariance, and estimator metadata.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-rawposedata"><code>RawPoseData</code></a></td><td>Unfiltered six-degree-of-freedom source pose measurement. Raw pose has no covariance unless the source reports one through a future dedicated type.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-posedata"><code>PoseData</code></a></td><td>Filtered six-degree-of-freedom pose sample without covariance.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-posewithcovariancedata"><code>PoseWithCovarianceData</code></a></td><td>Pose sample with 6x6 tangent covariance ordered [x, y, z, rotation_x, rotation_y, rotation_z].</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-twistdata"><code>TwistData</code></a></td><td>Linear and angular velocity sample without covariance.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-twistwithcovariancedata"><code>TwistWithCovarianceData</code></a></td><td>Twist sample with 6x6 covariance ordered [velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-odometrydata"><code>OdometryData</code></a></td><td>Compact combined pose, twist, and estimator metadata without covariance.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-odometrywithcovariancedata"><code>OdometryWithCovarianceData</code></a></td><td>Odometry with the complete 12x12 tangent covariance, retaining pose-twist cross-correlations. State order is [x, y, z, rotation_x, rotation_y, rotation_z, velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-externalodometrydata"><code>ExternalOdometryData</code></a></td><td>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. This is the compact high-rate path; uncertainty and estimator diagnostics are opt-in companion topics.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-externalodometrycovariancedata"><code>ExternalOdometryCovarianceData</code></a></td><td>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries only pose/twist. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-estimatorhealthdata"><code>EstimatorHealthData</code></a></td><td>Estimator health and innovation-test summary. The flags field is deliberately producer-defined: estimator status models differ between implementations and are standardized via discovery records, not the schema.</td></tr>
@@ -1510,6 +1560,13 @@
 <tr><td><code>table</code></td><td><code>LocalPositionEstimate</code> -&gt; <a href="#struct-localpositionestimatedata"><code>LocalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for LocalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>GlobalPositionEstimate</code> -&gt; <a href="#struct-globalpositionestimatedata"><code>GlobalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for GlobalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>OdometryEstimate</code> -&gt; <a href="#struct-odometryestimatedata"><code>OdometryEstimateData</code></a></td><td>FlatBuffers root wrapper for OdometryEstimateData.</td></tr>
+<tr><td><code>table</code></td><td><code>Pose</code> -&gt; <a href="#struct-posedata"><code>PoseData</code></a></td><td>FlatBuffers root wrapper for PoseData.</td></tr>
+<tr><td><code>table</code></td><td><code>RawPose</code> -&gt; <a href="#struct-rawposedata"><code>RawPoseData</code></a></td><td>FlatBuffers root wrapper for RawPoseData.</td></tr>
+<tr><td><code>table</code></td><td><code>PoseWithCovariance</code> -&gt; <a href="#struct-posewithcovariancedata"><code>PoseWithCovarianceData</code></a></td><td>FlatBuffers root wrapper for PoseWithCovarianceData.</td></tr>
+<tr><td><code>table</code></td><td><code>Twist</code> -&gt; <a href="#struct-twistdata"><code>TwistData</code></a></td><td>FlatBuffers root wrapper for TwistData.</td></tr>
+<tr><td><code>table</code></td><td><code>TwistWithCovariance</code> -&gt; <a href="#struct-twistwithcovariancedata"><code>TwistWithCovarianceData</code></a></td><td>FlatBuffers root wrapper for TwistWithCovarianceData.</td></tr>
+<tr><td><code>table</code></td><td><code>Odometry</code> -&gt; <a href="#struct-odometrydata"><code>OdometryData</code></a></td><td>FlatBuffers root wrapper for OdometryData.</td></tr>
+<tr><td><code>table</code></td><td><code>OdometryWithCovariance</code> -&gt; <a href="#struct-odometrywithcovariancedata"><code>OdometryWithCovarianceData</code></a></td><td>FlatBuffers root wrapper for OdometryWithCovarianceData.</td></tr>
 <tr><td><code>table</code></td><td><code>ExternalOdometry</code> -&gt; <a href="#struct-externalodometrydata"><code>ExternalOdometryData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryData.</td></tr>
 <tr><td><code>table</code></td><td><code>ExternalOdometryCovariance</code> -&gt; <a href="#struct-externalodometrycovariancedata"><code>ExternalOdometryCovarianceData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryCovarianceData.</td></tr>
 <tr><td><code>table</code></td><td><code>EstimatorHealth</code> -&gt; <a href="#struct-estimatorhealthdata"><code>EstimatorHealthData</code></a></td><td>FlatBuffers root wrapper for EstimatorHealthData.</td></tr>
@@ -1639,6 +1696,49 @@
 <tr><td><code>Lost</code></td><td><code>4</code></td><td>Extrapolation exceeded the producer’s safe limit.</td></tr>
 <tr><td><code>OutlierRejected</code></td><td><code>5</code></td><td>Current mocap update was rejected and the state was predicted.</td></tr>
 <tr><td><code>Degraded</code></td><td><code>6</code></td><td>Current mocap update was accepted but quality is reduced.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-odometryflags"><a class="header" href="#enum-odometryflags"><code>enum</code> OdometryFlags</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte (bit_flags)</code></p>
+<p>Field-validity and estimator-state bits for OdometryData and OdometryWithCovarianceData.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>PositionValid</code></td><td></td><td>pose.position_enu_m is meaningful.</td></tr>
+<tr><td><code>AttitudeValid</code></td><td></td><td>pose.attitude is meaningful.</td></tr>
+<tr><td><code>LinearVelocityValid</code></td><td></td><td>twist.linear_velocity_enu_m_s is meaningful.</td></tr>
+<tr><td><code>AngularVelocityValid</code></td><td></td><td>twist.angular_velocity_flu_rad_s is meaningful.</td></tr>
+<tr><td><code>Extrapolated</code></td><td></td><td>State was predicted without a current accepted correction.</td></tr>
+<tr><td><code>OutlierRejected</code></td><td></td><td>A current measurement was rejected by innovation gates.</td></tr>
+<tr><td><code>Degraded</code></td><td></td><td>State is usable but tracking quality or uncertainty is degraded.</td></tr>
+<tr><td><code>Lost</code></td><td></td><td>State should not be used for navigation.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-odometrystatus"><a class="header" href="#enum-odometrystatus"><code>enum</code> OdometryStatus</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Quality/status state for a producer-side odometry estimate.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Producer did not report a quality/status state.</td></tr>
+<tr><td><code>Filtered</code></td><td><code>1</code></td><td>Current measurement was accepted into the estimate.</td></tr>
+<tr><td><code>ExtrapolatedShort</code></td><td><code>2</code></td><td>Short prediction-only gap after the last accepted measurement.</td></tr>
+<tr><td><code>ExtrapolatedLong</code></td><td><code>3</code></td><td>Extended prediction-only gap; downstream users should degrade behavior.</td></tr>
+<tr><td><code>Lost</code></td><td><code>4</code></td><td>Extrapolation exceeded the producer’s safe limit.</td></tr>
+<tr><td><code>OutlierRejected</code></td><td><code>5</code></td><td>Current measurement was rejected and the state was predicted.</td></tr>
+<tr><td><code>Degraded</code></td><td><code>6</code></td><td>Current measurement was accepted but quality is reduced.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1807,6 +1907,133 @@
 <tr><td><code>angular_velocity_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Body angular velocity in the FLU frame.</td></tr>
 <tr><td><code>pose_covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular covariance for position and orientation.</td></tr>
 <tr><td><code>velocity_covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular covariance for linear and angular velocity.</td></tr>
+<tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
+<tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
+<tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-rawposedata"><a class="header" href="#struct-rawposedata"><code>struct</code> RawPoseData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Unfiltered six-degree-of-freedom source pose measurement. Raw pose has no covariance unless the source reports one through a future dedicated type.</p>
+<p><strong>FlatBuffers root table:</strong> <code>RawPose</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Source measurement timestamp in monotonic boot time.</td></tr>
+<tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Measured position and body-FLU-to-ENU quaternion attitude.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-posedata"><a class="header" href="#struct-posedata"><code>struct</code> PoseData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Filtered six-degree-of-freedom pose sample without covariance.</p>
+<p><strong>FlatBuffers root table:</strong> <code>Pose</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Position and body-FLU-to-ENU quaternion attitude.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-posewithcovariancedata"><a class="header" href="#struct-posewithcovariancedata"><code>struct</code> PoseWithCovarianceData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Pose sample with 6x6 tangent covariance ordered [x, y, z, rotation_x, rotation_y, rotation_z].</p>
+<p><strong>FlatBuffers root table:</strong> <code>PoseWithCovariance</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Position and body-FLU-to-ENU quaternion attitude.</td></tr>
+<tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular pose covariance.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-twistdata"><a class="header" href="#struct-twistdata"><code>struct</code> TwistData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Linear and angular velocity sample without covariance.</p>
+<p><strong>FlatBuffers root table:</strong> <code>Twist</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>ENU linear velocity and body-FLU angular velocity.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-twistwithcovariancedata"><a class="header" href="#struct-twistwithcovariancedata"><code>struct</code> TwistWithCovarianceData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Twist sample with 6x6 covariance ordered [velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].</p>
+<p><strong>FlatBuffers root table:</strong> <code>TwistWithCovariance</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>ENU linear velocity and body-FLU angular velocity.</td></tr>
+<tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular twist covariance.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-odometrydata"><a class="header" href="#struct-odometrydata"><code>struct</code> OdometryData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Compact combined pose, twist, and estimator metadata without covariance.</p>
+<p><strong>FlatBuffers root table:</strong> <code>Odometry</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Estimated position and attitude.</td></tr>
+<tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>Estimated linear and angular velocity.</td></tr>
+<tr><td><code>flags</code></td><td><a href="#enum-odometryflags"><code>OdometryFlags</code></a></td><td>bitmask</td><td>Bitmask of OdometryFlags bits.</td></tr>
+<tr><td><code>status</code></td><td><a href="#enum-odometrystatus"><code>OdometryStatus</code></a></td><td></td><td>Producer state quality and extrapolation status.</td></tr>
+<tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
+<tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
+<tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-odometrywithcovariancedata"><a class="header" href="#struct-odometrywithcovariancedata"><code>struct</code> OdometryWithCovarianceData</a></h1>
+<p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
+<p>Odometry with the complete 12x12 tangent covariance, retaining pose-twist cross-correlations. State order is [x, y, z, rotation_x, rotation_y, rotation_z, velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].</p>
+<p><strong>FlatBuffers root table:</strong> <code>OdometryWithCovariance</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp matching the contained state.</td></tr>
+<tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Estimated position and attitude.</td></tr>
+<tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>Estimated linear and angular velocity.</td></tr>
+<tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>synapse.types.CovarianceUpperTriangle78f</code></a></td><td></td><td>Upper-triangular 12x12 state covariance.</td></tr>
+<tr><td><code>flags</code></td><td><a href="#enum-odometryflags"><code>OdometryFlags</code></a></td><td>bitmask</td><td>Bitmask of OdometryFlags bits.</td></tr>
+<tr><td><code>status</code></td><td><a href="#enum-odometrystatus"><code>OdometryStatus</code></a></td><td></td><td>Producer state quality and extrapolation status.</td></tr>
 <tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
 <tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
 <tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
@@ -2603,6 +2830,14 @@
 <tr><td><a href="#struct-locksteptickdata"><code>LockstepTick</code></a></td><td><a href="#struct-locksteptickdata"><code>LockstepTick</code></a></td><td>Deterministic simulation barrier tick.</td></tr>
 <tr><td><a href="#struct-lockstepstatusdata"><code>LockstepStatus</code></a></td><td><a href="#struct-lockstepstatusdata"><code>LockstepStatus</code></a></td><td>Deterministic simulation participant status.</td></tr>
 <tr><td><a href="#table-firmwareprogress"><code>FirmwareProgress</code></a></td><td><a href="#table-firmwareprogress"><code>FirmwareProgress</code></a></td><td>Firmware image transfer, verification, and activation progress.</td></tr>
+<tr><td><a href="#struct-rawposedata"><code>RawPose</code></a></td><td><a href="#struct-rawposedata"><code>RawPose</code></a></td><td>Unfiltered position and quaternion attitude measurement.</td></tr>
+<tr><td><a href="#struct-posedata"><code>Pose</code></a></td><td><a href="#struct-posedata"><code>Pose</code></a></td><td>Filtered position and quaternion attitude sample.</td></tr>
+<tr><td><a href="#struct-posewithcovariancedata"><code>PoseWithCovariance</code></a></td><td><a href="#struct-posewithcovariancedata"><code>PoseWithCovariance</code></a></td><td>Filtered pose sample with covariance.</td></tr>
+<tr><td><a href="#struct-twistdata"><code>Twist</code></a></td><td><a href="#struct-twistdata"><code>Twist</code></a></td><td>Linear and angular velocity sample.</td></tr>
+<tr><td><a href="#struct-twistwithcovariancedata"><code>TwistWithCovariance</code></a></td><td><a href="#struct-twistwithcovariancedata"><code>TwistWithCovariance</code></a></td><td>Twist sample with covariance.</td></tr>
+<tr><td><a href="#struct-odometrydata"><code>Odometry</code></a></td><td><a href="#struct-odometrydata"><code>Odometry</code></a></td><td>Compact pose, twist, and estimator status.</td></tr>
+<tr><td><a href="#struct-odometrywithcovariancedata"><code>OdometryWithCovariance</code></a></td><td><a href="#struct-odometrywithcovariancedata"><code>OdometryWithCovariance</code></a></td><td>Odometry with complete state covariance.</td></tr>
+<tr><td><a href="#table-mocapposeframe"><code>MocapPoseFrame</code></a></td><td><a href="#table-mocapposeframe"><code>MocapPoseFrame</code></a></td><td>Raw motion-capture frame with quaternion rigid-body attitudes.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2656,8 +2891,10 @@
 <tr><td><code>struct</code></td><td><a href="#struct-quaternionf"><code>Quaternionf</code></a></td><td>Unit quaternion in Hamilton convention, component order w, x, y, z. It rotates body-frame FLU vectors into the world ENU frame: v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-rotationmatrix3f"><code>RotationMatrix3f</code></a></td><td>Row-major 3x3 rotation matrix.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-ratetriplet"><code>RateTriplet</code></a></td><td>Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-posef"><code>Posef</code></a></td><td>Six-degree-of-freedom pose in the Synapse local/world and body frames.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-twistf"><code>Twistf</code></a></td><td>Linear and angular velocity in the Synapse local/world and body frames.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>CovarianceUpperTriangle21f</code></a></td><td>Upper-triangular 6x6 covariance matrix stored row-major as 21 float values. State order is x, y, z translation followed by rotation about x, y, z.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>CovarianceUpperTriangle78f</code></a></td><td>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. For external odometry covariance the tangent-state order is attitude perturbation, velocity, position, angular velocity.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>CovarianceUpperTriangle78f</code></a></td><td>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. The containing field documents its tangent-state order.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-severity"><code>Severity</code></a></td><td>Text and diagnostic severity levels following RFC 5424 syslog numbering.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-commandresultcode"><code>CommandResultCode</code></a></td><td>Result of command or transfer request execution.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-gnssfixtype"><code>GnssFixType</code></a></td><td>GNSS receiver fix quality.</td></tr>
@@ -2758,6 +2995,36 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-posef"><a class="header" href="#struct-posef"><code>struct</code> Posef</a></h1>
+<p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
+<p>Six-degree-of-freedom pose in the Synapse local/world and body frames.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Local/world position in ENU meters.</td></tr>
+<tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>Quaternionf</code></a></td><td></td><td>Orientation rotating body FLU vectors into ENU.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-twistf"><a class="header" href="#struct-twistf"><code>struct</code> Twistf</a></h1>
+<p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
+<p>Linear and angular velocity in the Synapse local/world and body frames.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>linear_velocity_enu_m_s</code></td><td><a href="#struct-vec3f"><code>Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Linear velocity in ENU meters per second.</td></tr>
+<tr><td><code>angular_velocity_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Angular velocity in body FLU radians per second.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-covarianceuppertriangle21f"><a class="header" href="#struct-covarianceuppertriangle21f"><code>struct</code> CovarianceUpperTriangle21f</a></h1>
 <p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
 <p>Upper-triangular 6x6 covariance matrix stored row-major as 21 float values. State order is x, y, z translation followed by rotation about x, y, z.</p>
@@ -2794,7 +3061,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-covarianceuppertriangle78f"><a class="header" href="#struct-covarianceuppertriangle78f"><code>struct</code> CovarianceUpperTriangle78f</a></h1>
 <p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
-<p>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. For external odometry covariance the tangent-state order is attitude perturbation, velocity, position, angular velocity.</p>
+<p>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. The containing field documents its tangent-state order.</p>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -3106,6 +3373,14 @@
 <tr><td><code>LockstepTick</code></td><td><code>32</code></td><td>Deterministic simulation barrier telling a receiver which boot time to reach.</td></tr>
 <tr><td><code>LockstepStatus</code></td><td><code>33</code></td><td>Deterministic simulation participant status and tick completion acknowledgement.</td></tr>
 <tr><td><code>FirmwareProgress</code></td><td><code>34</code></td><td>Firmware image transfer, verification, and activation progress.</td></tr>
+<tr><td><code>RawPose</code></td><td><code>35</code></td><td>Unfiltered position and quaternion attitude measurement.</td></tr>
+<tr><td><code>Pose</code></td><td><code>36</code></td><td>Filtered position and quaternion attitude sample.</td></tr>
+<tr><td><code>PoseWithCovariance</code></td><td><code>37</code></td><td>Filtered pose sample with 6x6 tangent covariance.</td></tr>
+<tr><td><code>Twist</code></td><td><code>38</code></td><td>Filter-derived linear and angular velocity sample.</td></tr>
+<tr><td><code>TwistWithCovariance</code></td><td><code>39</code></td><td>Filter-derived twist sample with 6x6 covariance.</td></tr>
+<tr><td><code>Odometry</code></td><td><code>40</code></td><td>Compact combined pose, twist, and estimator status.</td></tr>
+<tr><td><code>OdometryWithCovariance</code></td><td><code>41</code></td><td>Odometry with complete 12x12 state covariance.</td></tr>
+<tr><td><code>MocapPoseFrame</code></td><td><code>42</code></td><td>Raw motion-capture frame with quaternion rigid-body attitudes.</td></tr>
 </tbody>
 </table>
 </div>
@@ -3149,7 +3424,7 @@
         <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="theme/version-selector-de650870.js"></script>
+        <script src="theme/version-selector-5836fc1f.js"></script>
 
         <script>
         window.addEventListener('load', function() {

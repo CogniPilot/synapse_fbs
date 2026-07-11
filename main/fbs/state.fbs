@@ -65,6 +65,30 @@ enum ExternalOdometryStatus:ubyte {
   Degraded = 6, // Current mocap update was accepted but quality is reduced.
 }
 
+// Field-validity and estimator-state bits for OdometryData and
+// OdometryWithCovarianceData.
+enum OdometryFlags:ubyte (bit_flags) {
+  PositionValid, // pose.position_enu_m is meaningful.
+  AttitudeValid, // pose.attitude is meaningful.
+  LinearVelocityValid, // twist.linear_velocity_enu_m_s is meaningful.
+  AngularVelocityValid, // twist.angular_velocity_flu_rad_s is meaningful.
+  Extrapolated, // State was predicted without a current accepted correction.
+  OutlierRejected, // A current measurement was rejected by innovation gates.
+  Degraded, // State is usable but tracking quality or uncertainty is degraded.
+  Lost, // State should not be used for navigation.
+}
+
+// Quality/status state for a producer-side odometry estimate.
+enum OdometryStatus:ubyte {
+  Unknown = 0, // Producer did not report a quality/status state.
+  Filtered = 1, // Current measurement was accepted into the estimate.
+  ExtrapolatedShort = 2, // Short prediction-only gap after the last accepted measurement.
+  ExtrapolatedLong = 3, // Extended prediction-only gap; downstream users should degrade behavior.
+  Lost = 4, // Extrapolation exceeded the producer's safe limit.
+  OutlierRejected = 5, // Current measurement was rejected and the state was predicted.
+  Degraded = 6, // Current measurement was accepted but quality is reduced.
+}
+
 // Field-validity bits for GlobalPositionEstimateData.flags.
 enum GlobalPositionFlags:ubyte (bit_flags) {
   Valid, // The global position estimate is usable for navigation.
@@ -153,6 +177,69 @@ struct OdometryEstimateData {
   angular_velocity_flu_rad_s:synapse.types.RateTriplet; // Body angular velocity in the FLU frame.
   pose_covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular covariance for position and orientation.
   velocity_covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular covariance for linear and angular velocity.
+  reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
+  estimator_type:ubyte; // Producer-defined estimator implementation identifier.
+  quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
+}
+
+// Unfiltered six-degree-of-freedom source pose measurement. Raw pose has no
+// covariance unless the source reports one through a future dedicated type.
+struct RawPoseData {
+  timestamp_us:ulong; // Source measurement timestamp in monotonic boot time.
+  pose:synapse.types.Posef; // Measured position and body-FLU-to-ENU quaternion attitude.
+}
+
+// Filtered six-degree-of-freedom pose sample without covariance.
+struct PoseData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  pose:synapse.types.Posef; // Position and body-FLU-to-ENU quaternion attitude.
+}
+
+// Pose sample with 6x6 tangent covariance ordered
+// [x, y, z, rotation_x, rotation_y, rotation_z].
+struct PoseWithCovarianceData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  pose:synapse.types.Posef; // Position and body-FLU-to-ENU quaternion attitude.
+  covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular pose covariance.
+}
+
+// Linear and angular velocity sample without covariance.
+struct TwistData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  twist:synapse.types.Twistf; // ENU linear velocity and body-FLU angular velocity.
+}
+
+// Twist sample with 6x6 covariance ordered
+// [velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].
+struct TwistWithCovarianceData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  twist:synapse.types.Twistf; // ENU linear velocity and body-FLU angular velocity.
+  covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular twist covariance.
+}
+
+// Compact combined pose, twist, and estimator metadata without covariance.
+struct OdometryData {
+  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  pose:synapse.types.Posef; // Estimated position and attitude.
+  twist:synapse.types.Twistf; // Estimated linear and angular velocity.
+  flags:OdometryFlags; // Bitmask of OdometryFlags bits.
+  status:OdometryStatus; // Producer state quality and extrapolation status.
+  reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
+  estimator_type:ubyte; // Producer-defined estimator implementation identifier.
+  quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
+}
+
+// Odometry with the complete 12x12 tangent covariance, retaining pose-twist
+// cross-correlations. State order is [x, y, z, rotation_x, rotation_y,
+// rotation_z, velocity_x, velocity_y, velocity_z, angular_x, angular_y,
+// angular_z].
+struct OdometryWithCovarianceData {
+  timestamp_us:ulong; // Estimate timestamp matching the contained state.
+  pose:synapse.types.Posef; // Estimated position and attitude.
+  twist:synapse.types.Twistf; // Estimated linear and angular velocity.
+  covariance:synapse.types.CovarianceUpperTriangle78f; // Upper-triangular 12x12 state covariance.
+  flags:OdometryFlags; // Bitmask of OdometryFlags bits.
+  status:OdometryStatus; // Producer state quality and extrapolation status.
   reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
   estimator_type:ubyte; // Producer-defined estimator implementation identifier.
   quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
@@ -269,6 +356,41 @@ table GlobalPositionEstimate {
 // FlatBuffers root wrapper for OdometryEstimateData.
 table OdometryEstimate {
   data:OdometryEstimateData; // Fixed-layout odometry payload.
+}
+
+// FlatBuffers root wrapper for PoseData.
+table Pose {
+  data:PoseData; // Fixed-layout pose payload.
+}
+
+// FlatBuffers root wrapper for RawPoseData.
+table RawPose {
+  data:RawPoseData; // Fixed-layout unfiltered pose payload.
+}
+
+// FlatBuffers root wrapper for PoseWithCovarianceData.
+table PoseWithCovariance {
+  data:PoseWithCovarianceData; // Fixed-layout pose-with-covariance payload.
+}
+
+// FlatBuffers root wrapper for TwistData.
+table Twist {
+  data:TwistData; // Fixed-layout twist payload.
+}
+
+// FlatBuffers root wrapper for TwistWithCovarianceData.
+table TwistWithCovariance {
+  data:TwistWithCovarianceData; // Fixed-layout twist-with-covariance payload.
+}
+
+// FlatBuffers root wrapper for OdometryData.
+table Odometry {
+  data:OdometryData; // Fixed-layout compact odometry payload.
+}
+
+// FlatBuffers root wrapper for OdometryWithCovarianceData.
+table OdometryWithCovariance {
+  data:OdometryWithCovarianceData; // Fixed-layout odometry-with-covariance payload.
 }
 
 // FlatBuffers root wrapper for ExternalOdometryData.

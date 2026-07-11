@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-06e2e66e.js";
+            window.path_to_searchindex_js = "../searchindex-b9176271.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-0b0ecf9a.js"></script>
+        <script src="../toc-cc9f6bc5.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,7 +192,9 @@
 <tr><td><code>enum</code></td><td><a href="mocap/MocapRawFlags.html"><code>MocapRawFlags</code></a></td><td>Validity and source-detail bits for raw mocap samples.</td></tr>
 <tr><td><code>struct</code></td><td><a href="mocap/MocapMarkerData.html"><code>MocapMarkerData</code></a></td><td>Raw 3D marker sample. The bridge converts coordinates into ENU meters while preserving the source marker id and residual.</td></tr>
 <tr><td><code>struct</code></td><td><a href="mocap/MocapRigidBodyData.html"><code>MocapRigidBodyData</code></a></td><td>Raw 6DOF rigid-body sample. The bridge converts coordinates into ENU meters while preserving the source rotation matrix and residual.</td></tr>
+<tr><td><code>struct</code></td><td><a href="mocap/MocapRigidBodyPoseData.html"><code>MocapRigidBodyPoseData</code></a></td><td>Raw 6DOF rigid-body pose with the preferred Synapse quaternion attitude.</td></tr>
 <tr><td><code>table</code></td><td><a href="mocap/MocapFrame.html"><code>MocapFrame</code></a></td><td>Raw mocap frame for logging, debugging, and bridge-level processing. This is intentionally table-encoded; estimators should consume ExternalOdometry.</td></tr>
+<tr><td><code>table</code></td><td><a href="mocap/MocapPoseFrame.html"><code>MocapPoseFrame</code></a></td><td>Raw mocap frame using quaternion attitude for rigid bodies. This supersedes MocapFrame for new publishers while the matrix-based wire type remains available for compatibility with existing recordings and consumers.</td></tr>
 </tbody>
 </table>
 </div>
@@ -248,7 +250,7 @@
         <script src="../book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../theme/version-selector-de650870.js"></script>
+        <script src="../theme/version-selector-5836fc1f.js"></script>
 
 
 

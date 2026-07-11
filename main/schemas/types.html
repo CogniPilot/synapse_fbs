@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-06e2e66e.js";
+            window.path_to_searchindex_js = "../searchindex-b9176271.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-0b0ecf9a.js"></script>
+        <script src="../toc-cc9f6bc5.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,8 +192,10 @@
 <tr><td><code>struct</code></td><td><a href="types/Quaternionf.html"><code>Quaternionf</code></a></td><td>Unit quaternion in Hamilton convention, component order w, x, y, z. It rotates body-frame FLU vectors into the world ENU frame: v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/RotationMatrix3f.html"><code>RotationMatrix3f</code></a></td><td>Row-major 3x3 rotation matrix.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/RateTriplet.html"><code>RateTriplet</code></a></td><td>Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.</td></tr>
+<tr><td><code>struct</code></td><td><a href="types/Posef.html"><code>Posef</code></a></td><td>Six-degree-of-freedom pose in the Synapse local/world and body frames.</td></tr>
+<tr><td><code>struct</code></td><td><a href="types/Twistf.html"><code>Twistf</code></a></td><td>Linear and angular velocity in the Synapse local/world and body frames.</td></tr>
 <tr><td><code>struct</code></td><td><a href="types/CovarianceUpperTriangle21f.html"><code>CovarianceUpperTriangle21f</code></a></td><td>Upper-triangular 6x6 covariance matrix stored row-major as 21 float values. State order is x, y, z translation followed by rotation about x, y, z.</td></tr>
-<tr><td><code>struct</code></td><td><a href="types/CovarianceUpperTriangle78f.html"><code>CovarianceUpperTriangle78f</code></a></td><td>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. For external odometry covariance the tangent-state order is attitude perturbation, velocity, position, angular velocity.</td></tr>
+<tr><td><code>struct</code></td><td><a href="types/CovarianceUpperTriangle78f.html"><code>CovarianceUpperTriangle78f</code></a></td><td>Upper-triangular 12x12 covariance matrix stored row-major as 78 float values. The containing field documents its tangent-state order.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/Severity.html"><code>Severity</code></a></td><td>Text and diagnostic severity levels following RFC 5424 syslog numbering.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/CommandResultCode.html"><code>CommandResultCode</code></a></td><td>Result of command or transfer request execution.</td></tr>
 <tr><td><code>enum</code></td><td><a href="types/GnssFixType.html"><code>GnssFixType</code></a></td><td>GNSS receiver fix quality.</td></tr>
@@ -259,7 +261,7 @@
         <script src="../book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../theme/version-selector-de650870.js"></script>
+        <script src="../theme/version-selector-5836fc1f.js"></script>
 
 
 

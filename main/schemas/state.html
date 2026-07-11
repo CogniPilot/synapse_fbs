@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-06e2e66e.js";
+            window.path_to_searchindex_js = "../searchindex-b9176271.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-0b0ecf9a.js"></script>
+        <script src="../toc-cc9f6bc5.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -194,6 +194,8 @@
 <tr><td><code>enum</code></td><td><a href="state/LocalPositionFlags.html"><code>LocalPositionFlags</code></a></td><td>Field-validity bits for LocalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/ExternalOdometryFlags.html"><code>ExternalOdometryFlags</code></a></td><td>Field-validity bits for ExternalOdometryData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/ExternalOdometryStatus.html"><code>ExternalOdometryStatus</code></a></td><td>Quality/status state for external odometry producer output.</td></tr>
+<tr><td><code>enum</code></td><td><a href="state/OdometryFlags.html"><code>OdometryFlags</code></a></td><td>Field-validity and estimator-state bits for OdometryData and OdometryWithCovarianceData.</td></tr>
+<tr><td><code>enum</code></td><td><a href="state/OdometryStatus.html"><code>OdometryStatus</code></a></td><td>Quality/status state for a producer-side odometry estimate.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/GlobalPositionFlags.html"><code>GlobalPositionFlags</code></a></td><td>Field-validity bits for GlobalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/HomeReferenceFlags.html"><code>HomeReferenceFlags</code></a></td><td>Field-validity bits for HomeReferenceData.flags.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/VehicleHealthData.html"><code>VehicleHealthData</code></a></td><td>Vehicle-wide state summary for operator displays and failsafe supervision.</td></tr>
@@ -202,6 +204,13 @@
 <tr><td><code>struct</code></td><td><a href="state/LocalPositionEstimateData.html"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/GlobalPositionEstimateData.html"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/OdometryEstimateData.html"><code>OdometryEstimateData</code></a></td><td>Combined pose, twist, covariance, and estimator metadata.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/RawPoseData.html"><code>RawPoseData</code></a></td><td>Unfiltered six-degree-of-freedom source pose measurement. Raw pose has no covariance unless the source reports one through a future dedicated type.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/PoseData.html"><code>PoseData</code></a></td><td>Filtered six-degree-of-freedom pose sample without covariance.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/PoseWithCovarianceData.html"><code>PoseWithCovarianceData</code></a></td><td>Pose sample with 6x6 tangent covariance ordered [x, y, z, rotation_x, rotation_y, rotation_z].</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/TwistData.html"><code>TwistData</code></a></td><td>Linear and angular velocity sample without covariance.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/TwistWithCovarianceData.html"><code>TwistWithCovarianceData</code></a></td><td>Twist sample with 6x6 covariance ordered [velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/OdometryData.html"><code>OdometryData</code></a></td><td>Compact combined pose, twist, and estimator metadata without covariance.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/OdometryWithCovarianceData.html"><code>OdometryWithCovarianceData</code></a></td><td>Odometry with the complete 12x12 tangent covariance, retaining pose-twist cross-correlations. State order is [x, y, z, rotation_x, rotation_y, rotation_z, velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/ExternalOdometryData.html"><code>ExternalOdometryData</code></a></td><td>External pose and twist measurement for estimator input. Pose is expressed in local/world ENU. Linear velocity is ENU. Angular velocity is body FLU. This is the compact high-rate path; uncertainty and estimator diagnostics are opt-in companion topics.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/ExternalOdometryCovarianceData.html"><code>ExternalOdometryCovarianceData</code></a></td><td>Optional covariance companion for ExternalOdometryData. Publish this only when consumers subscribe to the covariance topic or request estimator diagnostics; the high-rate external odometry topic carries only pose/twist. The covariance is over the 12D tangent state [theta, velocity, position, angular_velocity], where theta is the attitude perturbation in the body-FLU tangent and velocity/position are ENU.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/EstimatorHealthData.html"><code>EstimatorHealthData</code></a></td><td>Estimator health and innovation-test summary. The flags field is deliberately producer-defined: estimator status models differ between implementations and are standardized via discovery records, not the schema.</td></tr>
@@ -214,6 +223,13 @@
 <tr><td><code>table</code></td><td><code>LocalPositionEstimate</code> -&gt; <a href="state/LocalPositionEstimateData.html"><code>LocalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for LocalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>GlobalPositionEstimate</code> -&gt; <a href="state/GlobalPositionEstimateData.html"><code>GlobalPositionEstimateData</code></a></td><td>FlatBuffers root wrapper for GlobalPositionEstimateData.</td></tr>
 <tr><td><code>table</code></td><td><code>OdometryEstimate</code> -&gt; <a href="state/OdometryEstimateData.html"><code>OdometryEstimateData</code></a></td><td>FlatBuffers root wrapper for OdometryEstimateData.</td></tr>
+<tr><td><code>table</code></td><td><code>Pose</code> -&gt; <a href="state/PoseData.html"><code>PoseData</code></a></td><td>FlatBuffers root wrapper for PoseData.</td></tr>
+<tr><td><code>table</code></td><td><code>RawPose</code> -&gt; <a href="state/RawPoseData.html"><code>RawPoseData</code></a></td><td>FlatBuffers root wrapper for RawPoseData.</td></tr>
+<tr><td><code>table</code></td><td><code>PoseWithCovariance</code> -&gt; <a href="state/PoseWithCovarianceData.html"><code>PoseWithCovarianceData</code></a></td><td>FlatBuffers root wrapper for PoseWithCovarianceData.</td></tr>
+<tr><td><code>table</code></td><td><code>Twist</code> -&gt; <a href="state/TwistData.html"><code>TwistData</code></a></td><td>FlatBuffers root wrapper for TwistData.</td></tr>
+<tr><td><code>table</code></td><td><code>TwistWithCovariance</code> -&gt; <a href="state/TwistWithCovarianceData.html"><code>TwistWithCovarianceData</code></a></td><td>FlatBuffers root wrapper for TwistWithCovarianceData.</td></tr>
+<tr><td><code>table</code></td><td><code>Odometry</code> -&gt; <a href="state/OdometryData.html"><code>OdometryData</code></a></td><td>FlatBuffers root wrapper for OdometryData.</td></tr>
+<tr><td><code>table</code></td><td><code>OdometryWithCovariance</code> -&gt; <a href="state/OdometryWithCovarianceData.html"><code>OdometryWithCovarianceData</code></a></td><td>FlatBuffers root wrapper for OdometryWithCovarianceData.</td></tr>
 <tr><td><code>table</code></td><td><code>ExternalOdometry</code> -&gt; <a href="state/ExternalOdometryData.html"><code>ExternalOdometryData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryData.</td></tr>
 <tr><td><code>table</code></td><td><code>ExternalOdometryCovariance</code> -&gt; <a href="state/ExternalOdometryCovarianceData.html"><code>ExternalOdometryCovarianceData</code></a></td><td>FlatBuffers root wrapper for ExternalOdometryCovarianceData.</td></tr>
 <tr><td><code>table</code></td><td><code>EstimatorHealth</code> -&gt; <a href="state/EstimatorHealthData.html"><code>EstimatorHealthData</code></a></td><td>FlatBuffers root wrapper for EstimatorHealthData.</td></tr>
@@ -275,7 +291,7 @@
         <script src="../book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../theme/version-selector-de650870.js"></script>
+        <script src="../theme/version-selector-5836fc1f.js"></script>
 
 
 

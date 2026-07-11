@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-06e2e66e.js";
+            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-0b0ecf9a.js"></script>
+        <script src="../../toc-cc9f6bc5.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -223,6 +223,14 @@
 <tr><td><code>LockstepTick</code></td><td><code>32</code></td><td>Deterministic simulation barrier telling a receiver which boot time to reach.</td></tr>
 <tr><td><code>LockstepStatus</code></td><td><code>33</code></td><td>Deterministic simulation participant status and tick completion acknowledgement.</td></tr>
 <tr><td><code>FirmwareProgress</code></td><td><code>34</code></td><td>Firmware image transfer, verification, and activation progress.</td></tr>
+<tr><td><code>RawPose</code></td><td><code>35</code></td><td>Unfiltered position and quaternion attitude measurement.</td></tr>
+<tr><td><code>Pose</code></td><td><code>36</code></td><td>Filtered position and quaternion attitude sample.</td></tr>
+<tr><td><code>PoseWithCovariance</code></td><td><code>37</code></td><td>Filtered pose sample with 6x6 tangent covariance.</td></tr>
+<tr><td><code>Twist</code></td><td><code>38</code></td><td>Filter-derived linear and angular velocity sample.</td></tr>
+<tr><td><code>TwistWithCovariance</code></td><td><code>39</code></td><td>Filter-derived twist sample with 6x6 covariance.</td></tr>
+<tr><td><code>Odometry</code></td><td><code>40</code></td><td>Compact combined pose, twist, and estimator status.</td></tr>
+<tr><td><code>OdometryWithCovariance</code></td><td><code>41</code></td><td>Odometry with complete 12x12 state covariance.</td></tr>
+<tr><td><code>MocapPoseFrame</code></td><td><code>42</code></td><td>Raw motion-capture frame with quaternion rigid-body attitudes.</td></tr>
 </tbody>
 </table>
 </div>
@@ -272,7 +280,7 @@
         <script src="../../book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
-        <script src="../../theme/version-selector-de650870.js"></script>
+        <script src="../../theme/version-selector-5836fc1f.js"></script>
 
 
 
