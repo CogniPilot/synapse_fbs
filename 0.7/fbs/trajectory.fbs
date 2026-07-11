@@ -1,0 +1,63 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Coefficient interpretation for a trajectory segment.
+enum TrajectoryType:ubyte {
+  Unknown = 0, // Trajectory interpretation is not reported.
+  Bezier = 1, // Coefficients are Bezier control points.
+  Polynomial = 2, // Coefficients are polynomial coefficients.
+}
+
+// Polynomial or Bezier degree represented by a trajectory segment.
+enum TrajectoryDegree:ubyte {
+  Unknown = 0, // Degree is not reported.
+  Cubic = 3, // Degree 3 segment with p0 through p3 used.
+  Quintic = 5, // Degree 5 segment with p0 through p5 used.
+  Septic = 7, // Degree 7 segment with p0 through p7 used.
+}
+
+// Validity and transfer behavior bits for TrajectorySegmentData.
+enum TrajectorySegmentFlags:ushort (bit_flags) {
+  Start, // Segment starts a new trajectory revision.
+  Final, // Segment is the final segment in the trajectory revision.
+  Replace, // Receiver should discard older segments for this trajectory before applying this one.
+  YawValid, // The yaw coefficient fields are meaningful.
+}
+
+// Fixed-layout segment for high-rate trajectory exchange. Lower-degree
+// trajectories ignore the higher-index coefficient fields.
+struct TrajectorySegmentData {
+  timestamp_us:ulong; // Publication timestamp in monotonic boot time.
+  start_time_us:ulong; // Trajectory segment start time in the producer's monotonic boot time.
+  p0_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 0 in local ENU meters.
+  p1_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 1 in local ENU meters.
+  p2_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 2 in local ENU meters.
+  p3_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 3 in local ENU meters.
+  p4_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 4 in local ENU meters.
+  p5_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 5 in local ENU meters.
+  p6_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 6 in local ENU meters.
+  p7_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 7 in local ENU meters.
+  yaw0_rad:float; // Yaw control point or polynomial coefficient 0 in radians.
+  yaw1_rad:float; // Yaw control point or polynomial coefficient 1 in radians.
+  yaw2_rad:float; // Yaw control point or polynomial coefficient 2 in radians.
+  yaw3_rad:float; // Yaw control point or polynomial coefficient 3 in radians.
+  yaw4_rad:float; // Yaw control point or polynomial coefficient 4 in radians.
+  yaw5_rad:float; // Yaw control point or polynomial coefficient 5 in radians.
+  yaw6_rad:float; // Yaw control point or polynomial coefficient 6 in radians.
+  yaw7_rad:float; // Yaw control point or polynomial coefficient 7 in radians.
+  trajectory_id:uint; // Trajectory stream or plan identifier.
+  segment_seq:uint; // Segment sequence number within the trajectory revision.
+  duration_us:uint; // Segment duration.
+  plan_version:uint; // Monotonic trajectory revision identifier.
+  flags:ushort; // Bitmask of TrajectorySegmentFlags bits.
+  trajectory_type:TrajectoryType; // Bezier or polynomial coefficient interpretation.
+  degree:TrajectoryDegree; // Highest coefficient index used by this segment.
+  frame:synapse.types.LocalFrame; // Local frame for position control points or coefficients.
+  id:ubyte; // Optional topic instance identifier for multiple trajectory streams.
+}
+
+// FlatBuffers root wrapper for TrajectorySegmentData.
+table TrajectorySegment {
+  data:TrajectorySegmentData; // Fixed-layout trajectory segment payload.
+}
