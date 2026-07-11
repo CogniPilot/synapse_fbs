@@ -65,6 +65,18 @@ struct RateTriplet {
   yaw:float; // Rotation rate about the body Z (up) axis.
 }
 
+// Six-degree-of-freedom pose in the Synapse local/world and body frames.
+struct Posef {
+  position_enu_m:Vec3f; // Local/world position in ENU meters.
+  attitude:Quaternionf; // Orientation rotating body FLU vectors into ENU.
+}
+
+// Linear and angular velocity in the Synapse local/world and body frames.
+struct Twistf {
+  linear_velocity_enu_m_s:Vec3f; // Linear velocity in ENU meters per second.
+  angular_velocity_flu_rad_s:RateTriplet; // Angular velocity in body FLU radians per second.
+}
+
 // Upper-triangular 6x6 covariance matrix stored row-major as 21 float values.
 // State order is x, y, z translation followed by rotation about x, y, z.
 struct CovarianceUpperTriangle21f {
@@ -92,8 +104,7 @@ struct CovarianceUpperTriangle21f {
 }
 
 // Upper-triangular 12x12 covariance matrix stored row-major as 78 float
-// values. For external odometry covariance the tangent-state order is
-// attitude perturbation, velocity, position, angular velocity.
+// values. The containing field documents its tangent-state order.
 struct CovarianceUpperTriangle78f {
   c0:float; // Upper-triangular covariance element 0.
   c1:float; // Upper-triangular covariance element 1.
@@ -303,4 +314,12 @@ enum TopicId:ushort {
   LockstepTick = 32, // Deterministic simulation barrier telling a receiver which boot time to reach.
   LockstepStatus = 33, // Deterministic simulation participant status and tick completion acknowledgement.
   FirmwareProgress = 34, // Firmware image transfer, verification, and activation progress.
+  RawPose = 35, // Unfiltered position and quaternion attitude measurement.
+  Pose = 36, // Filtered position and quaternion attitude sample.
+  PoseWithCovariance = 37, // Filtered pose sample with 6x6 tangent covariance.
+  Twist = 38, // Filter-derived linear and angular velocity sample.
+  TwistWithCovariance = 39, // Filter-derived twist sample with 6x6 covariance.
+  Odometry = 40, // Compact combined pose, twist, and estimator status.
+  OdometryWithCovariance = 41, // Odometry with complete 12x12 state covariance.
+  MocapPoseFrame = 42, // Raw motion-capture frame with quaternion rigid-body attitudes.
 }

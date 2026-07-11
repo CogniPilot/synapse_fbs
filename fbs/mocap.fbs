@@ -39,6 +39,14 @@ struct MocapRigidBodyData {
   component:MocapRawComponent; // RigidBody6d for current producers.
 }
 
+// Raw 6DOF rigid-body pose with the preferred Synapse quaternion attitude.
+struct MocapRigidBodyPoseData {
+  pose:synapse.types.Posef; // Rigid-body position and body-FLU-to-ENU quaternion attitude.
+  residual_mm:float; // Source 6DOF solve residual in millimeters.
+  id:int; // Rigid-body definition index from the mocap source.
+  flags:ushort; // Bitmask of MocapRawFlags bits.
+}
+
 // Raw mocap frame for logging, debugging, and bridge-level processing. This is
 // intentionally table-encoded; estimators should consume ExternalOdometry.
 table MocapFrame {
@@ -51,4 +59,19 @@ table MocapFrame {
   markers:[MocapMarkerData]; // Labeled marker samples.
   unlabeled_markers:[MocapMarkerData]; // Unlabeled marker samples.
   rigid_bodies:[MocapRigidBodyData]; // Six-degree-of-freedom rigid-body samples.
+}
+
+// Raw mocap frame using quaternion attitude for rigid bodies. This supersedes
+// MocapFrame for new publishers while the matrix-based wire type remains
+// available for compatibility with existing recordings and consumers.
+table MocapPoseFrame {
+  timestamp_us:ulong; // Marker timestamp in monotonic boot time.
+  frame_number:uint; // Source frame number.
+  drop_rate_2d_dpermille:ushort; // Recent 2D camera-frame drop rate in deci-percent.
+  out_of_sync_rate_2d_dpermille:ushort; // Recent 2D camera-frame out-of-sync rate in deci-percent.
+  source_id:ubyte; // Mocap source instance identifier.
+  flags:ushort; // Bitmask of MocapRawFlags bits describing the frame as a whole.
+  markers:[MocapMarkerData]; // Labeled marker samples.
+  unlabeled_markers:[MocapMarkerData]; // Unlabeled marker samples.
+  rigid_bodies:[MocapRigidBodyPoseData]; // Six-degree-of-freedom rigid-body pose samples.
 }
