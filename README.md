@@ -16,7 +16,7 @@ release artifacts from the pinned Linux toolchain in `flake.nix`.
 
 - Schema docs: <https://cognipilot.github.io/synapse_fbs/>
 - Main-branch schema docs: <https://cognipilot.github.io/synapse_fbs/main/>
-- Latest 0.6 schema docs: <https://cognipilot.github.io/synapse_fbs/0.6/>
+- Latest 0.7 schema docs: <https://cognipilot.github.io/synapse_fbs/0.7/>
 - Design use cases: [USE_CASES.md](USE_CASES.md)
 - GitHub releases: <https://github.com/CogniPilot/synapse_fbs/releases>
 - Rust crate: <https://crates.io/crates/synapse_fbs>
@@ -108,11 +108,19 @@ examples:
 ```text
 health                       # bench: one vehicle, no namespace
 cub1/health                  # fleet vehicle "cub1"
-cub1/odom                    # cub1 odometry estimate
+cub1/odom                    # compact cub1 odometry estimate without covariance
+cub1/pose_raw                # unfiltered position and attitude measurement
+cub1/pose                    # filtered position and attitude
+cub1/pose_cov                # filtered pose with 6x6 tangent covariance
+cub1/twist                   # linear and angular velocity
+cub1/twist_cov               # twist with 6x6 covariance
+cub1/odom_cov                # odometry state with full 12x12 covariance
 cub1/imu/0                   # first IMU instance on cub1
 cub2/imu/1                   # second IMU instance on cub2
 cub1/cmd/mission_set         # mission upload addressed to cub1
 qualisys/mocap               # raw frames from the "qualisys" mocap system
+qualisys/mocap_matrix        # legacy raw frames with rigid-body rotation matrices
+qualisys/cub1/pose_raw       # raw Qualisys position and attitude for cub1
 qualisys/cub1/external_pose  # qualisys measurement of cub1's pose
 cub1/external_pose           # bridge output in cub1's own namespace
 sim/tick                     # simulator lockstep tick
@@ -125,6 +133,10 @@ outputs nest a vehicle sub-namespace (`qualisys/cub1/external_pose`). Bridges
 write estimator inputs into the namespace of the vehicle that consumes them
 (`cub1/external_pose`), so a vehicle's estimator and control stack never
 subscribe outside their own namespace.
+
+New mocap publishers use `MocapPoseFrame` on `mocap`, with rigid-body
+attitudes encoded as body-FLU-to-ENU quaternions. The released matrix-based
+`MocapFrame` contract remains available on `mocap_matrix` for compatibility.
 
 A ground station subscribes to `*/health` for every vehicle at one namespace
 level, or `**/health` for arbitrary nesting, and learns which vehicle a
@@ -178,13 +190,23 @@ network. Public Zenoh subscribers never accept metadata-free values or infer a
 contract from a key. This keeps the strict default while avoiding repeated
 schema strings on a controlled radio link.
 
-**Mocap has raw and estimator paths.** `MocapFrame` preserves source-like raw
-marker and 6DOF rigid-body samples for logging and bridge processing.
-Estimators consume `ExternalOdometry`, a compact fixed-layout pose/twist
-measurement. Frame ids are not carried in high-rate payloads: pose and linear
-velocity are ENU, angular velocity is body FLU, and bridges transform before
-publishing. Uncertainty and full 12D tangent-state covariance are opt-in
-companion data, not part of the default 240 Hz path.
+**Pose, twist, and odometry use compact/covariance pairs.** `RawPose` carries
+an unfiltered source measurement with no covariance. `Pose` and `Twist`
+carry the high-rate geometry, while `PoseWithCovariance` and
+`TwistWithCovariance` add 6x6 tangent covariance. `Odometry` combines a
+coherent pose/twist estimate with status metadata; `OdometryWithCovariance`
+adds the complete 12x12 covariance, including pose-twist cross-correlations.
+The nested `synapse.types.Posef` and `Twistf` structs are deliberately
+unstamped. Each top-level topic payload carries one `timestamp_us`, and nested
+state in one odometry or mocap frame inherits that outer timestamp.
+
+**Mocap has raw and estimator paths.** `MocapPoseFrame` preserves source-like
+raw marker and quaternion rigid-body samples for logging and bridge
+processing; the released matrix-based `MocapFrame` remains available for
+compatibility. Estimators can still consume the legacy `ExternalOdometry`
+input contract. Frame ids are not carried in compact per-body payloads: pose
+and linear velocity are ENU, angular velocity is body FLU, and bridges
+transform before publishing.
 
 **Commands are queryables, not topics.** A GCS issues
 `get("cub1/cmd/mission_get", payload)` and receives the matching reply table.
@@ -431,7 +453,7 @@ consumers. Prefer `find_package` for projects that download, extract, or
 install the release archive as part of their dependency setup:
 
 ```cmake
-find_package(synapse_fbs 0.6.0 CONFIG REQUIRED)
+find_package(synapse_fbs 0.7.0 CONFIG REQUIRED)
 
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
@@ -447,7 +469,7 @@ remains the simplest direct-from-release path:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.6.0)
+set(SYNAPSE_FBS_VERSION 0.7.0)
 
 FetchContent_Declare(
   synapse_fbs
@@ -506,7 +528,7 @@ through CMake `FetchContent`.
 Generate the static schema documentation locally:
 
 ```sh
-nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.6 --out-dir target/xtask/docs
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.7 --out-dir target/xtask/docs
 ```
 
 The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
@@ -520,7 +542,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a semantic version tag such as `v0.6.0` publishes a GitHub Release and
+Pushing a semantic version tag such as `v0.7.0` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
@@ -545,7 +567,7 @@ directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes schema documentation to the `gh-pages` branch used
 by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.6.0` updates `/0.6/`. Only the latest patch
+matching minor-version docs, so `v0.7.0` updates `/0.7/`. Only the latest patch
 for each published minor line is kept on GitHub Pages. Exact historical docs can
 be rebuilt from the corresponding tag.
 
