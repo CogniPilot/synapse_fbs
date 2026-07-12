@@ -1,0 +1,49 @@
+.synapse-version-menu {
+  align-items: center;
+  display: flex;
+  gap: 0.4rem;
+  height: var(--menu-bar-height);
+  padding: 0 0.55rem;
+}
+
+.synapse-version-menu label {
+  color: var(--fg);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.synapse-version-select {
+  background: var(--bg);
+  border: 1px solid var(--table-border-color);
+  border-radius: 4px;
+  color: var(--fg);
+  font: inherit;
+  height: 1.9rem;
+  max-width: 15rem;
+  min-width: 8.5rem;
+  padding: 0 0.45rem;
+}
+
+.content table {
+  font-size: 0.9em;
+}
+
+.content table code {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .synapse-version-menu {
+    gap: 0.25rem;
+    padding: 0 0.25rem;
+  }
+
+  .synapse-version-menu label {
+    display: none;
+  }
+
+  .synapse-version-select {
+    max-width: 8.5rem;
+    min-width: 7rem;
+  }
+}

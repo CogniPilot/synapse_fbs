@@ -1,0 +1,45 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Status bits for GcsStatusData.flags.
+enum GcsStatusFlags:ubyte (bit_flags) {
+  Armed, // Actuators are allowed to produce motion.
+  Failsafe, // An active failsafe is affecting vehicle behavior.
+  GlobalPositionValid, // The latitude/longitude/altitude fields are usable.
+  YawValid, // The yaw field is usable.
+  HomeSet, // A home reference is set and distance_home_dam is meaningful.
+  RcLink, // The manual control link is healthy.
+  GcsLink, // The ground-control link is healthy.
+}
+
+// Compact vehicle status aggregate for low-rate ground-control links such as
+// LoRa or satellite backhaul. This is a display-oriented estimate-layer
+// summary published at 0.2 to 1 Hz; it is never used for control. Angles
+// follow REP-0103: zero east, positive counter-clockwise.
+struct GcsStatusData {
+  time_boot_ms:uint; // Sample timestamp in monotonic boot time.
+  latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
+  longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
+  altitude_msl_m:short; // Height above mean sea level.
+  relative_altitude_m:short; // Height above the home reference.
+  yaw_cdeg:short; // Heading in the range -18000 to 18000; zero east, positive counter-clockwise.
+  ground_speed_cm_s:ushort; // Horizontal ground speed magnitude.
+  climb_cm_s:short; // Vertical speed, positive up.
+  distance_home_dam:ushort; // Straight-line distance to home in decameters.
+  voltage_battery_cv:ushort; // Primary battery pack voltage in centi-volts.
+  current_battery_da:short; // Primary battery current in deci-amps; positive means discharge.
+  mission_seq:ushort; // Current mission item sequence number.
+  battery_remaining_pct:byte; // Remaining battery percentage, or negative when unknown.
+  flight_mode:ubyte; // Producer-defined active flight mode.
+  system_state:ubyte; // Producer-defined high-level system state.
+  link_quality_pct:ubyte; // Command/control link quality from 0 to 100.
+  satellites_used:ubyte; // Number of GNSS satellites used in the solution.
+  fix_type:synapse.types.GnssFixType; // GNSS fix quality.
+  flags:ubyte; // Bitmask of GcsStatusFlags bits.
+}
+
+// FlatBuffers root wrapper for GcsStatusData.
+table GcsStatus {
+  data:GcsStatusData; // Fixed-layout ground-control status payload.
+}

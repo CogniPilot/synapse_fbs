@@ -1,0 +1,77 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Raw motion-capture component type represented by a sample.
+enum MocapRawComponent:ubyte {
+  Unknown = 0, // Component type is not reported.
+  Marker3d = 1, // Labeled 3D marker sample.
+  Marker3dNoLabel = 2, // Unlabeled 3D marker sample with a source-assigned tracking id.
+  RigidBody6d = 3, // Six-degree-of-freedom rigid-body sample with rotation matrix.
+}
+
+// Validity and source-detail bits for raw mocap samples.
+enum MocapRawFlags:ushort (bit_flags) {
+  Valid, // Position and rotation fields are meaningful.
+  ResidualValid, // residual_mm is meaningful.
+  LabelValid, // id indexes a known source label or rigid-body definition.
+  TrackingIdValid, // id is a source-assigned tracking id.
+}
+
+// Raw 3D marker sample. The bridge converts coordinates into ENU meters while
+// preserving the source marker id and residual.
+struct MocapMarkerData {
+  position_enu_m:synapse.types.Vec3f; // Marker position in local/world ENU.
+  residual_mm:float; // Source solve residual in millimeters.
+  id:int; // Label index or tracking id from the mocap source.
+  flags:ushort; // Bitmask of MocapRawFlags bits.
+  component:MocapRawComponent; // Labeled or unlabeled 3D component class.
+}
+
+// Raw 6DOF rigid-body sample. The bridge converts coordinates into ENU meters
+// while preserving the source rotation matrix and residual.
+struct MocapRigidBodyData {
+  position_enu_m:synapse.types.Vec3f; // Rigid-body position in local/world ENU.
+  rotation:synapse.types.RotationMatrix3f; // Rotation matrix from body FLU to ENU.
+  residual_mm:float; // Source 6DOF solve residual in millimeters.
+  id:int; // Rigid-body definition index from the mocap source.
+  flags:ushort; // Bitmask of MocapRawFlags bits.
+  component:MocapRawComponent; // RigidBody6d for current producers.
+}
+
+// Raw 6DOF rigid-body pose with the preferred Synapse quaternion attitude.
+struct MocapRigidBodyPoseData {
+  pose:synapse.types.Posef; // Rigid-body position and body-FLU-to-ENU quaternion attitude.
+  residual_mm:float; // Source 6DOF solve residual in millimeters.
+  id:int; // Rigid-body definition index from the mocap source.
+  flags:ushort; // Bitmask of MocapRawFlags bits.
+}
+
+// Raw mocap frame for logging, debugging, and bridge-level processing. This is
+// intentionally table-encoded; estimators should consume ExternalOdometry.
+table MocapFrame {
+  timestamp_us:ulong; // Marker timestamp in monotonic boot time.
+  frame_number:uint; // Source frame number.
+  drop_rate_2d_dpermille:ushort; // Recent 2D camera-frame drop rate in deci-percent.
+  out_of_sync_rate_2d_dpermille:ushort; // Recent 2D camera-frame out-of-sync rate in deci-percent.
+  source_id:ubyte; // Mocap source instance identifier.
+  flags:ushort; // Bitmask of MocapRawFlags bits describing the frame as a whole.
+  markers:[MocapMarkerData]; // Labeled marker samples.
+  unlabeled_markers:[MocapMarkerData]; // Unlabeled marker samples.
+  rigid_bodies:[MocapRigidBodyData]; // Six-degree-of-freedom rigid-body samples.
+}
+
+// Raw mocap frame using quaternion attitude for rigid bodies. This supersedes
+// MocapFrame for new publishers while the matrix-based wire type remains
+// available for compatibility with existing recordings and consumers.
+table MocapPoseFrame {
+  timestamp_us:ulong; // Marker timestamp in monotonic boot time.
+  frame_number:uint; // Source frame number.
+  drop_rate_2d_dpermille:ushort; // Recent 2D camera-frame drop rate in deci-percent.
+  out_of_sync_rate_2d_dpermille:ushort; // Recent 2D camera-frame out-of-sync rate in deci-percent.
+  source_id:ubyte; // Mocap source instance identifier.
+  flags:ushort; // Bitmask of MocapRawFlags bits describing the frame as a whole.
+  markers:[MocapMarkerData]; // Labeled marker samples.
+  unlabeled_markers:[MocapMarkerData]; // Unlabeled marker samples.
+  rigid_bodies:[MocapRigidBodyPoseData]; // Six-degree-of-freedom rigid-body pose samples.
+}

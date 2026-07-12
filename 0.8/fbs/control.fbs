@@ -1,0 +1,275 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Axis-validity bits for ManualControlData.active_axes.
+enum ManualControlAxes:ushort (bit_flags) {
+  Pitch, // pitch_milli is meaningful.
+  Roll, // roll_milli is meaningful.
+  Throttle, // throttle_milli is meaningful.
+  Yaw, // yaw_milli is meaningful.
+  Aux0, // aux0_milli is meaningful.
+  Aux1, // aux1_milli is meaningful.
+  Aux2, // aux2_milli is meaningful.
+  Aux3, // aux3_milli is meaningful.
+  Aux4, // aux4_milli is meaningful.
+  Aux5, // aux5_milli is meaningful.
+}
+
+// Switch and validity bits for ManualControlData.flags.
+enum ManualControlFlags:ubyte (bit_flags) {
+  ArmSwitch, // The pilot arm switch is in the arm position.
+  KillSwitch, // The pilot kill switch requests immediate output inhibition.
+  Active, // Manual input is currently selected or influencing control.
+  Valid, // The manual input sample is fresh and passed validation.
+}
+
+// Ignore bits for AttitudeCommandData.type_mask.
+enum AttitudeCommandMask:ubyte (bit_flags) {
+  IgnoreAttitude, // Ignore the attitude quaternion.
+  IgnoreRateRoll, // Ignore the roll body-rate feed-forward.
+  IgnoreRatePitch, // Ignore the pitch body-rate feed-forward.
+  IgnoreRateYaw, // Ignore the yaw body-rate feed-forward.
+  IgnoreThrust, // Ignore the thrust field.
+}
+
+// Ignore bits for RateCommandData.type_mask.
+enum RateCommandMask:ubyte (bit_flags) {
+  IgnoreRateRoll, // Ignore the roll rate setpoint.
+  IgnoreRatePitch, // Ignore the pitch rate setpoint.
+  IgnoreRateYaw, // Ignore the yaw rate setpoint.
+  IgnoreThrust, // Ignore the thrust field.
+}
+
+// Ignore and interpretation bits for LocalPositionCommandData.type_mask.
+enum LocalPositionCommandMask:ushort (bit_flags) {
+  IgnorePositionX, // Ignore the X position setpoint.
+  IgnorePositionY, // Ignore the Y position setpoint.
+  IgnorePositionZ, // Ignore the Z position setpoint.
+  IgnoreVelocityX, // Ignore the X velocity setpoint.
+  IgnoreVelocityY, // Ignore the Y velocity setpoint.
+  IgnoreVelocityZ, // Ignore the Z velocity setpoint.
+  IgnoreAccelerationX, // Ignore the X acceleration setpoint.
+  IgnoreAccelerationY, // Ignore the Y acceleration setpoint.
+  IgnoreAccelerationZ, // Ignore the Z acceleration setpoint.
+  ForceSetpoint, // Interpret the acceleration fields as force instead of acceleration.
+  IgnoreYaw, // Ignore the yaw setpoint.
+  IgnoreYawRate, // Ignore the yaw-rate setpoint.
+}
+
+// Raw receiver channel sample before pilot-input normalization. This is a
+// raw-layer topic: channel values are the receiver's native pulse widths.
+struct RadioControlData {
+  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  channel_count:ubyte; // Number of valid channels in this sample, starting at channel 0.
+  link_quality_pct:ubyte; // Receiver link quality from 0 to 100.
+  chan0_raw_us:ushort; // Raw channel 0 pulse width.
+  chan1_raw_us:ushort; // Raw channel 1 pulse width.
+  chan2_raw_us:ushort; // Raw channel 2 pulse width.
+  chan3_raw_us:ushort; // Raw channel 3 pulse width.
+  chan4_raw_us:ushort; // Raw channel 4 pulse width.
+  chan5_raw_us:ushort; // Raw channel 5 pulse width.
+  chan6_raw_us:ushort; // Raw channel 6 pulse width.
+  chan7_raw_us:ushort; // Raw channel 7 pulse width.
+  chan8_raw_us:ushort; // Raw channel 8 pulse width.
+  chan9_raw_us:ushort; // Raw channel 9 pulse width.
+  chan10_raw_us:ushort; // Raw channel 10 pulse width.
+  chan11_raw_us:ushort; // Raw channel 11 pulse width.
+  chan12_raw_us:ushort; // Raw channel 12 pulse width.
+  chan13_raw_us:ushort; // Raw channel 13 pulse width.
+  chan14_raw_us:ushort; // Raw channel 14 pulse width.
+  chan15_raw_us:ushort; // Raw channel 15 pulse width.
+  chan16_raw_us:ushort; // Raw channel 16 pulse width.
+  chan17_raw_us:ushort; // Raw channel 17 pulse width.
+}
+
+// Normalized pilot intent after receiver decoding, mapping, and validity
+// checks. Axis fields use the full range -1000 to 1000. Throttle semantics
+// are fixed by the schema: negative values command reverse thrust or descent;
+// unidirectional vehicles clamp negative throttle to zero. Axis validity is
+// carried only by active_axes; there are no sentinel values.
+struct ManualControlData {
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  buttons:uint; // Bitmask of active momentary buttons or switches, indexed from bit 0.
+  active_axes:ushort; // Bitmask of ManualControlAxes bits indicating meaningful axes.
+  pitch_milli:short; // Pitch command in milli-units over -1000 to 1000; positive pitches nose up.
+  roll_milli:short; // Roll command in milli-units over -1000 to 1000; positive rolls right.
+  throttle_milli:short; // Throttle command in milli-units over -1000 to 1000; negative means reverse or descend.
+  yaw_milli:short; // Yaw command in milli-units over -1000 to 1000; positive yaws counter-clockwise.
+  aux0_milli:short; // Auxiliary axis 0 in milli-units over -1000 to 1000.
+  aux1_milli:short; // Auxiliary axis 1 in milli-units over -1000 to 1000.
+  aux2_milli:short; // Auxiliary axis 2 in milli-units over -1000 to 1000.
+  aux3_milli:short; // Auxiliary axis 3 in milli-units over -1000 to 1000.
+  aux4_milli:short; // Auxiliary axis 4 in milli-units over -1000 to 1000.
+  aux5_milli:short; // Auxiliary axis 5 in milli-units over -1000 to 1000.
+  flight_mode:ubyte; // Producer-defined requested flight mode.
+  flags:ubyte; // Bitmask of ManualControlFlags bits.
+}
+
+// Attitude setpoint with optional angular-rate and thrust feed-forward.
+struct AttitudeCommandData {
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  attitude:synapse.types.Quaternionf; // Desired orientation rotating body FLU vectors into the ENU world frame.
+  body_rate_flu_rad_s:synapse.types.RateTriplet; // Body-rate feed-forward in the FLU frame.
+  thrust:float; // Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.
+  type_mask:ubyte; // Bitmask of AttitudeCommandMask bits for ignored fields.
+}
+
+// Body-rate setpoint with optional thrust feed-forward.
+struct RateCommandData {
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  body_rate_flu_rad_s:synapse.types.RateTriplet; // Desired body angular rates in the FLU frame.
+  thrust:float; // Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.
+  type_mask:ubyte; // Bitmask of RateCommandMask bits for ignored fields.
+}
+
+// Local-frame position, velocity, acceleration, and yaw setpoint.
+struct LocalPositionCommandData {
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  position_enu_m:synapse.types.Vec3f; // Desired local position in the ENU frame.
+  velocity_enu_m_s:synapse.types.Vec3f; // Desired local velocity in the ENU frame.
+  acceleration_or_force_enu:synapse.types.Vec3f; // Desired ENU acceleration in m/s^2, or force in newtons when ForceSetpoint is set.
+  yaw_rad:float; // Desired yaw angle; zero east and positive counter-clockwise.
+  yaw_rate_rad_s:float; // Desired yaw rate; positive counter-clockwise.
+  type_mask:ushort; // Bitmask of LocalPositionCommandMask bits.
+  coordinate_frame:synapse.types.LocalFrame; // Frame in which the setpoint is expressed.
+}
+
+// Normalized actuator command for up to sixteen logical actuator controls.
+struct ActuatorCommandData {
+  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  active_mask:uint; // Bitmask indicating which control slots are valid, indexed from bit 0.
+  control0:float; // Normalized actuator control slot 0.
+  control1:float; // Normalized actuator control slot 1.
+  control2:float; // Normalized actuator control slot 2.
+  control3:float; // Normalized actuator control slot 3.
+  control4:float; // Normalized actuator control slot 4.
+  control5:float; // Normalized actuator control slot 5.
+  control6:float; // Normalized actuator control slot 6.
+  control7:float; // Normalized actuator control slot 7.
+  control8:float; // Normalized actuator control slot 8.
+  control9:float; // Normalized actuator control slot 9.
+  control10:float; // Normalized actuator control slot 10.
+  control11:float; // Normalized actuator control slot 11.
+  control12:float; // Normalized actuator control slot 12.
+  control13:float; // Normalized actuator control slot 13.
+  control14:float; // Normalized actuator control slot 14.
+  control15:float; // Normalized actuator control slot 15.
+}
+
+// Normalized actuator feedback for up to thirty-two physical outputs. The
+// command message carries sixteen logical controls while feedback covers
+// thirty-two physical outputs after mixing and allocation.
+struct ActuatorFeedbackData {
+  timestamp_us:ulong; // Feedback timestamp in monotonic boot time.
+  active_mask:uint; // Bitmask indicating which output slots are valid, indexed from bit 0.
+  output0:float; // Normalized actuator output slot 0.
+  output1:float; // Normalized actuator output slot 1.
+  output2:float; // Normalized actuator output slot 2.
+  output3:float; // Normalized actuator output slot 3.
+  output4:float; // Normalized actuator output slot 4.
+  output5:float; // Normalized actuator output slot 5.
+  output6:float; // Normalized actuator output slot 6.
+  output7:float; // Normalized actuator output slot 7.
+  output8:float; // Normalized actuator output slot 8.
+  output9:float; // Normalized actuator output slot 9.
+  output10:float; // Normalized actuator output slot 10.
+  output11:float; // Normalized actuator output slot 11.
+  output12:float; // Normalized actuator output slot 12.
+  output13:float; // Normalized actuator output slot 13.
+  output14:float; // Normalized actuator output slot 14.
+  output15:float; // Normalized actuator output slot 15.
+  output16:float; // Normalized actuator output slot 16.
+  output17:float; // Normalized actuator output slot 17.
+  output18:float; // Normalized actuator output slot 18.
+  output19:float; // Normalized actuator output slot 19.
+  output20:float; // Normalized actuator output slot 20.
+  output21:float; // Normalized actuator output slot 21.
+  output22:float; // Normalized actuator output slot 22.
+  output23:float; // Normalized actuator output slot 23.
+  output24:float; // Normalized actuator output slot 24.
+  output25:float; // Normalized actuator output slot 25.
+  output26:float; // Normalized actuator output slot 26.
+  output27:float; // Normalized actuator output slot 27.
+  output28:float; // Normalized actuator output slot 28.
+  output29:float; // Normalized actuator output slot 29.
+  output30:float; // Normalized actuator output slot 30.
+  output31:float; // Normalized actuator output slot 31.
+}
+
+// Raw PWM pulse-width outputs for servo and ESC drivers.
+struct PwmSignalOutputsData {
+  timestamp_us:ulong; // Output timestamp in monotonic boot time.
+  active_mask:uint; // Bitmask indicating which PWM outputs are valid, indexed from bit 0.
+  port:ubyte; // Producer-defined output bank or timer port.
+  output0_us:ushort; // PWM output 0 pulse width.
+  output1_us:ushort; // PWM output 1 pulse width.
+  output2_us:ushort; // PWM output 2 pulse width.
+  output3_us:ushort; // PWM output 3 pulse width.
+  output4_us:ushort; // PWM output 4 pulse width.
+  output5_us:ushort; // PWM output 5 pulse width.
+  output6_us:ushort; // PWM output 6 pulse width.
+  output7_us:ushort; // PWM output 7 pulse width.
+  output8_us:ushort; // PWM output 8 pulse width.
+  output9_us:ushort; // PWM output 9 pulse width.
+  output10_us:ushort; // PWM output 10 pulse width.
+  output11_us:ushort; // PWM output 11 pulse width.
+  output12_us:ushort; // PWM output 12 pulse width.
+  output13_us:ushort; // PWM output 13 pulse width.
+  output14_us:ushort; // PWM output 14 pulse width.
+  output15_us:ushort; // PWM output 15 pulse width.
+}
+
+// Runtime metrics for a control loop or scheduler slice.
+struct ControlLoopMetricsData {
+  timestamp_us:ulong; // Metrics timestamp in monotonic boot time.
+  period_us:uint; // Measured loop period.
+  latency_us:uint; // Time from scheduled release to completion or publication.
+  overrun_count:uint; // Cumulative count of missed deadlines.
+  load_dpermille:ushort; // Loop load as deci-percent, where 1000 means 100%.
+}
+
+// FlatBuffers root wrapper for RadioControlData.
+table RadioControl {
+  data:RadioControlData; // Fixed-layout raw receiver payload.
+}
+
+// FlatBuffers root wrapper for ManualControlData.
+table ManualControlCommand {
+  data:ManualControlData; // Fixed-layout manual-control payload.
+}
+
+// FlatBuffers root wrapper for AttitudeCommandData.
+table AttitudeCommand {
+  data:AttitudeCommandData; // Fixed-layout attitude-command payload.
+}
+
+// FlatBuffers root wrapper for RateCommandData.
+table RateCommand {
+  data:RateCommandData; // Fixed-layout rate-command payload.
+}
+
+// FlatBuffers root wrapper for LocalPositionCommandData.
+table LocalPositionCommand {
+  data:LocalPositionCommandData; // Fixed-layout local-position-command payload.
+}
+
+// FlatBuffers root wrapper for ActuatorCommandData.
+table ActuatorCommand {
+  data:ActuatorCommandData; // Fixed-layout actuator-command payload.
+}
+
+// FlatBuffers root wrapper for ActuatorFeedbackData.
+table ActuatorFeedback {
+  data:ActuatorFeedbackData; // Fixed-layout actuator-feedback payload.
+}
+
+// FlatBuffers root wrapper for PwmSignalOutputsData.
+table PwmSignalOutputs {
+  data:PwmSignalOutputsData; // Fixed-layout PWM output payload.
+}
+
+// FlatBuffers root wrapper for ControlLoopMetricsData.
+table ControlLoopMetrics {
+  data:ControlLoopMetricsData; // Fixed-layout control-loop metrics payload.
+}
