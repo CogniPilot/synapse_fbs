@@ -11,10 +11,13 @@
 //
 // Fixed memory layout is a protocol priority. Runtime telemetry, state,
 // command, and control payloads are structs so that shared memory, Zenoh
-// values, radio frames, and log messages all carry identical bytes. Little
+// values, and radio frames all carry identical bytes. Little
 // endian byte order is a protocol requirement. Use tables only for
 // FlatBuffers roots, unions, request/reply payloads, or naturally
-// variable-size data.
+// variable-size data. Logging is an explicit exception: a log is a chain of
+// heterogeneous MCAP records containing table-wrapped topic samples, not a
+// single inter-chip payload. Fixed structs are captured first and wrapped for
+// logging outside real-time control and shared-memory paths.
 //
 // Field validity uses one schema-defined flags bitmask per message. Sentinel
 // values are never used; zero-means-unavailable is allowed only where zero is
