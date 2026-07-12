@@ -20,6 +20,10 @@
       "types": "./topic_catalog.d.ts",
       "default": "./topic_catalog.js"
     },
+    "./mcap": {
+      "types": "./mcap.d.ts",
+      "default": "./mcap.js"
+    },
     "./topics.json": "./topics.json",
     "./fbs/*": "./fbs/*",
     "./bfbs/*": "./bfbs/*",
@@ -30,15 +34,26 @@
     "index.d.ts",
     "topic_catalog.js",
     "topic_catalog.d.ts",
+    "mcap.js",
+    "mcap.d.ts",
     "topics.json",
     "fbs",
     "bfbs",
     "schema.sha256",
     "bfbs.sha256",
     "README.md",
+    "MCAP.md",
     "LICENSE"
   ],
   "sideEffects": false,
+  "peerDependencies": {
+    "@mcap/core": "{{ mcap_javascript_version }}"
+  },
+  "peerDependenciesMeta": {
+    "@mcap/core": {
+      "optional": true
+    }
+  },
   "publishConfig": {
     "access": "public"
   }

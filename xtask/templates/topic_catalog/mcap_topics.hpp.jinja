@@ -1,0 +1,40 @@
+// Generated MCAP topic descriptors. Each function references only the BFBS
+// schema group required by the explicitly selected topic.
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+
+namespace synapse {
+namespace mcap {
+
+struct Topic {
+  std::uint16_t id;
+  std::string_view name;
+  const std::byte* schema_data;
+  std::size_t schema_size;
+  std::size_t payload_size;
+  bool fixed_layout;
+};
+
+{%- for schema in mcap_schemas %}
+extern const std::byte {{ schema.symbol }}[];
+extern const std::size_t {{ schema.symbol }}_size;
+{%- endfor %}
+
+{%- for topic in topics %}
+inline Topic {{ topic.name }}Topic() {
+  return Topic{
+      {{ topic.id }},
+      {{ topic.mcap_schema_name_literal }},
+      {{ topic.mcap_schema_symbol }},
+      {{ topic.mcap_schema_symbol }}_size,
+      {{ topic.payload_size_c }},
+      {{ topic.fixed_layout_c }},
+  };
+}
+{%- endfor %}
+
+}  // namespace mcap
+}  // namespace synapse

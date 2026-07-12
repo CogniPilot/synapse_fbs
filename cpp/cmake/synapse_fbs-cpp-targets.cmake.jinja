@@ -12,3 +12,16 @@ add_library(synapse_fbs::cpp ALIAS synapse_fbs_cpp)
 target_include_directories(synapse_fbs_cpp INTERFACE
   "${_SYNAPSE_FBS_ROOT}/include"
 )
+
+add_library(synapse_fbs_mcap STATIC EXCLUDE_FROM_ALL
+  "${_SYNAPSE_FBS_ROOT}/src/mcap.cpp"
+{{ mcap_bfbs_source_paths }}
+)
+add_library(synapse_fbs::mcap ALIAS synapse_fbs_mcap)
+
+target_compile_features(synapse_fbs_mcap PUBLIC cxx_std_17)
+target_compile_definitions(synapse_fbs_mcap PUBLIC
+  MCAP_COMPRESSION_NO_LZ4
+  MCAP_COMPRESSION_NO_ZSTD
+)
+target_link_libraries(synapse_fbs_mcap PUBLIC synapse_fbs::cpp)

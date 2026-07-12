@@ -1,4 +1,8 @@
 #include <synapse/transport_generated.h>
+#include <synapse/mcap.hpp>
 #include <synapse/topic_catalog.h>
 
-int main() { return synapse_topic_by_name("VehicleHealth") == nullptr; }
+int main() {
+  return synapse_topic_by_name("VehicleHealth") == nullptr ||
+         synapse::mcap::OdometryTopic().id == 0;
+}

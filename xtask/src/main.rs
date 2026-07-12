@@ -233,6 +233,12 @@ struct Tools {
     flatbuffers_build_version: String,
     flatcc_version: String,
     flatcc_commit: String,
+    mcap_rust_version: String,
+    mcap_python_version: String,
+    mcap_javascript_version: String,
+    mcap_cpp_version: String,
+    mcap_cpp_commit: String,
+    typescript_version: String,
     mdbook_version: String,
 }
 
@@ -243,6 +249,8 @@ struct ToolsFile {
     #[serde(rename = "flatbuffers-build")]
     flatbuffers_build: FlatbuffersBuildTools,
     flatcc: FlatccTools,
+    mcap: McapTools,
+    typescript: TypescriptTools,
     docs: DocsTools,
 }
 
@@ -266,6 +274,25 @@ struct FlatbuffersBuildTools {
 struct FlatccTools {
     version: String,
     commit: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct McapTools {
+    rust: String,
+    python: String,
+    javascript: String,
+    cpp: McapCppTools,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct McapCppTools {
+    version: String,
+    commit: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct TypescriptTools {
+    version: String,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -385,7 +412,7 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     generate_bindings(root, &flatc, &templates, &packages)?;
     check_rust_package(&packages.rust)?;
     build_python_package(root, &packages.python, &tools)?;
-    build_js_package(root, &templates, &packages.js, &flatc)?;
+    build_js_package(root, &templates, &packages.js, &flatc, &tools, true)?;
     build_archives(root, &tools, &flatc, &flatcc, &options.release_name)?;
     generate_docs_site(
         root,
@@ -568,7 +595,7 @@ fn js(root: &Path) -> Result<()> {
     let package = root.join("target/xtask/packages/js");
     stage_template_tree(root, "js", &package, &templates, package_context(&tools))?;
     let flatc = build_flatc(root, &tools)?;
-    build_js_package(root, &templates, &package, &flatc)?;
+    build_js_package(root, &templates, &package, &flatc, &tools, false)?;
 
     println!("staged npm package at {}", package.display());
     Ok(())
@@ -665,6 +692,12 @@ fn read_tools(_root: &Path) -> Result<Tools> {
         flatbuffers_build_version: parsed.flatbuffers_build.version,
         flatcc_version: parsed.flatcc.version,
         flatcc_commit: parsed.flatcc.commit,
+        mcap_rust_version: parsed.mcap.rust,
+        mcap_python_version: parsed.mcap.python,
+        mcap_javascript_version: parsed.mcap.javascript,
+        mcap_cpp_version: parsed.mcap.cpp.version,
+        mcap_cpp_commit: parsed.mcap.cpp.commit,
+        typescript_version: parsed.typescript.version,
         mdbook_version: parsed.docs.mdbook,
     })
 }
@@ -1118,11 +1151,18 @@ fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {
 
     require_git_sha("FLATBUFFERS_COMMIT", &tools.flatbuffers_commit)?;
     require_git_sha("FLATCC_COMMIT", &tools.flatcc_commit)?;
+    require_git_sha("MCAP_CPP_COMMIT", &tools.mcap_cpp_commit)?;
 
     let rust_cargo = fs::read_to_string(packages.rust.join("Cargo.toml"))?;
     let rust_pin = format!("flatbuffers = \"={}\"", tools.flatbuffers_version);
     if !rust_cargo.contains(&rust_pin) {
         return fail(format!("staged rust/Cargo.toml must contain {rust_pin}"));
+    }
+    let rust_mcap_pin = format!("mcap = {{ version = \"={}\"", tools.mcap_rust_version);
+    if !rust_cargo.contains(&rust_mcap_pin) {
+        return fail(format!(
+            "staged rust/Cargo.toml must contain {rust_mcap_pin}"
+        ));
     }
 
     let pyproject = fs::read_to_string(packages.python.join("pyproject.toml"))?;
@@ -1131,6 +1171,18 @@ fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {
         return fail(format!(
             "staged python/pyproject.toml must contain {python_pin}"
         ));
+    }
+    let python_mcap_pin = format!("mcap=={}", tools.mcap_python_version);
+    if !pyproject.contains(&python_mcap_pin) {
+        return fail(format!(
+            "staged python/pyproject.toml must contain {python_mcap_pin}"
+        ));
+    }
+
+    let js_package = fs::read_to_string(packages.js.join("package.json"))?;
+    let js_mcap_pin = format!("\"@mcap/core\": \"{}\"", tools.mcap_javascript_version);
+    if !js_package.contains(&js_mcap_pin) {
+        return fail(format!("staged js/package.json must contain {js_mcap_pin}"));
     }
 
     Ok(())
@@ -1172,6 +1224,9 @@ fn package_context(tools: &Tools) -> Value {
     context! {
         package_version => tools.package_version.as_str(),
         flatbuffers_version => tools.flatbuffers_version.as_str(),
+        mcap_rust_version => tools.mcap_rust_version.as_str(),
+        mcap_python_version => tools.mcap_python_version.as_str(),
+        mcap_javascript_version => tools.mcap_javascript_version.as_str(),
     }
 }
 
@@ -1193,6 +1248,8 @@ fn archive_context(
         flatbuffers_build_version => tools.flatbuffers_build_version.as_str(),
         flatcc_version => tools.flatcc_version.as_str(),
         flatcc_commit => tools.flatcc_commit.as_str(),
+        mcap_cpp_version => tools.mcap_cpp_version.as_str(),
+        mcap_cpp_commit => tools.mcap_cpp_commit.as_str(),
         schema_sha256 => schema_sha256,
         bfbs_sha256 => bfbs_sha256,
         runtime_source_paths => runtime_source_paths,
@@ -1362,6 +1419,17 @@ fn generate_bindings(
         .args(SCHEMAS);
     run(&mut python_cmd)?;
 
+    fs::copy(
+        root.join("python/mcap.py"),
+        packages.python.join("synapse/mcap.py"),
+    )?;
+    write_file(&packages.python.join("synapse/py.typed"), "")?;
+    fs::copy(
+        root.join("MCAP.md"),
+        packages.python.join("synapse/MCAP.md"),
+    )?;
+    generate_reflection_schemas(root, flatc, &packages.python.join("synapse/bfbs"))?;
+
     let docs = parse_schema_docs(root)?;
     validate_schema_docs(&docs)?;
     validate_protocol(&docs)?;
@@ -1474,6 +1542,19 @@ fn write_c_mcap_topics(
         "xtask/topic_catalog/mcap_topics.h.jinja",
         topic_catalog_context(docs, topics)?,
         &package_root.join("include/synapse/mcap_topics.h"),
+    )
+}
+
+fn write_cpp_mcap_topics(
+    templates: &Templates,
+    package_root: &Path,
+    docs: &SchemaDoc,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/mcap_topics.hpp.jinja",
+        topic_catalog_context(docs, topics)?,
+        &package_root.join("include/synapse/mcap_topics.hpp"),
     )
 }
 
@@ -1942,17 +2023,23 @@ fn smoke_python_package(
         .arg("-m")
         .arg("pip")
         .arg("install")
-        .arg(&wheel))?;
+        .arg(format!("{}[mcap]", wheel.display())))?;
+
+    let mcap_path = venv.join("python-writer.mcap");
 
     let code = format!(
         r#"import importlib.metadata as metadata
+from io import BytesIO
+from mcap.writer import CompressionType, IndexType, Writer as ContainerWriter
 from synapse import topic_catalog
 from synapse.types.Vec3f import Vec3f
 from synapse.topic.GnssFixData import GnssFixData
 from synapse.cmd.ParamValue import ParamValue
 from synapse.cmd.FirmwarePrepareRequest import FirmwarePrepareRequest
 from synapse.topic.FirmwareProgress import FirmwareProgress
+from synapse.mcap import Reader, TimeBasis, Writer
 assert metadata.version("flatbuffers") == "{}"
+assert metadata.version("mcap") == "{}"
 assert Vec3f is not None and GnssFixData is not None and ParamValue is not None
 assert FirmwarePrepareRequest is not None and FirmwareProgress is not None
 assert topic_catalog.key_for_topic("VehicleHealth") == "health"
@@ -1970,10 +2057,41 @@ assert topic_catalog.MCAP_SCHEMA_ENCODING == "flatbuffer"
 assert topic_catalog.MCAP_MESSAGE_ENCODING == "flatbuffer"
 assert topic_catalog.topic_by_name("Odometry").mcap_schema_name == "synapse.topic.Odometry"
 assert topic_catalog.topic_by_name("Odometry").mcap_schema_file == "bfbs/state.bfbs"
+topic = topic_catalog.topic_by_name("Odometry")
+with open({}, "wb") as output:
+    writer = Writer(output, "synapse-fbs-python-test/1", "0123456789abcdef0123456789abcdef", "test-python", TimeBasis.MONOTONIC_BOOT)
+    channel = writer.add_topic(topic, "test/odom")
+    writer.write_fixed(channel, 2000, 1000, bytes(topic.payload_size))
+    writer.finish()
+with open({}, "rb") as input_file:
+    reader = Reader(input_file)
+    messages = list(reader.messages(log_time_order=False))
+    assert len(messages) == 1
+    schema, channel, message = messages[0]
+    assert schema.name == "synapse.topic.Odometry" and schema.encoding == "flatbuffer"
+    assert channel.topic == "test/odom" and channel.message_encoding == "flatbuffer"
+    assert message.log_time == 2000 and message.publish_time == 1000
+historical = BytesIO()
+container_writer = ContainerWriter(historical, compression=CompressionType.NONE, index_types=IndexType.NONE, repeat_channels=False, repeat_schemas=False, use_chunking=False, use_statistics=False, use_summary_offsets=False, enable_crcs=False)
+container_writer.start(profile=topic_catalog.MCAP_PROFILE, library="historical-test")
+container_writer.add_metadata(topic_catalog.MCAP_METADATA_NAME, {{
+    topic_catalog.MCAP_SCHEMA_SET_HASH_KEY: "0" * 32,
+    topic_catalog.MCAP_SESSION_ID_KEY: "fedcba9876543210fedcba9876543210",
+    topic_catalog.MCAP_SOURCE_KEY: "historical-test",
+    topic_catalog.MCAP_TIME_BASIS_KEY: topic_catalog.MCAP_TIME_BASIS_MONOTONIC_BOOT,
+}})
+container_writer.finish()
+historical.seek(0)
+Reader(historical)
 "#,
-        tools.flatbuffers_version
+        tools.flatbuffers_version,
+        tools.mcap_python_version,
+        source_string_literal(&mcap_path.display().to_string()),
+        source_string_literal(&mcap_path.display().to_string()),
     );
     run(Command::new(&venv_python).arg("-c").arg(code))?;
+    validate_mcap_with_rust(root, &mcap_path)?;
+    remove_file_if_exists(&mcap_path)?;
 
     Ok(())
 }
@@ -1983,6 +2101,8 @@ fn build_js_package(
     templates: &Templates,
     package_root: &Path,
     flatc: &Path,
+    tools: &Tools,
+    validate_cross_language: bool,
 ) -> Result<()> {
     println!("building JavaScript schema-assets package");
 
@@ -1998,17 +2118,37 @@ fn build_js_package(
     write_schema_hashes(root, &package_root.join("schema.sha256"))?;
     write_bfbs_hashes(package_root, &package_root.join("bfbs.sha256"))?;
 
-    smoke_js_package(package_root)?;
+    smoke_js_package(root, package_root, tools, validate_cross_language)?;
 
     Ok(())
 }
 
-fn smoke_js_package(package_root: &Path) -> Result<()> {
+fn smoke_js_package(
+    root: &Path,
+    package_root: &Path,
+    tools: &Tools,
+    validate_cross_language: bool,
+) -> Result<()> {
     println!("smoke-testing JavaScript package");
 
     let node = node_bin()?;
-    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath, keyForTopic, topicById, topicByKey, parseKey, commandByName } from './index.js';
-import { existsSync } from 'node:fs';
+    if command_succeeds(Command::new("npm").arg("--version")) {
+        run(Command::new("npm")
+            .current_dir(package_root)
+            .arg("install")
+            .arg("--ignore-scripts")
+            .arg("--no-package-lock")
+            .arg("--no-save")
+            .arg(format!("@mcap/core@{}", tools.mcap_javascript_version))
+            .arg(format!("typescript@{}", tools.typescript_version)))?;
+    } else {
+        return fail("npm is required to test the optional JavaScript MCAP API");
+    }
+
+    let mcap_path = package_root.join("javascript-writer.mcap");
+    let script = r#"import { fbsDir, bfbsDir, schemaFiles, schemaPath, keyForTopic, topicById, topicByKey, parseKey, commandByName, topicByName, mcapMetadataName, mcapSchemaSetHashKey, mcapSessionIdKey, mcapSourceKey, mcapTimeBasisKey } from './index.js';
+import { container, Reader, TimeBasis, Writer } from './mcap.js';
+import { existsSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 for (const name of schemaFiles) {
   if (!existsSync(schemaPath(name))) throw new Error('missing schema ' + name);
@@ -2024,8 +2164,72 @@ if (topicByKey('cub1/health')?.id !== 1) throw new Error('bad namespaced key loo
 if (commandByName('param_get')?.key !== 'cmd/param_get') throw new Error('bad command helper');
 if (commandByName('firmware_prepare')?.key !== 'cmd/firmware_prepare') throw new Error('bad firmware command helper');
 if (topicByKey('fw')?.id !== 34) throw new Error('bad firmware progress helper');
+class MemoryWritable {
+  constructor() { this.parts = []; this.offset = 0n; }
+  async write(data) { this.parts.push(new Uint8Array(data)); this.offset += BigInt(data.byteLength); }
+  position() { return this.offset; }
+  bytes() {
+    const output = new Uint8Array(Number(this.offset));
+    let offset = 0;
+    for (const part of this.parts) { output.set(part, offset); offset += part.byteLength; }
+    return output;
+  }
+}
+const sink = new MemoryWritable();
+const writer = new Writer({
+  writable: sink,
+  library: 'synapse-fbs-javascript-test/1',
+  sessionId: '0123456789abcdef0123456789abcdef',
+  source: 'test-javascript',
+  timeBasis: TimeBasis.MONOTONIC_BOOT,
+});
+await writer.start();
+const odometry = topicByName('Odometry');
+const channel = await writer.addTopic(odometry, 'test/odom');
+await writer.writeFixed(channel, 2000n, 1000n, new Uint8Array(odometry.payloadSize));
+await writer.finish();
+const bytes = sink.bytes();
+writeFileSync(__MCAP_PATH__, bytes);
+const reader = new Reader();
+reader.append(bytes);
+const records = [];
+for (let record; (record = reader.nextRecord());) records.push(record);
+reader.assertValid();
+const schema = records.find((record) => record.type === 'Schema');
+const message = records.find((record) => record.type === 'Message');
+if (schema?.name !== 'synapse.topic.Odometry' || schema.encoding !== 'flatbuffer') throw new Error('bad MCAP schema');
+if (message?.logTime !== 2000n || message.publishTime !== 1000n) throw new Error('bad MCAP message');
+const historicalSink = new MemoryWritable();
+const historicalWriter = new container.McapWriter({
+  writable: historicalSink,
+  useStatistics: false,
+  useSummaryOffsets: false,
+  useChunks: false,
+  repeatSchemas: false,
+  repeatChannels: false,
+  useAttachmentIndex: false,
+  useMetadataIndex: false,
+  useMessageIndex: false,
+  useChunkIndex: false,
+});
+await historicalWriter.start({ profile: 'synapse/1', library: 'historical-test' });
+await historicalWriter.addMetadata({ name: mcapMetadataName, metadata: new Map([
+  [mcapSchemaSetHashKey, '0'.repeat(32)],
+  [mcapSessionIdKey, 'fedcba9876543210fedcba9876543210'],
+  [mcapSourceKey, 'historical-test'],
+  [mcapTimeBasisKey, TimeBasis.MONOTONIC_BOOT],
+]) });
+await historicalWriter.end();
+const historicalReader = new Reader();
+historicalReader.append(historicalSink.bytes());
+while (historicalReader.nextRecord()) {}
+historicalReader.assertValid();
 console.log('synapse-fbs js package ok');
-"#;
+"#
+    .replace(
+        "__MCAP_PATH__",
+        &source_string_literal(&mcap_path.display().to_string()),
+    );
 
     run(Command::new(&node)
         .current_dir(package_root)
@@ -2033,13 +2237,50 @@ console.log('synapse-fbs js package ok');
         .arg("-e")
         .arg(script))?;
 
-    // Validate the published file set when npm is available.
-    if command_succeeds(Command::new("npm").arg("--version")) {
-        run(Command::new("npm")
-            .current_dir(package_root)
-            .arg("pack")
-            .arg("--dry-run"))?;
+    let type_smoke = package_root.join("mcap-type-smoke.ts");
+    write_file(
+        &type_smoke,
+        r#"import type { IWritable } from '@mcap/core';
+import { Reader, TimeBasis, Writer, type TopicChannel } from './mcap.js';
+
+declare const writable: IWritable;
+const writer = new Writer({
+  writable,
+  library: 'type-test',
+  sessionId: '0123456789abcdef0123456789abcdef',
+  source: 'type-test',
+  timeBasis: TimeBasis.MONOTONIC_BOOT,
+});
+const channel: Promise<TopicChannel> = writer.addTopic('Odometry', 'test/odom');
+const reader = new Reader();
+reader.append(new Uint8Array());
+void channel;
+"#,
+    )?;
+    run(Command::new(package_root.join("node_modules/.bin/tsc"))
+        .current_dir(package_root)
+        .arg("--noEmit")
+        .arg("--strict")
+        .arg("--target")
+        .arg("ES2022")
+        .arg("--module")
+        .arg("NodeNext")
+        .arg("--moduleResolution")
+        .arg("NodeNext")
+        .arg("--skipLibCheck")
+        .arg(&type_smoke))?;
+    remove_file_if_exists(&type_smoke)?;
+
+    if validate_cross_language {
+        validate_mcap_with_rust(root, &mcap_path)?;
     }
+    remove_file_if_exists(&mcap_path)?;
+
+    // Validate the published file set when npm is available.
+    run(Command::new("npm")
+        .current_dir(package_root)
+        .arg("pack")
+        .arg("--dry-run"))?;
 
     Ok(())
 }
@@ -2084,11 +2325,19 @@ fn build_archives(
         &tools.flatbuffers_commit,
         &flatbuffers_source,
     )?;
+    let mcap_source = workdir.join("mcap");
+    fetch_git_commit(
+        "https://github.com/foxglove/mcap.git",
+        &tools.mcap_cpp_commit,
+        &mcap_source,
+    )?;
 
     let cpp_root = workdir.join("synapse_fbs-cpp");
     fs::create_dir_all(cpp_root.join("include/synapse"))?;
     fs::create_dir_all(cpp_root.join("include"))?;
     fs::create_dir_all(cpp_root.join("third_party/flatbuffers"))?;
+    fs::create_dir_all(cpp_root.join("third_party/mcap"))?;
+    fs::create_dir_all(cpp_root.join("src/bfbs"))?;
     fs::create_dir_all(cpp_root.join("fbs"))?;
     fs::create_dir_all(cpp_root.join("bfbs"))?;
 
@@ -2112,10 +2361,31 @@ fn build_archives(
         flatbuffers_source.join("LICENSE"),
         cpp_root.join("third_party/flatbuffers/LICENSE"),
     )?;
+    copy_dir_all(
+        &mcap_source.join("cpp/mcap/include/mcap"),
+        &cpp_root.join("include/mcap"),
+    )?;
+    fs::copy(
+        mcap_source.join("LICENSE"),
+        cpp_root.join("third_party/mcap/LICENSE"),
+    )?;
     copy_common_archive_files(root, &cpp_root)?;
     write_c_topic_catalogs(&templates, &cpp_root, &docs, &topics)?;
+    write_cpp_mcap_topics(&templates, &cpp_root, &docs, &topics)?;
+    write_cpp_bfbs_assets(&cpp_root, &topics)?;
     write_schema_hashes(root, &cpp_root.join("schema.sha256"))?;
     write_bfbs_hashes(&cpp_root, &cpp_root.join("bfbs.sha256"))?;
+    let cpp_mcap_bfbs_source_paths = files_with_extension(&cpp_root.join("src/bfbs"), "cpp")?
+        .into_iter()
+        .map(|source| {
+            let name = source
+                .file_name()
+                .and_then(|value| value.to_str())
+                .expect("generated BFBS source must have a UTF-8 name");
+            format!("  \"${{_SYNAPSE_FBS_ROOT}}/src/bfbs/{name}\"")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     copy_render_template_tree(
         "cpp",
         &root.join("cpp"),
@@ -2128,7 +2398,7 @@ fn build_archives(
             &sha256_hex(&cpp_root.join("schema.sha256"))?,
             &sha256_hex(&cpp_root.join("bfbs.sha256"))?,
             "",
-            "",
+            &cpp_mcap_bfbs_source_paths,
         ),
     )?;
     write_tar_gz(
@@ -2226,7 +2496,7 @@ fn build_archives(
         "synapse_fbs-c.tar.gz",
     )?;
 
-    smoke_cpp_archive(&templates, &cpp_root)?;
+    smoke_cpp_archive(root, &templates, &cpp_root)?;
     smoke_c_archive(&templates, &c_root)?;
     smoke_c_to_rust_mcap(root, &c_root)?;
     smoke_cmake_fetch(
@@ -2311,6 +2581,42 @@ fn write_c_bfbs_assets(package_root: &Path, topics: &[TopicEntry]) -> Result<()>
             "const size_t synapse_bfbs_{stem}_size = sizeof(synapse_bfbs_{stem});\n"
         ));
         write_file(&output_dir.join(format!("{stem}.c")), &source)?;
+    }
+    Ok(())
+}
+
+fn write_cpp_bfbs_assets(package_root: &Path, topics: &[TopicEntry]) -> Result<()> {
+    let output_dir = package_root.join("src/bfbs");
+    reset_dir(&output_dir)?;
+    let mut schema_files = BTreeSet::new();
+    for topic in topics {
+        schema_files.insert(topic.schema_file.clone());
+    }
+    for schema_file in schema_files {
+        let stem = Path::new(&schema_file)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| io::Error::other("schema file has no UTF-8 stem"))?;
+        let bytes = fs::read(package_root.join(format!("bfbs/{stem}.bfbs")))?;
+        let mut source = String::from(
+            "#include <synapse/mcap_topics.hpp>\n\nnamespace synapse {\nnamespace mcap {\n\n",
+        );
+        source.push_str(&format!(
+            "extern const std::byte synapse_bfbs_{stem}[] = {{\n"
+        ));
+        for chunk in bytes.chunks(12) {
+            source.push_str("  ");
+            for byte in chunk {
+                source.push_str(&format!("std::byte{{0x{byte:02x}}}, "));
+            }
+            source.push('\n');
+        }
+        source.push_str("};\n");
+        source.push_str(&format!(
+            "extern const std::size_t synapse_bfbs_{stem}_size = sizeof(synapse_bfbs_{stem});\n\n"
+        ));
+        source.push_str("}  // namespace mcap\n}  // namespace synapse\n");
+        write_file(&output_dir.join(format!("{stem}.cpp")), &source)?;
     }
     Ok(())
 }
@@ -5117,7 +5423,7 @@ fn should_skip_staged_path(package: &str, rel: &Path) -> bool {
 
     match package {
         "rust" => rel.starts_with("src/generated"),
-        "python" => rel.starts_with("synapse"),
+        "python" => rel.starts_with("synapse") || rel == Path::new("mcap.py"),
         "js" => {
             rel.starts_with("fbs")
                 || rel.starts_with("bfbs")
@@ -5182,15 +5488,15 @@ fn write_tar_gz(
     Ok(())
 }
 
-fn smoke_cpp_archive(templates: &Templates, cpp_root: &Path) -> Result<()> {
+fn smoke_cpp_archive(root: &Path, templates: &Templates, cpp_root: &Path) -> Result<()> {
     println!("smoke-testing C++ archive");
 
     let smoke = cpp_root.join("smoke.cpp");
     templates.render_to_file("xtask/smoke.cpp.jinja", context! {}, &smoke)?;
 
     let cxx = env::var("CXX").unwrap_or_else(|_| "c++".to_string());
-    run(Command::new(cxx)
-        .arg("-std=c++11")
+    run(Command::new(&cxx)
+        .arg("-std=c++17")
         .arg("-I")
         .arg(cpp_root.join("include"))
         .arg("-c")
@@ -5200,6 +5506,25 @@ fn smoke_cpp_archive(templates: &Templates, cpp_root: &Path) -> Result<()> {
 
     remove_file_if_exists(&smoke)?;
     remove_file_if_exists(&cpp_root.join("smoke.o"))?;
+
+    let mcap_smoke = cpp_root.join("mcap_smoke");
+    run(Command::new(&cxx)
+        .arg("-std=c++17")
+        .arg("-Wall")
+        .arg("-Wextra")
+        .arg("-Werror")
+        .arg("-I")
+        .arg(cpp_root.join("include"))
+        .arg(cpp_root.join("tests/mcap_smoke.cpp"))
+        .arg(cpp_root.join("src/mcap.cpp"))
+        .arg(cpp_root.join("src/bfbs/state.cpp"))
+        .arg("-o")
+        .arg(&mcap_smoke))?;
+    let mcap_path = cpp_root.join("cpp-writer.mcap");
+    run(Command::new(&mcap_smoke).arg(&mcap_path))?;
+    validate_mcap_with_rust(root, &mcap_path)?;
+    remove_file_if_exists(&mcap_smoke)?;
+    remove_file_if_exists(&mcap_path)?;
 
     Ok(())
 }
@@ -5263,6 +5588,12 @@ fn smoke_c_archive(templates: &Templates, c_root: &Path) -> Result<()> {
 
 fn smoke_c_to_rust_mcap(root: &Path, c_root: &Path) -> Result<()> {
     println!("validating C MCAP output with the Rust reader");
+    validate_mcap_with_rust(root, &c_root.join("c-writer.mcap"))?;
+    remove_file_if_exists(&c_root.join("c-writer.mcap"))?;
+    Ok(())
+}
+
+fn validate_mcap_with_rust(root: &Path, path: &Path) -> Result<()> {
     let package_root = root.join("target/xtask/packages/rust");
     let target_dir = package_root.join("target");
     run(Command::new("cargo")
@@ -5276,8 +5607,7 @@ fn smoke_c_to_rust_mcap(root: &Path, c_root: &Path) -> Result<()> {
         .arg("--manifest-path")
         .arg(package_root.join("Cargo.toml"))
         .arg("--")
-        .arg(c_root.join("c-writer.mcap")))?;
-    remove_file_if_exists(&c_root.join("c-writer.mcap"))?;
+        .arg(path))?;
     Ok(())
 }
 

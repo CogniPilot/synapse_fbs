@@ -27,37 +27,40 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if metadata.name == "synapse"
                 && metadata.metadata[MCAP_SCHEMA_SET_HASH_KEY] == SCHEMA_SET_HASH
     ));
-    assert!(matches!(
-        &records[2],
-        Record::Schema { header, data }
-            if header.id == 1
-                && header.name == "synapse.topic.Odometry"
-                && header.encoding == MCAP_SCHEMA_ENCODING
-                && data.as_ref() == schema_by_name("state").unwrap().bfbs
-    ));
-    assert!(matches!(
-        &records[3],
-        Record::Channel(channel)
-            if channel.id == 0 && channel.schema_id == 1
-                && channel.topic == "test/odom"
-                && channel.message_encoding == MCAP_MESSAGE_ENCODING
-                && channel.metadata[MCAP_TOPIC_ID_KEY] == "40"
-    ));
-    assert!(matches!(
-        &records[4],
-        Record::Channel(channel)
-            if channel.id == 1 && channel.schema_id == 1
-                && channel.topic == "test/odom/1"
-                && channel.message_encoding == MCAP_MESSAGE_ENCODING
-                && channel.metadata[MCAP_TOPIC_ID_KEY] == "40"
-    ));
-    assert!(matches!(
-        &records[5],
+    let schema_id = records
+        .iter()
+        .find_map(|record| match record {
+            Record::Schema { header, data }
+                if header.name == "synapse.topic.Odometry"
+                    && header.encoding == MCAP_SCHEMA_ENCODING
+                    && data.as_ref() == schema_by_name("state").unwrap().bfbs =>
+            {
+                Some(header.id)
+            }
+            _ => None,
+        })
+        .expect("missing canonical Odometry BFBS schema");
+    let channel_id = records
+        .iter()
+        .find_map(|record| match record {
+            Record::Channel(channel)
+                if channel.schema_id == schema_id
+                    && channel.topic == "test/odom"
+                    && channel.message_encoding == MCAP_MESSAGE_ENCODING
+                    && channel.metadata[MCAP_TOPIC_ID_KEY] == "40" =>
+            {
+                Some(channel.id)
+            }
+            _ => None,
+        })
+        .expect("missing canonical Odometry channel");
+    assert!(records.iter().any(|record| matches!(
+        record,
         Record::Message { header, data }
-            if header.channel_id == 0 && header.sequence == 0
+            if header.channel_id == channel_id && header.sequence == 0
                 && header.log_time == 2000 && header.publish_time == 1000
                 && flatbuffers::root::<Odometry<'_>>(data.as_ref()).is_ok()
-    ));
+    )));
     assert!(
         records
             .iter()

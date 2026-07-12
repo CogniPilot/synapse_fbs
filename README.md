@@ -328,12 +328,19 @@ the `Schema.name` and BFBS embedded in each log channel rather than
 substituting the reader's currently installed schemas; historical BFBS
 remains authoritative.
 
-MCAP support is built into the normal release but remains compile-time
-optional. Rust hosts enable the `mcap` Cargo feature and use
-`synapse_fbs::mcap`; C and Zephyr consumers link `synapse_fbs::mcap` or enable
-`CONFIG_SYNAPSE_FBS_MCAP`. Applications explicitly select topics and own their
-queues, buffers, logger thread, and storage sink, so disabled logging has no
-runtime or linked-code cost.
+Every published language has a first-class `synapse/1` reader/writer surface.
+Rust hosts enable the `mcap` Cargo feature and use `synapse_fbs::mcap`; Python
+installs `synapse-fbs[mcap]` and imports `synapse.mcap`; JavaScript installs the
+optional `@mcap/core` peer and imports `@cognipilot/synapse-fbs/mcap`; C and C++
+consumers link `synapse_fbs::mcap`; and Zephyr enables
+`CONFIG_SYNAPSE_FBS_MCAP`. Host packages delegate the MCAP container to the
+maintained upstream language library. The C/Zephyr writer is the intentionally
+small allocation-free implementation for embedded streaming.
+
+Applications explicitly select topics and own their queues, buffers, logger
+thread, and storage sink, so disabled logging has no runtime or linked-code
+cost. CI makes each language write and read a real log and validates every
+output with an independent implementation against this profile.
 
 ## ROS and FlatROS
 
@@ -444,6 +451,10 @@ Install the published package:
 pip install synapse-fbs
 ```
 
+Install the optional first-class MCAP API with `pip install
+'synapse-fbs[mcap]'`, then use `synapse.mcap.Writer` or
+`synapse.mcap.Reader`.
+
 After a local `xtask` build, install the staged wheel:
 
 ```sh
@@ -456,6 +467,17 @@ Install the published npm package:
 
 ```sh
 npm install @cognipilot/synapse-fbs
+```
+
+For logging, also install the maintained container implementation and import
+the Synapse profile wrapper:
+
+```sh
+npm install @cognipilot/synapse-fbs @mcap/core
+```
+
+```js
+import { Reader, Writer } from '@cognipilot/synapse-fbs/mcap';
 ```
 
 Unlike the Rust and Python packages, the npm package ships schema assets
@@ -480,8 +502,9 @@ target_link_libraries(app PRIVATE synapse_fbs::c)
 
 Point `CMAKE_PREFIX_PATH` at the extracted archive root, for example
 `synapse_fbs-c/` or `synapse_fbs-cpp/`. The C archive provides
-`synapse_fbs::c`, `synapse_fbs::flatcc_runtime`, and `synapse_fbs::print`; the
-C++ archive provides `synapse_fbs::cpp`.
+`synapse_fbs::c`, `synapse_fbs::flatcc_runtime`, `synapse_fbs::print`, and the
+allocation-free `synapse_fbs::mcap`; the C++ archive provides
+`synapse_fbs::cpp` and an official-library-backed `synapse_fbs::mcap`.
 
 For projects that do not have a package/dependency setup, `FetchContent`
 remains the simplest direct-from-release path:
