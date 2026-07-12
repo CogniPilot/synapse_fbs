@@ -6,6 +6,8 @@ export interface TopicInfo {
   readonly payloadType: string | null;
   readonly payloadSize: number | null;
   readonly schemaFile: string;
+  readonly mcapSchemaName: string;
+  readonly mcapSchemaFile: string;
   readonly wireType: string;
   readonly schemaHash: string;
   readonly fixedLayout: boolean;
@@ -40,6 +42,18 @@ export const cmdKeyPrefix: string;
 export const metaKeyPrefix: string;
 export const livelinessKeyPrefix: string;
 export const schemaSetHash: string;
+export const mcapProfile: string;
+export const mcapSchemaEncoding: string;
+export const mcapMessageEncoding: string;
+export const mcapMetadataName: string;
+export const mcapSchemaSetHashKey: string;
+export const mcapSessionIdKey: string;
+export const mcapSourceKey: string;
+export const mcapTimeBasisKey: string;
+export const mcapTimeBasisMonotonicBoot: string;
+export const mcapTimeBasisUnixEpoch: string;
+export const mcapTimeBasisCorrelated: string;
+export const mcapTopicIdKey: string;
 
 export const topicCatalog: readonly TopicInfo[];
 export const commandCatalog: readonly CommandInfo[];

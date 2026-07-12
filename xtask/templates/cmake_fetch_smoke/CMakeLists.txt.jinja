@@ -16,4 +16,4 @@ if(NOT EXISTS "${synapse_fbs_SOURCE_DIR}/bfbs/sim.bfbs")
 endif()
 
 add_executable(smoke main.c)
-target_link_libraries(smoke PRIVATE synapse_fbs::c)
+target_link_libraries(smoke PRIVATE synapse_fbs::c synapse_fbs::mcap)

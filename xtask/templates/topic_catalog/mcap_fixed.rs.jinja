@@ -1,0 +1,17 @@
+// Generated zero-copy access from fixed-layout Synapse structs to the optional
+// MCAP wrapper. FlatBuffers Rust structs are repr(transparent) public byte
+// arrays, so this introduces no conversion or allocation.
+
+{%- for topic in topics %}
+{%- if topic.fixed_layout %}
+impl crate::mcap::FixedMessage for crate::generated::{{ topic.payload_type_rust_path }} {
+    fn topic() -> &'static crate::topic_catalog::TopicInfo {
+        crate::topic_catalog::topic_by_id({{ topic.id }}).expect("generated topic id")
+    }
+
+    fn as_payload_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+{%- endif %}
+{%- endfor %}

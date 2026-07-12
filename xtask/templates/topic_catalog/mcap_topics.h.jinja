@@ -1,0 +1,33 @@
+/* Generated MCAP topic descriptors. No topic or BFBS storage is referenced
+ * until the application explicitly uses its SYNAPSE_MCAP_TOPIC_<Name> macro. */
+#ifndef SYNAPSE_MCAP_TOPICS_H
+#define SYNAPSE_MCAP_TOPICS_H
+
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdint.h>
+
+#include <synapse/mcap.h>
+
+{%- for schema in mcap_schemas %}
+extern const uint8_t {{ schema.symbol }}[];
+extern const size_t {{ schema.symbol }}_size;
+{%- endfor %}
+
+{%- for topic in topics %}
+#define SYNAPSE_MCAP_TOPIC_{{ topic.name }}                                      \
+    ((synapse_mcap_topic_t){                                                    \
+        .topic_id = {{ topic.id }},                                             \
+        .schema_name = {{ topic.mcap_schema_name_literal }},                    \
+        .schema_data = {{ topic.mcap_schema_symbol }},                          \
+        .schema_size = {{ topic.mcap_schema_symbol }}_size,                    \
+        .payload_size = {{ topic.payload_size_c }},                            \
+        .fixed_layout = {{ topic.fixed_layout_c }},                            \
+    })
+{%- endfor %}
+
+#define SYNAPSE_MCAP_ADD_TOPIC(writer, topic_name, channel_topic, channel)       \
+    synapse_mcap_add_topic((writer), &SYNAPSE_MCAP_TOPIC_##topic_name,          \
+                           (channel_topic), (channel))
+
+#endif

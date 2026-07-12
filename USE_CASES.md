@@ -256,6 +256,11 @@ Schema and protocol requirements:
 - Variable-size topics must be table-encoded and cataloged as such.
 - Fixed-layout transports must be able to filter them by catalog metadata.
 - Logging should use root tables and reflection schemas for tool compatibility.
+- MCAP is the officially supported log format; writers must follow the frozen
+  `synapse/1` profile and use a new profile name for incompatible evolution.
+- Readers must use the `Schema.name` and BFBS embedded in each log channel
+  instead of substituting schemas from the reader's currently installed
+  release.
 
 Success criteria:
 

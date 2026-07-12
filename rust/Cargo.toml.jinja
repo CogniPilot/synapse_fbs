@@ -7,10 +7,21 @@ license = "Apache-2.0"
 repository = "https://github.com/CogniPilot/synapse_fbs"
 include = [
   "Cargo.toml",
+  "MCAP.md",
+  "examples/**",
   "src/**",
   "fbs/**",
   "bfbs/**",
 ]
 
+[features]
+default = []
+mcap = ["dep:mcap"]
+
 [dependencies]
 flatbuffers = "={{ flatbuffers_version }}"
+mcap = { version = "=0.25.0", optional = true, default-features = false }
+
+[[example]]
+name = "validate_mcap"
+required-features = ["mcap"]

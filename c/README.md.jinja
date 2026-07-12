@@ -47,3 +47,8 @@ JSON helpers.
 
 const synapse_topic_info_t *topic = synapse_topic_by_key("vehicle_health");
 ```
+
+Link `synapse_fbs::mcap`, or enable `CONFIG_SYNAPSE_FBS_MCAP` when the archive
+is loaded as a Zephyr module, for the allocation-free `synapse/1` streaming
+writer. The application explicitly declares each logged topic and owns the
+queue, output buffer, thread, and storage sink.

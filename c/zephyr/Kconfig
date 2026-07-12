@@ -1,0 +1,6 @@
+config SYNAPSE_FBS_MCAP
+	bool "Synapse MCAP logging support"
+	default n
+	help
+	  Build the allocation-free synapse/1 MCAP streaming writer. Applications
+	  still declare their own topics, queues, buffers, thread, and storage sink.
