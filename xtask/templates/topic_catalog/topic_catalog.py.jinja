@@ -6,6 +6,18 @@ CMD_KEY_PREFIX = {{ cmd_key_prefix_literal }}
 META_KEY_PREFIX = {{ meta_key_prefix_literal }}
 LIVELINESS_KEY_PREFIX = {{ liveliness_key_prefix_literal }}
 SCHEMA_SET_HASH = {{ schema_set_hash_literal }}
+MCAP_PROFILE = {{ mcap_profile_literal }}
+MCAP_SCHEMA_ENCODING = {{ mcap_schema_encoding_literal }}
+MCAP_MESSAGE_ENCODING = {{ mcap_message_encoding_literal }}
+MCAP_METADATA_NAME = {{ mcap_metadata_name_literal }}
+MCAP_SCHEMA_SET_HASH_KEY = {{ mcap_schema_set_hash_key_literal }}
+MCAP_SESSION_ID_KEY = {{ mcap_session_id_key_literal }}
+MCAP_SOURCE_KEY = {{ mcap_source_key_literal }}
+MCAP_TIME_BASIS_KEY = {{ mcap_time_basis_key_literal }}
+MCAP_TIME_BASIS_MONOTONIC_BOOT = {{ mcap_time_basis_monotonic_boot_literal }}
+MCAP_TIME_BASIS_UNIX_EPOCH = {{ mcap_time_basis_unix_epoch_literal }}
+MCAP_TIME_BASIS_CORRELATED = {{ mcap_time_basis_correlated_literal }}
+MCAP_TOPIC_ID_KEY = {{ mcap_topic_id_key_literal }}
 
 
 @dataclass(frozen=True)
@@ -17,6 +29,8 @@ class TopicInfo:
     payload_type: Optional[str]
     payload_size: Optional[int]
     schema_file: str
+    mcap_schema_name: str
+    mcap_schema_file: str
     wire_type: str
     schema_hash: str
     fixed_layout: bool
@@ -59,6 +73,8 @@ TOPICS = (
         payload_type={{ topic.payload_type_python }},
         payload_size={{ topic.payload_size_python }},
         schema_file={{ topic.schema_file_literal }},
+        mcap_schema_name={{ topic.mcap_schema_name_literal }},
+        mcap_schema_file={{ topic.mcap_schema_file_literal }},
         wire_type={{ topic.wire_type_literal }},
         schema_hash={{ topic.schema_hash_literal }},
         fixed_layout={{ topic.fixed_layout_python }},

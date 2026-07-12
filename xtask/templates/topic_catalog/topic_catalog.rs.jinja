@@ -11,6 +11,19 @@ pub const LIVELINESS_KEY_PREFIX: &str = {{ liveliness_key_prefix_literal }};
 /// and command ids with their request/reply contracts. Constrained links
 /// compare it once at link establishment and refuse a mismatch.
 pub const SCHEMA_SET_HASH: &str = {{ schema_set_hash_literal }};
+/// Frozen MCAP logging contract. See MCAP.md in the source distribution.
+pub const MCAP_PROFILE: &str = {{ mcap_profile_literal }};
+pub const MCAP_SCHEMA_ENCODING: &str = {{ mcap_schema_encoding_literal }};
+pub const MCAP_MESSAGE_ENCODING: &str = {{ mcap_message_encoding_literal }};
+pub const MCAP_METADATA_NAME: &str = {{ mcap_metadata_name_literal }};
+pub const MCAP_SCHEMA_SET_HASH_KEY: &str = {{ mcap_schema_set_hash_key_literal }};
+pub const MCAP_SESSION_ID_KEY: &str = {{ mcap_session_id_key_literal }};
+pub const MCAP_SOURCE_KEY: &str = {{ mcap_source_key_literal }};
+pub const MCAP_TIME_BASIS_KEY: &str = {{ mcap_time_basis_key_literal }};
+pub const MCAP_TIME_BASIS_MONOTONIC_BOOT: &str = {{ mcap_time_basis_monotonic_boot_literal }};
+pub const MCAP_TIME_BASIS_UNIX_EPOCH: &str = {{ mcap_time_basis_unix_epoch_literal }};
+pub const MCAP_TIME_BASIS_CORRELATED: &str = {{ mcap_time_basis_correlated_literal }};
+pub const MCAP_TOPIC_ID_KEY: &str = {{ mcap_topic_id_key_literal }};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TopicInfo {
@@ -22,6 +35,10 @@ pub struct TopicInfo {
     pub payload_type: Option<&'static str>,
     pub payload_size: Option<usize>,
     pub schema_file: &'static str,
+    /// Fully qualified MCAP Schema.name for the rooted topic wrapper.
+    pub mcap_schema_name: &'static str,
+    /// Package-relative BFBS to place in MCAP Schema.data.
+    pub mcap_schema_file: &'static str,
     /// Fully qualified FlatBuffers type carried in the value bytes.
     pub wire_type: &'static str,
     /// SHA-256 of this wire type's transitive schema contract.
@@ -79,6 +96,8 @@ pub const TOPICS: &[TopicInfo] = &[
         payload_type: {{ topic.payload_type_rust }},
         payload_size: {{ topic.payload_size_rust }},
         schema_file: {{ topic.schema_file_literal }},
+        mcap_schema_name: {{ topic.mcap_schema_name_literal }},
+        mcap_schema_file: {{ topic.mcap_schema_file_literal }},
         wire_type: {{ topic.wire_type_literal }},
         schema_hash: {{ topic.schema_hash_literal }},
         fixed_layout: {{ topic.fixed_layout }},

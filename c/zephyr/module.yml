@@ -4,3 +4,4 @@
 # synapse_fbs::flatcc_runtime static library for builders and verifiers.
 build:
   cmake: .
+  kconfig: zephyr/Kconfig

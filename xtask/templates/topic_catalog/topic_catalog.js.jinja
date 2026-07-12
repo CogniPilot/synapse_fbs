@@ -3,6 +3,18 @@ export const cmdKeyPrefix = {{ cmd_key_prefix|tojson }};
 export const metaKeyPrefix = {{ meta_key_prefix|tojson }};
 export const livelinessKeyPrefix = {{ liveliness_key_prefix|tojson }};
 export const schemaSetHash = {{ schema_set_hash|tojson }};
+export const mcapProfile = {{ mcap_profile|tojson }};
+export const mcapSchemaEncoding = {{ mcap_schema_encoding|tojson }};
+export const mcapMessageEncoding = {{ mcap_message_encoding|tojson }};
+export const mcapMetadataName = {{ mcap_metadata_name|tojson }};
+export const mcapSchemaSetHashKey = {{ mcap_schema_set_hash_key|tojson }};
+export const mcapSessionIdKey = {{ mcap_session_id_key|tojson }};
+export const mcapSourceKey = {{ mcap_source_key|tojson }};
+export const mcapTimeBasisKey = {{ mcap_time_basis_key|tojson }};
+export const mcapTimeBasisMonotonicBoot = {{ mcap_time_basis_monotonic_boot|tojson }};
+export const mcapTimeBasisUnixEpoch = {{ mcap_time_basis_unix_epoch|tojson }};
+export const mcapTimeBasisCorrelated = {{ mcap_time_basis_correlated|tojson }};
+export const mcapTopicIdKey = {{ mcap_topic_id_key|tojson }};
 
 const topics = [
 {%- for topic in topics %}
@@ -14,6 +26,8 @@ const topics = [
     payloadType: {{ topic.payload_type|tojson }},
     payloadSize: {{ topic.payload_size|tojson }},
     schemaFile: {{ topic.schema_file|tojson }},
+    mcapSchemaName: {{ topic.mcap_schema_name|tojson }},
+    mcapSchemaFile: {{ topic.mcap_schema_file|tojson }},
     wireType: {{ topic.wire_type|tojson }},
     schemaHash: {{ topic.schema_hash|tojson }},
     fixedLayout: {{ topic.fixed_layout|tojson }},

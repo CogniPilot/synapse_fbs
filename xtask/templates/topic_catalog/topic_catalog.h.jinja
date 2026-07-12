@@ -15,6 +15,18 @@ extern "C" {
 #define SYNAPSE_META_KEY_PREFIX {{ meta_key_prefix_literal }}
 #define SYNAPSE_LIVELINESS_KEY_PREFIX {{ liveliness_key_prefix_literal }}
 #define SYNAPSE_SCHEMA_SET_HASH {{ schema_set_hash_literal }}
+#define SYNAPSE_MCAP_PROFILE {{ mcap_profile_literal }}
+#define SYNAPSE_MCAP_SCHEMA_ENCODING {{ mcap_schema_encoding_literal }}
+#define SYNAPSE_MCAP_MESSAGE_ENCODING {{ mcap_message_encoding_literal }}
+#define SYNAPSE_MCAP_METADATA_NAME {{ mcap_metadata_name_literal }}
+#define SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY {{ mcap_schema_set_hash_key_literal }}
+#define SYNAPSE_MCAP_SESSION_ID_KEY {{ mcap_session_id_key_literal }}
+#define SYNAPSE_MCAP_SOURCE_KEY {{ mcap_source_key_literal }}
+#define SYNAPSE_MCAP_TIME_BASIS_KEY {{ mcap_time_basis_key_literal }}
+#define SYNAPSE_MCAP_TIME_BASIS_MONOTONIC_BOOT {{ mcap_time_basis_monotonic_boot_literal }}
+#define SYNAPSE_MCAP_TIME_BASIS_UNIX_EPOCH {{ mcap_time_basis_unix_epoch_literal }}
+#define SYNAPSE_MCAP_TIME_BASIS_CORRELATED {{ mcap_time_basis_correlated_literal }}
+#define SYNAPSE_MCAP_TOPIC_ID_KEY {{ mcap_topic_id_key_literal }}
 
 typedef struct synapse_topic_info {
     uint16_t id;
@@ -24,6 +36,8 @@ typedef struct synapse_topic_info {
     const char *payload_type;
     size_t payload_size; /* zero when the topic has no fixed-layout payload */
     const char *schema_file;
+    const char *mcap_schema_name; /* fully qualified MCAP Schema.name */
+    const char *mcap_schema_file; /* package-relative BFBS */
     const char *wire_type; /* fully qualified FlatBuffers value type */
     const char *schema_hash; /* SHA-256 of the transitive wire schema */
     bool fixed_layout;
@@ -58,6 +72,8 @@ static const synapse_topic_info_t synapse_topics[] = {
         {{ topic.payload_type_c }},
         {{ topic.payload_size_c }},
         {{ topic.schema_file_literal }},
+        {{ topic.mcap_schema_name_literal }},
+        {{ topic.mcap_schema_file_literal }},
         {{ topic.wire_type_literal }},
         {{ topic.schema_hash_literal }},
         {{ topic.fixed_layout_c }},

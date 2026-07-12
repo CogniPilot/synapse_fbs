@@ -32,6 +32,22 @@ const CMD_KEY_PREFIX: &str = "cmd";
 const META_KEY_PREFIX: &str = "meta";
 const LIVELINESS_KEY_PREFIX: &str = "live";
 
+// Frozen literals from the normative MCAP.md `synapse/1` profile. Keep these
+// in one place so every generated language catalog gives writers the exact
+// same contract instead of requiring string literals in each implementation.
+const MCAP_PROFILE: &str = "synapse/1";
+const MCAP_SCHEMA_ENCODING: &str = "flatbuffer";
+const MCAP_MESSAGE_ENCODING: &str = "flatbuffer";
+const MCAP_METADATA_NAME: &str = "synapse";
+const MCAP_SCHEMA_SET_HASH_KEY: &str = "synapse.schema_set_hash";
+const MCAP_SESSION_ID_KEY: &str = "synapse.session_id";
+const MCAP_SOURCE_KEY: &str = "synapse.source";
+const MCAP_TIME_BASIS_KEY: &str = "synapse.time_basis";
+const MCAP_TIME_BASIS_MONOTONIC_BOOT: &str = "monotonic_boot";
+const MCAP_TIME_BASIS_UNIX_EPOCH: &str = "unix_epoch";
+const MCAP_TIME_BASIS_CORRELATED: &str = "correlated";
+const MCAP_TOPIC_ID_KEY: &str = "synapse.topic_id";
+
 /// Key segments reserved for non-topic key spaces; topic keys must not
 /// collide with them.
 const RESERVED_KEY_SEGMENTS: &[&str] = &[CMD_KEY_PREFIX, META_KEY_PREFIX, LIVELINESS_KEY_PREFIX];
@@ -657,8 +673,12 @@ fn read_tools(_root: &Path) -> Result<Tools> {
 /// available locally; each check is skipped when its tool is missing.
 fn smoke_catalog_helpers(check_dir: &Path) -> Result<()> {
     if command_succeeds(Command::new("node").arg("--version")) {
-        let script = r#"import { parseKey, keyForTopic, topicByKey, commandByName, schemaSetHash } from './topic_catalog.js';
+        let script = r#"import { parseKey, keyForTopic, topicByKey, topicByName, commandByName, schemaSetHash, mcapProfile, mcapSchemaEncoding, mcapMessageEncoding, mcapMetadataName, mcapTimeBasisMonotonicBoot } from './topic_catalog.js';
 if (!/^[0-9a-f]{32}$/.test(schemaSetHash)) throw new Error('bad schema-set hash');
+if (mcapProfile !== 'synapse/1' || mcapSchemaEncoding !== 'flatbuffer' || mcapMessageEncoding !== 'flatbuffer') throw new Error('bad MCAP contract');
+if (mcapMetadataName !== 'synapse' || mcapTimeBasisMonotonicBoot !== 'monotonic_boot') throw new Error('bad MCAP metadata contract');
+if (topicByName('Odometry').mcapSchemaName !== 'synapse.topic.Odometry') throw new Error('bad MCAP schema name');
+if (topicByName('Odometry').mcapSchemaFile !== 'bfbs/state.bfbs') throw new Error('bad MCAP schema file');
 const parsed = parseKey('cub1/imu/0');
 if (!parsed || parsed.namespace !== 'cub1' || parsed.topic.name !== 'InertialSample' || parsed.instance !== 0) throw new Error('bad parseKey');
 if (parseKey('health')?.namespace !== '') throw new Error('bad empty namespace');
@@ -692,6 +712,13 @@ console.log('catalog js helpers ok');
 sys.path.insert(0, ".")
 import topic_catalog as tc
 assert len(tc.SCHEMA_SET_HASH) == 32
+assert tc.MCAP_PROFILE == "synapse/1"
+assert tc.MCAP_SCHEMA_ENCODING == "flatbuffer"
+assert tc.MCAP_MESSAGE_ENCODING == "flatbuffer"
+assert tc.MCAP_METADATA_NAME == "synapse"
+assert tc.MCAP_TIME_BASIS_MONOTONIC_BOOT == "monotonic_boot"
+assert tc.topic_by_name("Odometry").mcap_schema_name == "synapse.topic.Odometry"
+assert tc.topic_by_name("Odometry").mcap_schema_file == "bfbs/state.bfbs"
 parsed = tc.parse_key("cub1/imu/0")
 assert parsed is not None and parsed.namespace == "cub1"
 assert parsed.topic.name == "InertialSample" and parsed.instance == 0
@@ -776,6 +803,12 @@ const C_CATALOG_TEST: &str = r#"#include "topic_catalog.h"
 
 int main(void) {
     assert(strlen(SYNAPSE_SCHEMA_SET_HASH) == 32);
+    assert(strcmp(SYNAPSE_MCAP_PROFILE, "synapse/1") == 0);
+    assert(strcmp(SYNAPSE_MCAP_SCHEMA_ENCODING, "flatbuffer") == 0);
+    assert(strcmp(SYNAPSE_MCAP_MESSAGE_ENCODING, "flatbuffer") == 0);
+    assert(strcmp(SYNAPSE_MCAP_METADATA_NAME, "synapse") == 0);
+    assert(strcmp(SYNAPSE_MCAP_TIME_BASIS_MONOTONIC_BOOT,
+                  "monotonic_boot") == 0);
     const char *ns = NULL;
     size_t ns_len = 0;
     int32_t instance = -2;
@@ -812,6 +845,11 @@ int main(void) {
 
     const synapse_topic_info_t *by_key = synapse_topic_by_key("cub1/health");
     assert(by_key != NULL && by_key->id == 1);
+
+    const synapse_topic_info_t *odom = synapse_topic_by_name("Odometry");
+    assert(odom != NULL &&
+           strcmp(odom->mcap_schema_name, "synapse.topic.Odometry") == 0 &&
+           strcmp(odom->mcap_schema_file, "bfbs/state.bfbs") == 0);
 
     const synapse_command_info_t *command = synapse_command_by_name("param_get");
     assert(command != NULL && command->id == 1 &&
@@ -909,6 +947,14 @@ const RUST_CATALOG_TEST: &str = r#"include!("topic_catalog.rs");
 
 fn main() {
     assert_eq!(SCHEMA_SET_HASH.len(), 32);
+    assert_eq!(MCAP_PROFILE, "synapse/1");
+    assert_eq!(MCAP_SCHEMA_ENCODING, "flatbuffer");
+    assert_eq!(MCAP_MESSAGE_ENCODING, "flatbuffer");
+    assert_eq!(MCAP_METADATA_NAME, "synapse");
+    assert_eq!(MCAP_TIME_BASIS_MONOTONIC_BOOT, "monotonic_boot");
+    let odom = topic_by_name("Odometry").unwrap();
+    assert_eq!(odom.mcap_schema_name, "synapse.topic.Odometry");
+    assert_eq!(odom.mcap_schema_file, "bfbs/state.bfbs");
     let parsed = parse_key("cub1/imu/0").unwrap();
     assert_eq!(parsed.namespace, "cub1");
     assert_eq!(parsed.topic.name, "InertialSample");
@@ -1136,6 +1182,7 @@ fn archive_context(
     schema_sha256: &str,
     bfbs_sha256: &str,
     runtime_source_paths: &str,
+    mcap_bfbs_source_paths: &str,
 ) -> Value {
     context! {
         artifact => artifact,
@@ -1149,6 +1196,7 @@ fn archive_context(
         schema_sha256 => schema_sha256,
         bfbs_sha256 => bfbs_sha256,
         runtime_source_paths => runtime_source_paths,
+        mcap_bfbs_source_paths => mcap_bfbs_source_paths,
     }
 }
 
@@ -1326,9 +1374,11 @@ fn generate_bindings(
     // binary schemas, and a generated debug decoder, so downstream tools do
     // not vendor schema copies that can drift from the pinned release.
     copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
+    fs::copy(root.join("MCAP.md"), packages.rust.join("MCAP.md"))?;
     generate_reflection_schemas(root, flatc, &packages.rust.join("bfbs"))?;
     write_rust_embedded_schemas(templates, &docs, &packages.rust)?;
     write_rust_topic_decode(templates, &docs, &topics, &packages.rust)?;
+    write_rust_mcap_fixed(templates, &docs, &topics, &packages.rust)?;
 
     Ok(())
 }
@@ -1414,6 +1464,19 @@ fn write_c_topic_catalogs(
     )
 }
 
+fn write_c_mcap_topics(
+    templates: &Templates,
+    package_root: &Path,
+    docs: &SchemaDoc,
+    topics: &[TopicEntry],
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/mcap_topics.h.jinja",
+        topic_catalog_context(docs, topics)?,
+        &package_root.join("include/synapse/mcap_topics.h"),
+    )
+}
+
 fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Value> {
     let command_entries = command_entries(docs)?;
     let commands = command_entries
@@ -1468,16 +1531,61 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
         .collect();
 
     let set_hash = schema_set_hash(topics, &command_entries);
+    let mut mcap_schema_files = BTreeSet::new();
+    for topic in topics {
+        mcap_schema_files.insert(topic.schema_file.clone());
+    }
+    let mcap_schemas = mcap_schema_files
+        .into_iter()
+        .map(|schema_file| {
+            let stem = Path::new(&schema_file)
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .expect("validated schema path must have a UTF-8 file stem")
+                .to_string();
+            McapSchemaTemplateEntry {
+                symbol: format!("synapse_bfbs_{stem}"),
+                schema_file,
+            }
+        })
+        .collect();
     Ok(Value::from_serialize(TopicCatalogContext {
         version: 2,
         schema_set_hash: set_hash.clone(),
         schema_set_hash_literal: source_string_literal(&set_hash),
+        mcap_profile: MCAP_PROFILE,
+        mcap_schema_encoding: MCAP_SCHEMA_ENCODING,
+        mcap_message_encoding: MCAP_MESSAGE_ENCODING,
+        mcap_metadata_name: MCAP_METADATA_NAME,
+        mcap_schema_set_hash_key: MCAP_SCHEMA_SET_HASH_KEY,
+        mcap_session_id_key: MCAP_SESSION_ID_KEY,
+        mcap_source_key: MCAP_SOURCE_KEY,
+        mcap_time_basis_key: MCAP_TIME_BASIS_KEY,
+        mcap_time_basis_monotonic_boot: MCAP_TIME_BASIS_MONOTONIC_BOOT,
+        mcap_time_basis_unix_epoch: MCAP_TIME_BASIS_UNIX_EPOCH,
+        mcap_time_basis_correlated: MCAP_TIME_BASIS_CORRELATED,
+        mcap_topic_id_key: MCAP_TOPIC_ID_KEY,
+        mcap_profile_literal: source_string_literal(MCAP_PROFILE),
+        mcap_schema_encoding_literal: source_string_literal(MCAP_SCHEMA_ENCODING),
+        mcap_message_encoding_literal: source_string_literal(MCAP_MESSAGE_ENCODING),
+        mcap_metadata_name_literal: source_string_literal(MCAP_METADATA_NAME),
+        mcap_schema_set_hash_key_literal: source_string_literal(MCAP_SCHEMA_SET_HASH_KEY),
+        mcap_session_id_key_literal: source_string_literal(MCAP_SESSION_ID_KEY),
+        mcap_source_key_literal: source_string_literal(MCAP_SOURCE_KEY),
+        mcap_time_basis_key_literal: source_string_literal(MCAP_TIME_BASIS_KEY),
+        mcap_time_basis_monotonic_boot_literal: source_string_literal(
+            MCAP_TIME_BASIS_MONOTONIC_BOOT,
+        ),
+        mcap_time_basis_unix_epoch_literal: source_string_literal(MCAP_TIME_BASIS_UNIX_EPOCH),
+        mcap_time_basis_correlated_literal: source_string_literal(MCAP_TIME_BASIS_CORRELATED),
+        mcap_topic_id_key_literal: source_string_literal(MCAP_TOPIC_ID_KEY),
         cmd_key_prefix: CMD_KEY_PREFIX,
         meta_key_prefix: META_KEY_PREFIX,
         liveliness_key_prefix: LIVELINESS_KEY_PREFIX,
         cmd_key_prefix_literal: source_string_literal(CMD_KEY_PREFIX),
         meta_key_prefix_literal: source_string_literal(META_KEY_PREFIX),
         liveliness_key_prefix_literal: source_string_literal(LIVELINESS_KEY_PREFIX),
+        mcap_schemas,
         topics: topics
             .iter()
             .map(|topic| {
@@ -1520,6 +1628,14 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
                     &topic.root_table_namespace,
                     &topic.root_table,
                 ));
+                let mcap_schema_name =
+                    qualified_name(&topic.root_table_namespace, &topic.root_table);
+                let schema_stem = Path::new(&topic.schema_file)
+                    .file_stem()
+                    .and_then(|value| value.to_str())
+                    .expect("validated topic schema path must have a UTF-8 file stem");
+                let mcap_schema_file = format!("bfbs/{schema_stem}.bfbs");
+                let mcap_schema_symbol = format!("synapse_bfbs_{schema_stem}");
                 let payload_type_qualified_literal = topic
                     .payload_type
                     .as_deref()
@@ -1537,6 +1653,9 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
                     payload_type: topic.payload_type.clone(),
                     payload_size: topic.payload_size,
                     schema_file: topic.schema_file.clone(),
+                    mcap_schema_name: mcap_schema_name.clone(),
+                    mcap_schema_file: mcap_schema_file.clone(),
+                    mcap_schema_symbol,
                     wire_type: topic.wire_type.clone(),
                     schema_hash: topic.schema_hash.clone(),
                     fixed_layout: topic.fixed_layout,
@@ -1558,6 +1677,8 @@ fn topic_catalog_context(docs: &SchemaDoc, topics: &[TopicEntry]) -> Result<Valu
                     root_table_qualified_literal,
                     payload_type_qualified_literal,
                     schema_file_literal: source_string_literal(&topic.schema_file),
+                    mcap_schema_name_literal: source_string_literal(&mcap_schema_name),
+                    mcap_schema_file_literal: source_string_literal(&mcap_schema_file),
                     wire_type_literal: source_string_literal(&topic.wire_type),
                     schema_hash_literal: source_string_literal(&topic.schema_hash),
                     fixed_layout_python: if topic.fixed_layout { "True" } else { "False" },
@@ -1654,6 +1775,19 @@ fn write_rust_topic_decode(
     )
 }
 
+fn write_rust_mcap_fixed(
+    templates: &Templates,
+    docs: &SchemaDoc,
+    topics: &[TopicEntry],
+    package_root: &Path,
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/topic_catalog/mcap_fixed.rs.jinja",
+        topic_catalog_context(docs, topics)?,
+        &package_root.join("src/mcap_fixed.rs"),
+    )
+}
+
 fn check_rust_package(package_root: &Path) -> Result<()> {
     println!("checking Rust crate");
 
@@ -1670,6 +1804,26 @@ fn check_rust_package(package_root: &Path) -> Result<()> {
         .arg("test")
         .arg("--manifest-path")
         .arg(package_root.join("Cargo.toml")))?;
+
+    run(Command::new("cargo")
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .arg("test")
+        .arg("--features")
+        .arg("mcap")
+        .arg("--manifest-path")
+        .arg(package_root.join("Cargo.toml")))?;
+
+    run(Command::new("cargo")
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .arg("clippy")
+        .arg("--all-targets")
+        .arg("--features")
+        .arg("mcap")
+        .arg("--manifest-path")
+        .arg(package_root.join("Cargo.toml"))
+        .arg("--")
+        .arg("-D")
+        .arg("warnings"))?;
 
     let mut package = Command::new("cargo");
     package
@@ -1811,6 +1965,11 @@ assert topic_catalog.command_by_name("param_get").key == "cmd/param_get"
 assert topic_catalog.command_by_name("firmware_prepare").key == "cmd/firmware_prepare"
 assert topic_catalog.topic_by_key("fw").id == 34
 assert topic_catalog.topic_by_name("GnssFix").payload_size is not None
+assert topic_catalog.MCAP_PROFILE == "synapse/1"
+assert topic_catalog.MCAP_SCHEMA_ENCODING == "flatbuffer"
+assert topic_catalog.MCAP_MESSAGE_ENCODING == "flatbuffer"
+assert topic_catalog.topic_by_name("Odometry").mcap_schema_name == "synapse.topic.Odometry"
+assert topic_catalog.topic_by_name("Odometry").mcap_schema_file == "bfbs/state.bfbs"
 "#,
         tools.flatbuffers_version
     );
@@ -1969,6 +2128,7 @@ fn build_archives(
             &sha256_hex(&cpp_root.join("schema.sha256"))?,
             &sha256_hex(&cpp_root.join("bfbs.sha256"))?,
             "",
+            "",
         ),
     )?;
     write_tar_gz(
@@ -1997,6 +2157,7 @@ fn build_archives(
         .args(SCHEMAS);
     run(&mut c_gen)?;
     generate_reflection_schemas(root, flatc, &c_root.join("bfbs"))?;
+    write_c_bfbs_assets(&c_root, &topics)?;
 
     copy_dir_all(
         &flatcc.source.join("include/flatcc"),
@@ -2017,6 +2178,7 @@ fn build_archives(
     )?;
     copy_common_archive_files(root, &c_root)?;
     write_c_topic_catalogs(&templates, &c_root, &docs, &topics)?;
+    write_c_mcap_topics(&templates, &c_root, &docs, &topics)?;
     write_c_topic_print(
         &templates,
         &docs,
@@ -2031,6 +2193,17 @@ fn build_archives(
         .map(|source| format!("  \"${{_SYNAPSE_FBS_ROOT}}/src/flatcc-runtime/{source}\""))
         .collect::<Vec<_>>()
         .join("\n");
+    let mcap_bfbs_source_paths = files_with_extension(&c_root.join("src/bfbs"), "c")?
+        .into_iter()
+        .map(|source| {
+            let name = source
+                .file_name()
+                .and_then(|value| value.to_str())
+                .expect("generated BFBS source must have a UTF-8 name");
+            format!("  \"${{_SYNAPSE_FBS_ROOT}}/src/bfbs/{name}\"")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     copy_render_template_tree(
         "c",
         &root.join("c"),
@@ -2043,6 +2216,7 @@ fn build_archives(
             &sha256_hex(&c_root.join("schema.sha256"))?,
             &sha256_hex(&c_root.join("bfbs.sha256"))?,
             &runtime_source_paths,
+            &mcap_bfbs_source_paths,
         ),
     )?;
     write_tar_gz(
@@ -2054,6 +2228,7 @@ fn build_archives(
 
     smoke_cpp_archive(&templates, &cpp_root)?;
     smoke_c_archive(&templates, &c_root)?;
+    smoke_c_to_rust_mcap(root, &c_root)?;
     smoke_cmake_fetch(
         &templates,
         &workdir,
@@ -2104,7 +2279,39 @@ fn generate_reflection_schemas(root: &Path, flatc: &Path, output_dir: &Path) -> 
 
 fn copy_common_archive_files(root: &Path, archive_root: &Path) -> Result<()> {
     fs::copy(root.join("LICENSE"), archive_root.join("LICENSE"))?;
+    fs::copy(root.join("MCAP.md"), archive_root.join("MCAP.md"))?;
     copy_dir_all(&root.join("fbs"), &archive_root.join("fbs"))?;
+    Ok(())
+}
+
+fn write_c_bfbs_assets(package_root: &Path, topics: &[TopicEntry]) -> Result<()> {
+    let output_dir = package_root.join("src/bfbs");
+    reset_dir(&output_dir)?;
+    let mut schema_files = BTreeSet::new();
+    for topic in topics {
+        schema_files.insert(topic.schema_file.clone());
+    }
+    for schema_file in schema_files {
+        let stem = Path::new(&schema_file)
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .ok_or_else(|| io::Error::other(format!("invalid schema path: {schema_file}")))?;
+        let bytes = fs::read(package_root.join(format!("bfbs/{stem}.bfbs")))?;
+        let mut source = String::from("#include <stddef.h>\n#include <stdint.h>\n\n");
+        source.push_str(&format!("const uint8_t synapse_bfbs_{stem}[] = {{\n"));
+        for chunk in bytes.chunks(12) {
+            source.push_str("    ");
+            for byte in chunk {
+                source.push_str(&format!("0x{byte:02x}, "));
+            }
+            source.push('\n');
+        }
+        source.push_str("};\n");
+        source.push_str(&format!(
+            "const size_t synapse_bfbs_{stem}_size = sizeof(synapse_bfbs_{stem});\n"
+        ));
+        write_file(&output_dir.join(format!("{stem}.c")), &source)?;
+    }
     Ok(())
 }
 
@@ -2234,14 +2441,45 @@ struct TopicCatalogContext {
     version: u8,
     schema_set_hash: String,
     schema_set_hash_literal: String,
+    mcap_profile: &'static str,
+    mcap_schema_encoding: &'static str,
+    mcap_message_encoding: &'static str,
+    mcap_metadata_name: &'static str,
+    mcap_schema_set_hash_key: &'static str,
+    mcap_session_id_key: &'static str,
+    mcap_source_key: &'static str,
+    mcap_time_basis_key: &'static str,
+    mcap_time_basis_monotonic_boot: &'static str,
+    mcap_time_basis_unix_epoch: &'static str,
+    mcap_time_basis_correlated: &'static str,
+    mcap_topic_id_key: &'static str,
+    mcap_profile_literal: String,
+    mcap_schema_encoding_literal: String,
+    mcap_message_encoding_literal: String,
+    mcap_metadata_name_literal: String,
+    mcap_schema_set_hash_key_literal: String,
+    mcap_session_id_key_literal: String,
+    mcap_source_key_literal: String,
+    mcap_time_basis_key_literal: String,
+    mcap_time_basis_monotonic_boot_literal: String,
+    mcap_time_basis_unix_epoch_literal: String,
+    mcap_time_basis_correlated_literal: String,
+    mcap_topic_id_key_literal: String,
     cmd_key_prefix: &'static str,
     meta_key_prefix: &'static str,
     liveliness_key_prefix: &'static str,
     cmd_key_prefix_literal: String,
     meta_key_prefix_literal: String,
     liveliness_key_prefix_literal: String,
+    mcap_schemas: Vec<McapSchemaTemplateEntry>,
     topics: Vec<TopicTemplateEntry>,
     commands: Vec<CommandTemplateEntry>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct McapSchemaTemplateEntry {
+    symbol: String,
+    schema_file: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -2253,6 +2491,9 @@ struct TopicTemplateEntry {
     payload_type: Option<String>,
     payload_size: Option<usize>,
     schema_file: String,
+    mcap_schema_name: String,
+    mcap_schema_file: String,
+    mcap_schema_symbol: String,
     wire_type: String,
     schema_hash: String,
     fixed_layout: bool,
@@ -2274,6 +2515,8 @@ struct TopicTemplateEntry {
     root_table_qualified_literal: String,
     payload_type_qualified_literal: String,
     schema_file_literal: String,
+    mcap_schema_name_literal: String,
+    mcap_schema_file_literal: String,
     wire_type_literal: String,
     schema_hash_literal: String,
     fixed_layout_python: &'static str,
@@ -4999,6 +5242,42 @@ fn smoke_c_archive(templates: &Templates, c_root: &Path) -> Result<()> {
     remove_file_if_exists(&smoke)?;
     remove_file_if_exists(&c_root.join("smoke.o"))?;
 
+    let mcap_smoke = c_root.join("mcap_smoke");
+    run(Command::new(&cc)
+        .arg("-std=c11")
+        .arg("-Wall")
+        .arg("-Wextra")
+        .arg("-Werror")
+        .arg("-I")
+        .arg(c_root.join("include"))
+        .arg(c_root.join("tests/mcap_smoke.c"))
+        .arg(c_root.join("src/mcap.c"))
+        .arg(c_root.join("src/bfbs/state.c"))
+        .arg("-o")
+        .arg(&mcap_smoke))?;
+    run(Command::new(&mcap_smoke).arg(c_root.join("c-writer.mcap")))?;
+    remove_file_if_exists(&mcap_smoke)?;
+
+    Ok(())
+}
+
+fn smoke_c_to_rust_mcap(root: &Path, c_root: &Path) -> Result<()> {
+    println!("validating C MCAP output with the Rust reader");
+    let package_root = root.join("target/xtask/packages/rust");
+    let target_dir = package_root.join("target");
+    run(Command::new("cargo")
+        .env("CARGO_TARGET_DIR", &target_dir)
+        .arg("run")
+        .arg("--quiet")
+        .arg("--features")
+        .arg("mcap")
+        .arg("--example")
+        .arg("validate_mcap")
+        .arg("--manifest-path")
+        .arg(package_root.join("Cargo.toml"))
+        .arg("--")
+        .arg(c_root.join("c-writer.mcap")))?;
+    remove_file_if_exists(&c_root.join("c-writer.mcap"))?;
     Ok(())
 }
 

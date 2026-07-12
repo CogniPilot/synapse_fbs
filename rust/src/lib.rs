@@ -27,4 +27,9 @@ pub mod topic_catalog;
 pub mod topic_decode;
 pub mod value_contract;
 
+#[cfg(feature = "mcap")]
+pub mod mcap;
+#[cfg(feature = "mcap")]
+mod mcap_fixed;
+
 pub use generated::synapse;

@@ -1,6 +1,22 @@
 {
   "version": {{ version }},
   "schema_set_hash": {{ schema_set_hash|tojson }},
+  "mcap": {
+    "profile": {{ mcap_profile|tojson }},
+    "schema_encoding": {{ mcap_schema_encoding|tojson }},
+    "message_encoding": {{ mcap_message_encoding|tojson }},
+    "metadata_name": {{ mcap_metadata_name|tojson }},
+    "schema_set_hash_key": {{ mcap_schema_set_hash_key|tojson }},
+    "session_id_key": {{ mcap_session_id_key|tojson }},
+    "source_key": {{ mcap_source_key|tojson }},
+    "time_basis_key": {{ mcap_time_basis_key|tojson }},
+    "time_basis_values": [
+      {{ mcap_time_basis_monotonic_boot|tojson }},
+      {{ mcap_time_basis_unix_epoch|tojson }},
+      {{ mcap_time_basis_correlated|tojson }}
+    ],
+    "topic_id_key": {{ mcap_topic_id_key|tojson }}
+  },
   "key_prefixes": {
     "cmd": {{ cmd_key_prefix|tojson }},
     "meta": {{ meta_key_prefix|tojson }},
@@ -16,6 +32,8 @@
       "payload_type": {{ topic.payload_type|tojson }},
       "payload_size": {{ topic.payload_size|tojson }},
       "schema_file": {{ topic.schema_file|tojson }},
+      "mcap_schema_name": {{ topic.mcap_schema_name|tojson }},
+      "mcap_schema_file": {{ topic.mcap_schema_file|tojson }},
       "wire_type": {{ topic.wire_type|tojson }},
       "schema_hash": {{ topic.schema_hash|tojson }},
       "fixed_layout": {{ topic.fixed_layout|tojson }},

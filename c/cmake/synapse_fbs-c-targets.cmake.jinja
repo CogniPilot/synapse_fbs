@@ -26,3 +26,15 @@ add_library(synapse_fbs_print STATIC EXCLUDE_FROM_ALL
 add_library(synapse_fbs::print ALIAS synapse_fbs_print)
 
 target_link_libraries(synapse_fbs_print PUBLIC synapse_fbs_c)
+
+add_library(synapse_fbs_mcap STATIC EXCLUDE_FROM_ALL
+  "${_SYNAPSE_FBS_ROOT}/src/mcap.c"
+{{ mcap_bfbs_source_paths }}
+)
+add_library(synapse_fbs::mcap ALIAS synapse_fbs_mcap)
+
+target_link_libraries(synapse_fbs_mcap PUBLIC synapse_fbs_c)
+
+if(CONFIG_SYNAPSE_FBS_MCAP AND TARGET app)
+  target_link_libraries(app PRIVATE synapse_fbs::mcap)
+endif()

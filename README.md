@@ -307,13 +307,33 @@ navigation at 1 Hz) is under 5 kbps in bare structs.
 
 ## Logging
 
-Synapse logs use [MCAP](https://mcap.dev) as the container: schema records
+MCAP is the officially supported Synapse log format. Synapse logs use
+[MCAP](https://mcap.dev) as the container: schema records
 carry the generated `.bfbs` reflection schemas (`flatbuffer` schema encoding),
 channel topics are the canonical Zenoh keys, and messages are the
 table-wrapped topic payloads so Foxglove, PlotJuggler, and the `mcap` CLI
 decode them directly. Flight controllers stream index-less MCAP and files are
 recovered/reindexed post-flight. Release archives include `bfbs/*.bfbs` and
 `bfbs.sha256` manifests for exactly this use.
+
+Logging is the deliberate exception to Synapse's fixed-layout priority. Live
+telemetry and control samples remain fixed structs for inter-chip, shared
+memory, serial-frame, and real-time paths. A log is an append-only chain of
+heterogeneous MCAP records, so topic structs are wrapped in their existing
+FlatBuffers root tables only after capture and outside the real-time path.
+The normative [`synapse/1` MCAP profile](MCAP.md) defines the exact header,
+metadata keys, timestamp basis, schema/channel mapping, message encoding,
+onboard streaming behavior, and compatibility requirements. Readers must use
+the `Schema.name` and BFBS embedded in each log channel rather than
+substituting the reader's currently installed schemas; historical BFBS
+remains authoritative.
+
+MCAP support is built into the normal release but remains compile-time
+optional. Rust hosts enable the `mcap` Cargo feature and use
+`synapse_fbs::mcap`; C and Zephyr consumers link `synapse_fbs::mcap` or enable
+`CONFIG_SYNAPSE_FBS_MCAP`. Applications explicitly select topics and own their
+queues, buffers, logger thread, and storage sink, so disabled logging has no
+runtime or linked-code cost.
 
 ## ROS and FlatROS
 
@@ -453,7 +473,7 @@ consumers. Prefer `find_package` for projects that download, extract, or
 install the release archive as part of their dependency setup:
 
 ```cmake
-find_package(synapse_fbs 0.7.0 CONFIG REQUIRED)
+find_package(synapse_fbs 0.8.0 CONFIG REQUIRED)
 
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
@@ -469,7 +489,7 @@ remains the simplest direct-from-release path:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.7.0)
+set(SYNAPSE_FBS_VERSION 0.8.0)
 
 FetchContent_Declare(
   synapse_fbs
@@ -542,7 +562,7 @@ from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
 CI generates bindings and builds all packages on pull requests and branch
 pushes.
 
-Pushing a semantic version tag such as `v0.7.0` publishes a GitHub Release and
+Pushing a semantic version tag such as `v0.8.0` publishes a GitHub Release and
 the language packages. The tag must match `package.version` in `flake.nix`; the
 release build fails before publishing if they differ.
 
@@ -567,7 +587,7 @@ directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
 
 The docs workflow publishes schema documentation to the `gh-pages` branch used
 by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.7.0` updates `/0.7/`. Only the latest patch
+matching minor-version docs, so `v0.8.0` updates `/0.8/`. Only the latest patch
 for each published minor line is kept on GitHub Pages. Exact historical docs can
 be rebuilt from the corresponding tag.
 
