@@ -19,6 +19,16 @@
           version = "0.6.1";
           commit = "d17e324e7e595272da486c5b9b20e848b78ba9ba";
         };
+        mcap = {
+          rust = "0.25.0";
+          python = "1.4.0";
+          javascript = "2.2.1";
+          cpp = {
+            version = "2.1.3";
+            commit = "1420296ffcfdcde4b6894c0c1aba0ad083f93dde";
+          };
+        };
+        typescript.version = "7.0.2";
         docs.mdbook = "0.5.3";
       };
       systems = [

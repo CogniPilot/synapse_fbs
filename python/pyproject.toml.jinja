@@ -11,9 +11,15 @@ requires-python = ">=3.9"
 license = "Apache-2.0"
 dependencies = ["flatbuffers=={{ flatbuffers_version }}"]
 
+[project.optional-dependencies]
+mcap = ["mcap=={{ mcap_python_version }}"]
+
 [project.urls]
 Repository = "https://github.com/CogniPilot/synapse_fbs"
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["synapse*"]
+
+[tool.setuptools.package-data]
+synapse = ["bfbs/*.bfbs", "MCAP.md", "py.typed"]

@@ -28,6 +28,22 @@ Tables, strings, and vectors are reserved for root wrappers, transfer
 request/reply messages, or naturally variable-size data.
 Logging uses MCAP with the shipped `.bfbs` reflection schemas.
 
+Install the optional maintained MCAP container dependency for first-class log
+reading and writing:
+
+```sh
+npm install @cognipilot/synapse-fbs @mcap/core
+```
+
+```js
+import { Reader, TimeBasis, Writer } from '@cognipilot/synapse-fbs/mcap';
+```
+
+The wrapper applies the frozen `synapse/1` metadata and topic catalog while
+`@mcap/core` owns container parsing and serialization. Its default BFBS loader
+works with Node package files and browser-hosted package assets; applications
+may inject a custom asynchronous loader for other bundlers or storage systems.
+
 Unlike the Rust and Python packages, this package does **not** ship generated
 language bindings and does **not** depend on the `flatbuffers` runtime. The npm
 `flatbuffers` release cadence does not track the pinned `flatc` version, so

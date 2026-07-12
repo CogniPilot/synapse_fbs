@@ -8,6 +8,12 @@ table names, and payload types.
 Use the archive through CMake and link `synapse_fbs::cpp`, or add `include/` to
 the compiler include path directly.
 
+Link `synapse_fbs::mcap` for the first-class `synapse/1` host reader/writer in
+`<synapse/mcap.hpp>`. It uses the pinned official MCAP C++ implementation;
+compression support is disabled because the Synapse baseline is direct,
+unchunked logging. The lower-level official `mcap::McapReader` and
+`mcap::McapWriter` APIs remain available from the same target.
+
 Prefer `find_package` when the archive is downloaded, extracted, or installed
 outside the project configure step:
 
