@@ -1338,6 +1338,38 @@ fn build_flatcc(root: &Path, tools: &Tools) -> Result<FlatccBuild> {
     let workdir = root.join("target/xtask/flatcc");
     let source = workdir.join("src");
     let build = workdir.join("build");
+    let binary = source.join("bin/flatcc");
+
+    let cached_commit = Command::new("git")
+        .arg("-C")
+        .arg(&source)
+        .arg("rev-parse")
+        .arg("HEAD")
+        .output()
+        .ok()
+        .filter(|result| result.status.success())
+        .and_then(|result| String::from_utf8(result.stdout).ok());
+    let cached_version = Command::new(&binary)
+        .arg("--version")
+        .output()
+        .ok()
+        .filter(|result| result.status.success())
+        .and_then(|result| String::from_utf8(result.stdout).ok())
+        .and_then(|text| {
+            text.lines().find_map(|line| {
+                line.split_once("version:")
+                    .map(|(_, value)| value.trim().to_owned())
+            })
+        });
+
+    if cached_commit.as_deref().map(str::trim) == Some(tools.flatcc_commit.as_str())
+        && cached_version.as_deref() == Some(tools.flatcc_version.as_str())
+        && binary.is_file()
+    {
+        println!("reusing cached flatcc {}", tools.flatcc_version);
+        return Ok(FlatccBuild { binary, source });
+    }
+
     reset_dir(&workdir)?;
     fetch_git_commit(
         "https://github.com/dvidelabs/flatcc.git",
@@ -1362,7 +1394,6 @@ fn build_flatcc(root: &Path, tools: &Tools) -> Result<FlatccBuild> {
         .arg("--parallel")
         .arg("2"))?;
 
-    let binary = source.join("bin/flatcc");
     if !binary.is_file() {
         return fail(format!(
             "flatcc binary was not created at {}",
