@@ -34,6 +34,7 @@ jobs:
               target/xtask/packages/rust/target/package/*.crate
               target/xtask/packages/js/*.tgz
               target/xtask/artifacts/*.tar.gz
+              target/xtask/artifacts/*.json
               target/xtask/artifacts/*.sha256
             )
             if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then

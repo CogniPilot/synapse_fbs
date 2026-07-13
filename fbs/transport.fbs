@@ -11,82 +11,136 @@ include "firmware.fbs";
 
 namespace synapse.topic;
 
-// Human-readable status text for diagnostics, operator messages, and logs.
+/// Human-readable status text for diagnostics, operator messages, and logs.
 table TextStatus {
-  timestamp_us:ulong; // Message timestamp in monotonic boot time.
-  severity:synapse.types.Severity = Informational; // RFC 5424 severity level.
-  text:string; // UTF-8 status text; this table is variable-size by design.
+  /// Message timestamp in monotonic boot time.
+  timestamp_us:ulong (unit: "s", clock: "monotonic_boot", scale: "1e-6", min: "0");
+  /// RFC 5424 severity level.
+  severity:synapse.types.Severity = Informational;
+  /// UTF-8 status text; this table is variable-size by design.
+  text:string;
 }
 
-// Union of topic root tables supported by the optional multiplexed Frame
-// transport. Order mirrors TopicId; the union discriminator is one byte, so
-// Frame supports at most 255 topics.
+/// Union of topic root tables supported by the optional multiplexed Frame
+/// transport. Order mirrors TopicId; the union discriminator is one byte, so
+/// Frame supports at most 255 topics.
 union SynapseMessage {
-  VehicleHealth, // Vehicle-level arming, failsafe, mode, link, and health summary.
-  TimeReference, // Boot-time to Unix-time reference sample.
-  RadioControl, // Raw receiver channel input sample.
-  ManualControlCommand, // Normalized manual pilot intent command.
-  InertialSample, // IMU, magnetometer, static pressure, and temperature sample.
-  AirData, // Barometric and aerodynamic measurement sample.
-  PowerStatus, // Battery or power-source state sample.
-  GnssFix, // GNSS fix and motion estimate.
-  OpticalFlow, // Integrated optical-flow sample.
-  OpticalFlowVelocity, // Velocity estimate derived from optical flow.
-  AttitudeEstimate, // Attitude and angular-velocity estimate.
-  LocalPositionEstimate, // Local ENU position, velocity, acceleration, and yaw estimate.
-  GlobalPositionEstimate, // Global geodetic position and velocity estimate.
-  OdometryEstimate, // Combined pose, twist, covariance, and estimator metadata.
-  EstimatorHealth, // Estimator health and innovation-test summary.
-  MissionProgress, // Mission progress and mission database identifiers.
-  NavigationTarget, // Navigation target and tracking-error summary.
-  HomeReference, // Home geodetic origin and local-frame reference.
-  AttitudeCommand, // Attitude setpoint command.
-  RateCommand, // Body-rate setpoint command.
-  LocalPositionCommand, // Local position/velocity/acceleration/yaw command.
-  TrajectorySegment, // Bezier or polynomial trajectory segment setpoint.
-  ActuatorCommand, // Normalized actuator command.
-  ActuatorFeedback, // Normalized actuator feedback.
-  PwmSignalOutputs, // Raw PWM output pulse widths.
-  ControlLoopMetrics, // Control-loop timing and load metrics.
-  TextStatus, // Human-readable status text.
-  GcsStatus, // Compact status aggregate for low-rate ground-control links.
-  ExternalOdometry, // External pose and twist measurement for estimator input.
-  ExternalOdometryCovariance, // Optional external odometry covariance companion.
-  MocapFrame, // Raw motion-capture marker and rigid-body samples.
-  LockstepTick, // Deterministic simulation barrier tick.
-  LockstepStatus, // Deterministic simulation participant status.
-  FirmwareProgress, // Firmware image transfer, verification, and activation progress.
-  RawPose, // Unfiltered position and quaternion attitude measurement.
-  Pose, // Filtered position and quaternion attitude sample.
-  PoseWithCovariance, // Filtered pose sample with covariance.
-  Twist, // Linear and angular velocity sample.
-  TwistWithCovariance, // Twist sample with covariance.
-  Odometry, // Compact pose, twist, and estimator status.
-  OdometryWithCovariance, // Odometry with complete state covariance.
-  MocapPoseFrame, // Raw motion-capture frame with quaternion rigid-body attitudes.
+  /// Vehicle-level arming, failsafe, mode, link, and health summary.
+  VehicleHealth,
+  /// Boot-time to Unix-time reference sample.
+  TimeReference,
+  /// Raw receiver channel input sample.
+  RadioControl,
+  /// Normalized manual pilot intent command.
+  ManualControlCommand,
+  /// IMU, magnetometer, static pressure, and temperature sample.
+  InertialSample,
+  /// Barometric and aerodynamic measurement sample.
+  AirData,
+  /// Battery or power-source state sample.
+  PowerStatus,
+  /// GNSS fix and motion estimate.
+  GnssFix,
+  /// Integrated optical-flow sample.
+  OpticalFlow,
+  /// Velocity estimate derived from optical flow.
+  OpticalFlowVelocity,
+  /// Attitude and angular-velocity estimate.
+  AttitudeEstimate,
+  /// Local ENU position, velocity, acceleration, and yaw estimate.
+  LocalPositionEstimate,
+  /// Global geodetic position and velocity estimate.
+  GlobalPositionEstimate,
+  /// Combined pose, twist, covariance, and estimator metadata.
+  OdometryEstimate,
+  /// Estimator health and innovation-test summary.
+  EstimatorHealth,
+  /// Mission progress and mission database identifiers.
+  MissionProgress,
+  /// Navigation target and tracking-error summary.
+  NavigationTarget,
+  /// Home geodetic origin and local-frame reference.
+  HomeReference,
+  /// Attitude setpoint command.
+  AttitudeCommand,
+  /// Body-rate setpoint command.
+  RateCommand,
+  /// Local position/velocity/acceleration/yaw command.
+  LocalPositionCommand,
+  /// Bezier or polynomial trajectory segment setpoint.
+  TrajectorySegment,
+  /// Normalized actuator command.
+  ActuatorCommand,
+  /// Normalized actuator feedback.
+  ActuatorFeedback,
+  /// Raw PWM output pulse widths.
+  PwmSignalOutputs,
+  /// Control-loop timing and load metrics.
+  ControlLoopMetrics,
+  /// Human-readable status text.
+  TextStatus,
+  /// Compact status aggregate for low-rate ground-control links.
+  GcsStatus,
+  /// External pose and twist measurement for estimator input.
+  ExternalOdometry,
+  /// Optional external odometry covariance companion.
+  ExternalOdometryCovariance,
+  /// Raw motion-capture marker and rigid-body samples.
+  MocapFrame,
+  /// Deterministic simulation barrier tick.
+  LockstepTick,
+  /// Deterministic simulation participant status.
+  LockstepStatus,
+  /// Firmware image transfer, verification, and activation progress.
+  FirmwareProgress,
+  /// Unfiltered position and quaternion attitude measurement.
+  RawPose,
+  /// Filtered position and quaternion attitude sample.
+  Pose,
+  /// Filtered pose sample with covariance.
+  PoseWithCovariance,
+  /// Linear and angular velocity sample.
+  Twist,
+  /// Twist sample with covariance.
+  TwistWithCovariance,
+  /// Compact pose, twist, and estimator status.
+  Odometry,
+  /// Odometry with complete state covariance.
+  OdometryWithCovariance,
+  /// Raw motion-capture frame with quaternion rigid-body attitudes.
+  MocapPoseFrame,
 }
 
-// Fixed-layout header carried by the optional multiplexed Frame transport.
+/// Fixed-layout header carried by the optional multiplexed Frame transport.
 struct FrameHeader {
-  timestamp_us:ulong; // Frame publication timestamp in monotonic boot time.
-  sequence:uint; // Monotonic sequence counter for loss/reorder detection.
-  flags:ushort; // Frame-envelope bitmask for serial or raw byte-stream features; zero means no envelope extensions.
-  topic_id:TopicId; // Numeric topic identifier for the enclosed message.
-  system_id:ubyte; // Source system identifier for links without key-based routing.
-  component_id:ubyte; // Source component identifier.
-  protocol_version:ubyte; // Synapse wire/schema compatibility version used by the publisher.
+  /// Frame publication timestamp in monotonic boot time.
+  timestamp_us:ulong (unit: "s", clock: "monotonic_boot", scale: "1e-6", min: "0");
+  /// Monotonic sequence counter for loss/reorder detection.
+  sequence:uint;
+  /// Frame-envelope bitmask for serial or raw byte-stream features; zero means no envelope extensions.
+  flags:ushort;
+  /// Numeric topic identifier for the enclosed message.
+  topic_id:TopicId;
+  /// Source system identifier for links without key-based routing.
+  system_id:ubyte;
+  /// Source component identifier.
+  component_id:ubyte;
+  /// Synapse wire/schema compatibility version used by the publisher.
+  protocol_version:ubyte;
 }
 
-// Optional multiplexed transport frame for generic bridges and multiplexed
-// byte streams. This is an intentional table boundary: the canonical Zenoh
-// encoding publishes bare fixed-layout payload structs with the key as the
-// discriminator, and constrained serial links should prefer the compact
-// framing described in the README ([sync][len][topic_id][seq][flags]
-// [bare struct][crc16]) over this envelope. Frame remains for consumers that
-// need a self-contained FlatBuffers container.
+/// Optional multiplexed transport frame for generic bridges and multiplexed
+/// byte streams. This is an intentional table boundary: the canonical Zenoh
+/// encoding publishes bare fixed-layout payload structs with the key as the
+/// discriminator, and constrained serial links should prefer the compact
+/// framing described in the README ([sync][len][topic_id][seq][flags]
+/// [bare struct][crc16]) over this envelope. Frame remains for consumers that
+/// need a self-contained FlatBuffers container.
 table Frame {
-  header:FrameHeader; // Fixed-layout transport header.
-  message:SynapseMessage; // Variable message payload selected by the union discriminator.
+  /// Fixed-layout transport header.
+  header:FrameHeader;
+  /// Variable message payload selected by the union discriminator.
+  message:SynapseMessage;
 }
 
 root_type Frame;

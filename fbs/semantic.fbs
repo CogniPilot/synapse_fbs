@@ -1,0 +1,28 @@
+/// Synapse language-neutral semantic metadata profile. These attributes are
+/// carried by flatc's BFBS reflection schema and never alter the wire layout.
+/// Physical unit of the decoded field value. Unit strings use UCUM-compatible
+/// spellings where practical; `1` denotes a dimensionless value.
+attribute "unit";
+/// Inclusive minimum permitted semantic value, expressed after applying
+/// `scale` and in the field's declared `unit`.
+attribute "min";
+/// Inclusive maximum permitted semantic value, expressed after applying
+/// `scale` and in the field's declared `unit`.
+attribute "max";
+/// Coordinate frame in which a vector, orientation, or geodetic value is
+/// expressed, such as `enu`, `flu`, `sensor`, or `wgs84`.
+attribute "frame";
+/// Clock or epoch used by a timestamp, such as `monotonic_boot`, `unix_epoch`,
+/// `gps`, or `correlated`.
+attribute "clock";
+/// Multiplier that converts the stored numeric value to the decoded value:
+/// `decoded_value = stored_value * scale`.
+attribute "scale";
+/// Condition under which the field carries a valid value. Conditions refer to
+/// fields in the same record unless a qualified path is given. The current
+/// profile uses `flags.Member` for flag-gated values and `value >= 0` for a
+/// signed field whose negative values are sentinels.
+attribute "valid_if";
+/// Language-neutral logical meaning not captured by the FlatBuffers storage
+/// type, such as a frame-qualified quaternion or a covariance layout.
+attribute "logical_type";

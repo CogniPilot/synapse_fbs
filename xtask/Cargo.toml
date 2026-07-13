@@ -5,6 +5,8 @@ edition = "2024"
 publish = false
 
 [dependencies]
+flatbuffers = "=25.12.19"
+flatbuffers-reflection = "=0.1.0"
 minijinja = { version = "=2.19.0", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 sha2 = "0.10"

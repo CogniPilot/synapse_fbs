@@ -1,3 +1,5 @@
+include "semantic.fbs";
+
 // Synapse shared types, core protocol enums, and topic identifiers.
 //
 // Frame conventions are layered:
@@ -25,304 +27,523 @@
 
 namespace synapse.types;
 
-// Two-component float vector used for planar rates, flow, and image motion.
+/// Two-component float vector used for planar rates, flow, and image motion.
 struct Vec2f {
-  x:float; // First axis component; frame and unit are defined by the containing field name.
-  y:float; // Second axis component; frame and unit are defined by the containing field name.
+  /// First axis component; frame and unit are defined by the containing field name.
+  x:float;
+  /// Second axis component; frame and unit are defined by the containing field name.
+  y:float;
 }
 
-// Three-component float vector used for ENU world vectors and FLU body vectors.
+/// Three-component float vector used for ENU world vectors and FLU body vectors.
 struct Vec3f {
-  x:float; // X component; east in ENU fields and forward in FLU fields.
-  y:float; // Y component; north in ENU fields and left in FLU fields.
-  z:float; // Z component; up in both ENU and FLU fields.
+  /// X component; east in ENU fields and forward in FLU fields.
+  x:float;
+  /// Y component; north in ENU fields and left in FLU fields.
+  y:float;
+  /// Z component; up in both ENU and FLU fields.
+  z:float;
 }
 
-// Unit quaternion in Hamilton convention, component order w, x, y, z.
-// It rotates body-frame FLU vectors into the world ENU frame:
-// v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.
+/// Unit quaternion in Hamilton convention, component order w, x, y, z.
+/// It rotates body-frame FLU vectors into the world ENU frame:
+/// v_enu = q * v_flu * conjugate(q). Identity rotation is 1, 0, 0, 0.
 struct Quaternionf {
-  w:float; // Scalar component.
-  x:float; // Vector X component.
-  y:float; // Vector Y component.
-  z:float; // Vector Z component.
+  /// Scalar component.
+  w:float;
+  /// Vector X component.
+  x:float;
+  /// Vector Y component.
+  y:float;
+  /// Vector Z component.
+  z:float;
 }
 
-// Row-major 3x3 rotation matrix.
+/// Row-major 3x3 rotation matrix.
 struct RotationMatrix3f {
-  r11:float; // Row 1, column 1.
-  r12:float; // Row 1, column 2.
-  r13:float; // Row 1, column 3.
-  r21:float; // Row 2, column 1.
-  r22:float; // Row 2, column 2.
-  r23:float; // Row 2, column 3.
-  r31:float; // Row 3, column 1.
-  r32:float; // Row 3, column 2.
-  r33:float; // Row 3, column 3.
+  /// Row 1, column 1.
+  r11:float;
+  /// Row 1, column 2.
+  r12:float;
+  /// Row 1, column 3.
+  r13:float;
+  /// Row 2, column 1.
+  r21:float;
+  /// Row 2, column 2.
+  r22:float;
+  /// Row 2, column 3.
+  r23:float;
+  /// Row 3, column 1.
+  r31:float;
+  /// Row 3, column 2.
+  r32:float;
+  /// Row 3, column 3.
+  r33:float;
 }
 
-// Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.
+/// Roll, pitch, and yaw rates or rate setpoints about the FLU body axes.
 struct RateTriplet {
-  roll:float; // Rotation rate about the body X (forward) axis.
-  pitch:float; // Rotation rate about the body Y (left) axis.
-  yaw:float; // Rotation rate about the body Z (up) axis.
+  /// Rotation rate about the body X (forward) axis.
+  roll:float;
+  /// Rotation rate about the body Y (left) axis.
+  pitch:float;
+  /// Rotation rate about the body Z (up) axis.
+  yaw:float;
 }
 
-// Six-degree-of-freedom pose in the Synapse local/world and body frames.
+/// Six-degree-of-freedom pose in the Synapse local/world and body frames.
 struct Posef {
-  position_enu_m:Vec3f; // Local/world position in ENU meters.
-  attitude:Quaternionf; // Orientation rotating body FLU vectors into ENU.
+  /// Local/world position in ENU meters.
+  position_enu_m:Vec3f (unit: "m", frame: "enu");
+  /// Orientation rotating body FLU vectors into ENU.
+  attitude:Quaternionf (logical_type: "quaternion_flu_to_enu");
 }
 
-// Linear and angular velocity in the Synapse local/world and body frames.
+/// Linear and angular velocity in the Synapse local/world and body frames.
 struct Twistf {
-  linear_velocity_enu_m_s:Vec3f; // Linear velocity in ENU meters per second.
-  angular_velocity_flu_rad_s:RateTriplet; // Angular velocity in body FLU radians per second.
+  /// Linear velocity in ENU meters per second.
+  linear_velocity_enu_m_s:Vec3f (unit: "m/s", frame: "enu");
+  /// Angular velocity in body FLU radians per second.
+  angular_velocity_flu_rad_s:RateTriplet (unit: "rad/s", frame: "flu");
 }
 
-// Upper-triangular 6x6 covariance matrix stored row-major as 21 float values.
-// State order is x, y, z translation followed by rotation about x, y, z.
+/// Upper-triangular 6x6 covariance matrix stored row-major as 21 float values.
+/// State order is x, y, z translation followed by rotation about x, y, z.
 struct CovarianceUpperTriangle21f {
-  c0:float; // Matrix element (0,0).
-  c1:float; // Matrix element (0,1).
-  c2:float; // Matrix element (0,2).
-  c3:float; // Matrix element (0,3).
-  c4:float; // Matrix element (0,4).
-  c5:float; // Matrix element (0,5).
-  c6:float; // Matrix element (1,1).
-  c7:float; // Matrix element (1,2).
-  c8:float; // Matrix element (1,3).
-  c9:float; // Matrix element (1,4).
-  c10:float; // Matrix element (1,5).
-  c11:float; // Matrix element (2,2).
-  c12:float; // Matrix element (2,3).
-  c13:float; // Matrix element (2,4).
-  c14:float; // Matrix element (2,5).
-  c15:float; // Matrix element (3,3).
-  c16:float; // Matrix element (3,4).
-  c17:float; // Matrix element (3,5).
-  c18:float; // Matrix element (4,4).
-  c19:float; // Matrix element (4,5).
-  c20:float; // Matrix element (5,5).
+  /// Matrix element (0,0).
+  c0:float;
+  /// Matrix element (0,1).
+  c1:float;
+  /// Matrix element (0,2).
+  c2:float;
+  /// Matrix element (0,3).
+  c3:float;
+  /// Matrix element (0,4).
+  c4:float;
+  /// Matrix element (0,5).
+  c5:float;
+  /// Matrix element (1,1).
+  c6:float;
+  /// Matrix element (1,2).
+  c7:float;
+  /// Matrix element (1,3).
+  c8:float;
+  /// Matrix element (1,4).
+  c9:float;
+  /// Matrix element (1,5).
+  c10:float;
+  /// Matrix element (2,2).
+  c11:float;
+  /// Matrix element (2,3).
+  c12:float;
+  /// Matrix element (2,4).
+  c13:float;
+  /// Matrix element (2,5).
+  c14:float;
+  /// Matrix element (3,3).
+  c15:float;
+  /// Matrix element (3,4).
+  c16:float;
+  /// Matrix element (3,5).
+  c17:float;
+  /// Matrix element (4,4).
+  c18:float;
+  /// Matrix element (4,5).
+  c19:float;
+  /// Matrix element (5,5).
+  c20:float;
 }
 
-// Upper-triangular 12x12 covariance matrix stored row-major as 78 float
-// values. The containing field documents its tangent-state order.
+/// Upper-triangular 12x12 covariance matrix stored row-major as 78 float
+/// values. The containing field documents its tangent-state order.
 struct CovarianceUpperTriangle78f {
-  c0:float; // Upper-triangular covariance element 0.
-  c1:float; // Upper-triangular covariance element 1.
-  c2:float; // Upper-triangular covariance element 2.
-  c3:float; // Upper-triangular covariance element 3.
-  c4:float; // Upper-triangular covariance element 4.
-  c5:float; // Upper-triangular covariance element 5.
-  c6:float; // Upper-triangular covariance element 6.
-  c7:float; // Upper-triangular covariance element 7.
-  c8:float; // Upper-triangular covariance element 8.
-  c9:float; // Upper-triangular covariance element 9.
-  c10:float; // Upper-triangular covariance element 10.
-  c11:float; // Upper-triangular covariance element 11.
-  c12:float; // Upper-triangular covariance element 12.
-  c13:float; // Upper-triangular covariance element 13.
-  c14:float; // Upper-triangular covariance element 14.
-  c15:float; // Upper-triangular covariance element 15.
-  c16:float; // Upper-triangular covariance element 16.
-  c17:float; // Upper-triangular covariance element 17.
-  c18:float; // Upper-triangular covariance element 18.
-  c19:float; // Upper-triangular covariance element 19.
-  c20:float; // Upper-triangular covariance element 20.
-  c21:float; // Upper-triangular covariance element 21.
-  c22:float; // Upper-triangular covariance element 22.
-  c23:float; // Upper-triangular covariance element 23.
-  c24:float; // Upper-triangular covariance element 24.
-  c25:float; // Upper-triangular covariance element 25.
-  c26:float; // Upper-triangular covariance element 26.
-  c27:float; // Upper-triangular covariance element 27.
-  c28:float; // Upper-triangular covariance element 28.
-  c29:float; // Upper-triangular covariance element 29.
-  c30:float; // Upper-triangular covariance element 30.
-  c31:float; // Upper-triangular covariance element 31.
-  c32:float; // Upper-triangular covariance element 32.
-  c33:float; // Upper-triangular covariance element 33.
-  c34:float; // Upper-triangular covariance element 34.
-  c35:float; // Upper-triangular covariance element 35.
-  c36:float; // Upper-triangular covariance element 36.
-  c37:float; // Upper-triangular covariance element 37.
-  c38:float; // Upper-triangular covariance element 38.
-  c39:float; // Upper-triangular covariance element 39.
-  c40:float; // Upper-triangular covariance element 40.
-  c41:float; // Upper-triangular covariance element 41.
-  c42:float; // Upper-triangular covariance element 42.
-  c43:float; // Upper-triangular covariance element 43.
-  c44:float; // Upper-triangular covariance element 44.
-  c45:float; // Upper-triangular covariance element 45.
-  c46:float; // Upper-triangular covariance element 46.
-  c47:float; // Upper-triangular covariance element 47.
-  c48:float; // Upper-triangular covariance element 48.
-  c49:float; // Upper-triangular covariance element 49.
-  c50:float; // Upper-triangular covariance element 50.
-  c51:float; // Upper-triangular covariance element 51.
-  c52:float; // Upper-triangular covariance element 52.
-  c53:float; // Upper-triangular covariance element 53.
-  c54:float; // Upper-triangular covariance element 54.
-  c55:float; // Upper-triangular covariance element 55.
-  c56:float; // Upper-triangular covariance element 56.
-  c57:float; // Upper-triangular covariance element 57.
-  c58:float; // Upper-triangular covariance element 58.
-  c59:float; // Upper-triangular covariance element 59.
-  c60:float; // Upper-triangular covariance element 60.
-  c61:float; // Upper-triangular covariance element 61.
-  c62:float; // Upper-triangular covariance element 62.
-  c63:float; // Upper-triangular covariance element 63.
-  c64:float; // Upper-triangular covariance element 64.
-  c65:float; // Upper-triangular covariance element 65.
-  c66:float; // Upper-triangular covariance element 66.
-  c67:float; // Upper-triangular covariance element 67.
-  c68:float; // Upper-triangular covariance element 68.
-  c69:float; // Upper-triangular covariance element 69.
-  c70:float; // Upper-triangular covariance element 70.
-  c71:float; // Upper-triangular covariance element 71.
-  c72:float; // Upper-triangular covariance element 72.
-  c73:float; // Upper-triangular covariance element 73.
-  c74:float; // Upper-triangular covariance element 74.
-  c75:float; // Upper-triangular covariance element 75.
-  c76:float; // Upper-triangular covariance element 76.
-  c77:float; // Upper-triangular covariance element 77.
+  /// Upper-triangular covariance element 0.
+  c0:float;
+  /// Upper-triangular covariance element 1.
+  c1:float;
+  /// Upper-triangular covariance element 2.
+  c2:float;
+  /// Upper-triangular covariance element 3.
+  c3:float;
+  /// Upper-triangular covariance element 4.
+  c4:float;
+  /// Upper-triangular covariance element 5.
+  c5:float;
+  /// Upper-triangular covariance element 6.
+  c6:float;
+  /// Upper-triangular covariance element 7.
+  c7:float;
+  /// Upper-triangular covariance element 8.
+  c8:float;
+  /// Upper-triangular covariance element 9.
+  c9:float;
+  /// Upper-triangular covariance element 10.
+  c10:float;
+  /// Upper-triangular covariance element 11.
+  c11:float;
+  /// Upper-triangular covariance element 12.
+  c12:float;
+  /// Upper-triangular covariance element 13.
+  c13:float;
+  /// Upper-triangular covariance element 14.
+  c14:float;
+  /// Upper-triangular covariance element 15.
+  c15:float;
+  /// Upper-triangular covariance element 16.
+  c16:float;
+  /// Upper-triangular covariance element 17.
+  c17:float;
+  /// Upper-triangular covariance element 18.
+  c18:float;
+  /// Upper-triangular covariance element 19.
+  c19:float;
+  /// Upper-triangular covariance element 20.
+  c20:float;
+  /// Upper-triangular covariance element 21.
+  c21:float;
+  /// Upper-triangular covariance element 22.
+  c22:float;
+  /// Upper-triangular covariance element 23.
+  c23:float;
+  /// Upper-triangular covariance element 24.
+  c24:float;
+  /// Upper-triangular covariance element 25.
+  c25:float;
+  /// Upper-triangular covariance element 26.
+  c26:float;
+  /// Upper-triangular covariance element 27.
+  c27:float;
+  /// Upper-triangular covariance element 28.
+  c28:float;
+  /// Upper-triangular covariance element 29.
+  c29:float;
+  /// Upper-triangular covariance element 30.
+  c30:float;
+  /// Upper-triangular covariance element 31.
+  c31:float;
+  /// Upper-triangular covariance element 32.
+  c32:float;
+  /// Upper-triangular covariance element 33.
+  c33:float;
+  /// Upper-triangular covariance element 34.
+  c34:float;
+  /// Upper-triangular covariance element 35.
+  c35:float;
+  /// Upper-triangular covariance element 36.
+  c36:float;
+  /// Upper-triangular covariance element 37.
+  c37:float;
+  /// Upper-triangular covariance element 38.
+  c38:float;
+  /// Upper-triangular covariance element 39.
+  c39:float;
+  /// Upper-triangular covariance element 40.
+  c40:float;
+  /// Upper-triangular covariance element 41.
+  c41:float;
+  /// Upper-triangular covariance element 42.
+  c42:float;
+  /// Upper-triangular covariance element 43.
+  c43:float;
+  /// Upper-triangular covariance element 44.
+  c44:float;
+  /// Upper-triangular covariance element 45.
+  c45:float;
+  /// Upper-triangular covariance element 46.
+  c46:float;
+  /// Upper-triangular covariance element 47.
+  c47:float;
+  /// Upper-triangular covariance element 48.
+  c48:float;
+  /// Upper-triangular covariance element 49.
+  c49:float;
+  /// Upper-triangular covariance element 50.
+  c50:float;
+  /// Upper-triangular covariance element 51.
+  c51:float;
+  /// Upper-triangular covariance element 52.
+  c52:float;
+  /// Upper-triangular covariance element 53.
+  c53:float;
+  /// Upper-triangular covariance element 54.
+  c54:float;
+  /// Upper-triangular covariance element 55.
+  c55:float;
+  /// Upper-triangular covariance element 56.
+  c56:float;
+  /// Upper-triangular covariance element 57.
+  c57:float;
+  /// Upper-triangular covariance element 58.
+  c58:float;
+  /// Upper-triangular covariance element 59.
+  c59:float;
+  /// Upper-triangular covariance element 60.
+  c60:float;
+  /// Upper-triangular covariance element 61.
+  c61:float;
+  /// Upper-triangular covariance element 62.
+  c62:float;
+  /// Upper-triangular covariance element 63.
+  c63:float;
+  /// Upper-triangular covariance element 64.
+  c64:float;
+  /// Upper-triangular covariance element 65.
+  c65:float;
+  /// Upper-triangular covariance element 66.
+  c66:float;
+  /// Upper-triangular covariance element 67.
+  c67:float;
+  /// Upper-triangular covariance element 68.
+  c68:float;
+  /// Upper-triangular covariance element 69.
+  c69:float;
+  /// Upper-triangular covariance element 70.
+  c70:float;
+  /// Upper-triangular covariance element 71.
+  c71:float;
+  /// Upper-triangular covariance element 72.
+  c72:float;
+  /// Upper-triangular covariance element 73.
+  c73:float;
+  /// Upper-triangular covariance element 74.
+  c74:float;
+  /// Upper-triangular covariance element 75.
+  c75:float;
+  /// Upper-triangular covariance element 76.
+  c76:float;
+  /// Upper-triangular covariance element 77.
+  c77:float;
 }
 
-// Text and diagnostic severity levels following RFC 5424 syslog numbering.
+/// Text and diagnostic severity levels following RFC 5424 syslog numbering.
 enum Severity:ubyte {
-  Emergency = 0, // System is unusable; immediate operator action required.
-  Alert = 1, // Action must be taken immediately.
-  Critical = 2, // Critical condition affecting flight safety.
-  Error = 3, // Error condition; a function is not working.
-  Warning = 4, // Warning condition; degraded but functional.
-  Notice = 5, // Normal but significant event.
-  Informational = 6, // Informational message.
-  Debug = 7, // Developer diagnostic message.
+  /// System is unusable; immediate operator action required.
+  Emergency = 0,
+  /// Action must be taken immediately.
+  Alert = 1,
+  /// Critical condition affecting flight safety.
+  Critical = 2,
+  /// Error condition; a function is not working.
+  Error = 3,
+  /// Warning condition; degraded but functional.
+  Warning = 4,
+  /// Normal but significant event.
+  Notice = 5,
+  /// Informational message.
+  Informational = 6,
+  /// Developer diagnostic message.
+  Debug = 7,
 }
 
-// Result of command or transfer request execution.
+/// Result of command or transfer request execution.
 enum CommandResultCode:ubyte {
-  Accepted = 0, // Command was accepted and executed or scheduled.
-  TemporarilyRejected = 1, // Valid command rejected in the current state; retry may succeed.
-  Denied = 2, // Command is valid but permanently refused in this configuration.
-  Unsupported = 3, // Command is unknown or not implemented by this producer.
-  Failed = 4, // Command was attempted and failed during execution.
-  InProgress = 5, // Command accepted; execution continues and progress updates follow.
-  Cancelled = 6, // Command execution was cancelled before completion.
+  /// Command was accepted and executed or scheduled.
+  Accepted = 0,
+  /// Valid command rejected in the current state; retry may succeed.
+  TemporarilyRejected = 1,
+  /// Command is valid but permanently refused in this configuration.
+  Denied = 2,
+  /// Command is unknown or not implemented by this producer.
+  Unsupported = 3,
+  /// Command was attempted and failed during execution.
+  Failed = 4,
+  /// Command accepted; execution continues and progress updates follow.
+  InProgress = 5,
+  /// Command execution was cancelled before completion.
+  Cancelled = 6,
 }
 
-// GNSS receiver fix quality.
+/// GNSS receiver fix quality.
 enum GnssFixType:ubyte {
-  NoFix = 0, // No position solution.
-  TimeOnly = 1, // Time-only solution without position.
-  Fix2d = 2, // Two-dimensional position fix.
-  Fix3d = 3, // Three-dimensional position fix.
-  Dgnss = 4, // Differentially corrected fix.
-  RtkFloat = 5, // RTK solution with float ambiguities.
-  RtkFixed = 6, // RTK solution with fixed ambiguities.
-  DeadReckoning = 7, // Dead-reckoning or combined solution without full GNSS observability.
+  /// No position solution.
+  NoFix = 0,
+  /// Time-only solution without position.
+  TimeOnly = 1,
+  /// Two-dimensional position fix.
+  Fix2d = 2,
+  /// Three-dimensional position fix.
+  Fix3d = 3,
+  /// Differentially corrected fix.
+  Dgnss = 4,
+  /// RTK solution with float ambiguities.
+  RtkFloat = 5,
+  /// RTK solution with fixed ambiguities.
+  RtkFixed = 6,
+  /// Dead-reckoning or combined solution without full GNSS observability.
+  DeadReckoning = 7,
 }
 
-// Battery or power-source charging state.
+/// Battery or power-source charging state.
 enum BatteryChargeState:ubyte {
-  Unknown = 0, // Charge state is not reported.
-  Ok = 1, // Normal operation.
-  Low = 2, // Low charge; operator attention advised.
-  Critical = 3, // Critical charge; land or recover soon.
-  Emergency = 4, // Emergency charge level; immediate action required.
-  Failed = 5, // Battery failure detected.
-  Unhealthy = 6, // Battery is degraded or operating outside limits.
-  Charging = 7, // Battery is charging.
+  /// Charge state is not reported.
+  Unknown = 0,
+  /// Normal operation.
+  Ok = 1,
+  /// Low charge; operator attention advised.
+  Low = 2,
+  /// Critical charge; land or recover soon.
+  Critical = 3,
+  /// Emergency charge level; immediate action required.
+  Emergency = 4,
+  /// Battery failure detected.
+  Failed = 5,
+  /// Battery is degraded or operating outside limits.
+  Unhealthy = 6,
+  /// Battery is charging.
+  Charging = 7,
 }
 
-// Role a battery or power source plays on the vehicle.
+/// Role a battery or power source plays on the vehicle.
 enum BatteryFunction:ubyte {
-  Unknown = 0, // Function is not reported.
-  Propulsion = 1, // Powers motors and propulsion.
-  Avionics = 2, // Powers flight controllers and avionics.
-  Payload = 3, // Powers a payload or auxiliary system.
+  /// Function is not reported.
+  Unknown = 0,
+  /// Powers motors and propulsion.
+  Propulsion = 1,
+  /// Powers flight controllers and avionics.
+  Avionics = 2,
+  /// Powers a payload or auxiliary system.
+  Payload = 3,
 }
 
-// Battery chemistry or power-source type.
+/// Battery chemistry or power-source type.
 enum BatteryType:ubyte {
-  Unknown = 0, // Chemistry is not reported.
-  LiPo = 1, // Lithium polymer.
-  LiIon = 2, // Lithium ion.
-  LiFe = 3, // Lithium iron phosphate.
-  NiMh = 4, // Nickel metal hydride.
-  Pb = 5, // Lead acid.
+  /// Chemistry is not reported.
+  Unknown = 0,
+  /// Lithium polymer.
+  LiPo = 1,
+  /// Lithium ion.
+  LiIon = 2,
+  /// Lithium iron phosphate.
+  LiFe = 3,
+  /// Nickel metal hydride.
+  NiMh = 4,
+  /// Lead acid.
+  Pb = 5,
 }
 
-// Mission execution state.
+/// Mission execution state.
 enum MissionState:ubyte {
-  Unknown = 0, // Mission state is not reported.
-  Idle = 1, // No mission is executing.
-  Active = 2, // Mission is executing.
-  Paused = 3, // Mission is paused and can resume.
-  Complete = 4, // Mission finished all items.
+  /// Mission state is not reported.
+  Unknown = 0,
+  /// No mission is executing.
+  Idle = 1,
+  /// Mission is executing.
+  Active = 2,
+  /// Mission is paused and can resume.
+  Paused = 3,
+  /// Mission finished all items.
+  Complete = 4,
 }
 
-// Altitude reference frame for geographic commands and mission items.
+/// Altitude reference frame for geographic commands and mission items.
 enum GeoAltitudeFrame:ubyte {
-  Msl = 0, // Altitude above mean sea level.
-  Ellipsoid = 1, // Altitude above the WGS-84 ellipsoid.
-  RelativeHome = 2, // Altitude relative to the home reference.
-  Terrain = 3, // Altitude above terrain.
+  /// Altitude above mean sea level.
+  Msl = 0,
+  /// Altitude above the WGS-84 ellipsoid.
+  Ellipsoid = 1,
+  /// Altitude relative to the home reference.
+  RelativeHome = 2,
+  /// Altitude above terrain.
+  Terrain = 3,
 }
 
-// Local coordinate frame selector for local-frame commands.
+/// Local coordinate frame selector for local-frame commands.
 enum LocalFrame:ubyte {
-  LocalEnu = 0, // Local ENU frame anchored at the active local origin.
-  BodyFlu = 1, // Vehicle body FLU frame.
+  /// Local ENU frame anchored at the active local origin.
+  LocalEnu = 0,
+  /// Vehicle body FLU frame.
+  BodyFlu = 1,
 }
 
 namespace synapse.topic;
 
-// Stable numeric identifiers for well-known Synapse topics. Values are
-// contiguous and mirror the SynapseMessage union order in transport.fbs.
+/// Stable numeric identifiers for well-known Synapse topics. Values are
+/// contiguous and mirror the SynapseMessage union order in transport.fbs.
 enum TopicId:ushort {
-  Unknown = 0, // Reserved value for invalid, unassigned, or externally named topics.
-  VehicleHealth = 1, // Vehicle-level arming, failsafe, mode, link, and health summary.
-  TimeReference = 2, // Correlates boot-relative time with an absolute Unix time reference.
-  RadioControl = 3, // Raw receiver channel input and link quality.
-  ManualControlCommand = 4, // Normalized manual pilot intent after input mapping.
-  InertialSample = 5, // IMU, magnetometer, static pressure, and temperature sample.
-  AirData = 6, // Barometric and aerodynamic measurements used by fixed-wing control.
-  PowerStatus = 7, // Battery, current, energy, and power-source state.
-  GnssFix = 8, // Global navigation fix, accuracy, velocity, and heading information.
-  OpticalFlow = 9, // Integrated optical-flow sample from an image sensor or flow module.
-  OpticalFlowVelocity = 10, // Velocity estimate derived from optical flow.
-  AttitudeEstimate = 11, // Vehicle attitude estimate and angular velocity.
-  LocalPositionEstimate = 12, // Local ENU position, velocity, acceleration, and yaw estimate.
-  GlobalPositionEstimate = 13, // Global latitude/longitude/altitude estimate with ENU velocity.
-  OdometryEstimate = 14, // Combined pose, twist, covariance, and estimator quality sample.
-  EstimatorHealth = 15, // Estimator consistency metrics and accuracy estimates.
-  MissionProgress = 16, // Mission item progress and mission database identifiers.
-  NavigationTarget = 17, // Current navigation target and tracking-error summary.
-  HomeReference = 18, // Home geodetic origin and corresponding local-frame reference.
-  AttitudeCommand = 19, // Attitude setpoint with optional body-rate and thrust feed-forward.
-  RateCommand = 20, // Body-rate setpoint with thrust feed-forward.
-  LocalPositionCommand = 21, // Local ENU position/velocity/acceleration/yaw setpoint.
-  TrajectorySegment = 22, // Fixed-layout Bezier or polynomial trajectory segment setpoint.
-  ActuatorCommand = 23, // Normalized actuator control request.
-  ActuatorFeedback = 24, // Normalized actuator output feedback.
-  PwmSignalOutputs = 25, // Raw PWM output pulse widths.
-  ControlLoopMetrics = 26, // Control-loop timing, overrun, and load telemetry.
-  TextStatus = 27, // Human-readable status or diagnostic text.
-  GcsStatus = 28, // Compact vehicle status aggregate for low-rate ground-control links.
-  ExternalOdometry = 29, // Fixed-layout external pose and twist measurement for estimator input.
-  ExternalOdometryCovariance = 30, // Optional fixed-layout covariance companion for external odometry.
-  MocapFrame = 31, // Raw motion-capture marker and rigid-body samples for logging and tooling.
-  LockstepTick = 32, // Deterministic simulation barrier telling a receiver which boot time to reach.
-  LockstepStatus = 33, // Deterministic simulation participant status and tick completion acknowledgement.
-  FirmwareProgress = 34, // Firmware image transfer, verification, and activation progress.
-  RawPose = 35, // Unfiltered position and quaternion attitude measurement.
-  Pose = 36, // Filtered position and quaternion attitude sample.
-  PoseWithCovariance = 37, // Filtered pose sample with 6x6 tangent covariance.
-  Twist = 38, // Filter-derived linear and angular velocity sample.
-  TwistWithCovariance = 39, // Filter-derived twist sample with 6x6 covariance.
-  Odometry = 40, // Compact combined pose, twist, and estimator status.
-  OdometryWithCovariance = 41, // Odometry with complete 12x12 state covariance.
-  MocapPoseFrame = 42, // Raw motion-capture frame with quaternion rigid-body attitudes.
+  /// Reserved value for invalid, unassigned, or externally named topics.
+  Unknown = 0,
+  /// Vehicle-level arming, failsafe, mode, link, and health summary.
+  VehicleHealth = 1,
+  /// Correlates boot-relative time with an absolute Unix time reference.
+  TimeReference = 2,
+  /// Raw receiver channel input and link quality.
+  RadioControl = 3,
+  /// Normalized manual pilot intent after input mapping.
+  ManualControlCommand = 4,
+  /// IMU, magnetometer, static pressure, and temperature sample.
+  InertialSample = 5,
+  /// Barometric and aerodynamic measurements used by fixed-wing control.
+  AirData = 6,
+  /// Battery, current, energy, and power-source state.
+  PowerStatus = 7,
+  /// Global navigation fix, accuracy, velocity, and heading information.
+  GnssFix = 8,
+  /// Integrated optical-flow sample from an image sensor or flow module.
+  OpticalFlow = 9,
+  /// Velocity estimate derived from optical flow.
+  OpticalFlowVelocity = 10,
+  /// Vehicle attitude estimate and angular velocity.
+  AttitudeEstimate = 11,
+  /// Local ENU position, velocity, acceleration, and yaw estimate.
+  LocalPositionEstimate = 12,
+  /// Global latitude/longitude/altitude estimate with ENU velocity.
+  GlobalPositionEstimate = 13,
+  /// Combined pose, twist, covariance, and estimator quality sample.
+  OdometryEstimate = 14,
+  /// Estimator consistency metrics and accuracy estimates.
+  EstimatorHealth = 15,
+  /// Mission item progress and mission database identifiers.
+  MissionProgress = 16,
+  /// Current navigation target and tracking-error summary.
+  NavigationTarget = 17,
+  /// Home geodetic origin and corresponding local-frame reference.
+  HomeReference = 18,
+  /// Attitude setpoint with optional body-rate and thrust feed-forward.
+  AttitudeCommand = 19,
+  /// Body-rate setpoint with thrust feed-forward.
+  RateCommand = 20,
+  /// Local ENU position/velocity/acceleration/yaw setpoint.
+  LocalPositionCommand = 21,
+  /// Fixed-layout Bezier or polynomial trajectory segment setpoint.
+  TrajectorySegment = 22,
+  /// Normalized actuator control request.
+  ActuatorCommand = 23,
+  /// Normalized actuator output feedback.
+  ActuatorFeedback = 24,
+  /// Raw PWM output pulse widths.
+  PwmSignalOutputs = 25,
+  /// Control-loop timing, overrun, and load telemetry.
+  ControlLoopMetrics = 26,
+  /// Human-readable status or diagnostic text.
+  TextStatus = 27,
+  /// Compact vehicle status aggregate for low-rate ground-control links.
+  GcsStatus = 28,
+  /// Fixed-layout external pose and twist measurement for estimator input.
+  ExternalOdometry = 29,
+  /// Optional fixed-layout covariance companion for external odometry.
+  ExternalOdometryCovariance = 30,
+  /// Raw motion-capture marker and rigid-body samples for logging and tooling.
+  MocapFrame = 31,
+  /// Deterministic simulation barrier telling a receiver which boot time to reach.
+  LockstepTick = 32,
+  /// Deterministic simulation participant status and tick completion acknowledgement.
+  LockstepStatus = 33,
+  /// Firmware image transfer, verification, and activation progress.
+  FirmwareProgress = 34,
+  /// Unfiltered position and quaternion attitude measurement.
+  RawPose = 35,
+  /// Filtered position and quaternion attitude sample.
+  Pose = 36,
+  /// Filtered pose sample with 6x6 tangent covariance.
+  PoseWithCovariance = 37,
+  /// Filter-derived linear and angular velocity sample.
+  Twist = 38,
+  /// Filter-derived twist sample with 6x6 covariance.
+  TwistWithCovariance = 39,
+  /// Compact combined pose, twist, and estimator status.
+  Odometry = 40,
+  /// Odometry with complete 12x12 state covariance.
+  OdometryWithCovariance = 41,
+  /// Raw motion-capture frame with quaternion rigid-body attitudes.
+  MocapPoseFrame = 42,
 }

@@ -407,6 +407,8 @@ sizes are computed and checked on every build.
   sizes, scopes, encodings, and command metadata in release artifacts.
 - `bfbs/*.bfbs`: generated FlatBuffers reflection schemas included in C/C++
   release archives and the npm package.
+- `synapse-schema.json`: checked-in target-neutral semantic manifest generated
+  from compact BFBS and qualified `///` documentation.
 - `rust/`, `python/`, `js/`, `c/`, `cpp/`: package skeletons for the published
   artifacts.
 - `xtask/`: reproducible local and CI build driver.
@@ -556,6 +558,25 @@ TopicId/union consistency, payload sizes, catalog helper smoke tests):
 nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- check
 ```
 
+Generate the target-neutral semantic manifest from the canonical FlatBuffers
+BFBS representation and qualified `///` source documentation:
+
+```sh
+nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- semantic
+```
+
+The semantic attribute vocabulary and manifest contract are specified in
+[SEMANTICS.md](SEMANTICS.md). The checked-in `synapse-schema.json` is verified
+for staleness by full CI and published as a versioned release asset. Its text is
+rendered with MiniJinja; BFBS lowering, validation, and release assembly are
+implemented in Rust.
+
+Synapse does not generate Modelica protocol records. A future adapter consumes
+the Synapse semantic manifest and Rumoca's separate model-interface manifest to
+map generated C/Rust boundary values to message-independent records such as
+`Autopilot.Interfaces`. This repository does not add a Synapse dependency to
+`modelica_models` or define its domain API.
+
 Run the same full task that CI runs:
 
 ```sh
@@ -565,8 +586,8 @@ nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 The `ci` task builds pinned `flatc` and FlatCC, stages Rust/Python/JavaScript
 packages under `target/xtask/packages/`, creates the C/C++ tarballs under
 `target/xtask/artifacts/`, includes pinned `bfbs/*.bfbs` reflection schemas
-and `bfbs.sha256` manifests in those archives, and smoke-tests the C archive
-through CMake `FetchContent`.
+and `bfbs.sha256` manifests in those archives, publishes the versioned semantic
+JSON manifest, and smoke-tests the C archive through CMake `FetchContent`.
 
 Generate the static schema documentation locally:
 
@@ -601,6 +622,7 @@ release build fails before publishing if they differ.
     plus `bfbs/*.bfbs` reflection schemas
   - C generated header tarball with matching FlatCC headers, runtime sources,
     `zephyr/module.yml`, and `bfbs/*.bfbs` reflection schemas
+  - versioned `synapse-schema.json` semantic manifest and SHA-256 checksum
 
 The generated C archive is intentionally generic. Downstream firmware projects
 that need it should consume a release tarball with `find_package` or fetch it

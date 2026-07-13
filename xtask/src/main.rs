@@ -1,4 +1,5 @@
 use std::{
+    borrow::Cow,
     cmp::Ordering,
     collections::{BTreeMap, BTreeSet},
     env, fs, io,
@@ -10,9 +11,12 @@ use minijinja::{AutoEscape, Environment, Value, context};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
+mod semantic;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 const SCHEMAS: &[&str] = &[
+    "fbs/semantic.fbs",
     "fbs/types.fbs",
     "fbs/sensors.fbs",
     "fbs/state.fbs",
@@ -316,9 +320,10 @@ fn main() -> Result<()> {
         "js" => js(&root),
         "docs" => docs(&root, &options),
         "check" => check(&root),
+        "semantic" => generate_semantic_command(&root),
         "update-compatibility" => update_compatibility(&root),
         _ => fail(format!(
-            "unknown command '{command}'. expected: ci, js, docs, check, or update-compatibility"
+            "unknown command '{command}'. expected: ci, js, docs, check, semantic, or update-compatibility"
         )),
     }
 }
@@ -408,6 +413,7 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     let packages = stage_packages(root, &templates, &tools)?;
     check_pins(&packages, &tools)?;
     let flatc = build_flatc(root, &tools)?;
+    check_semantic_artifact(root, &flatc, &templates, &tools.package_version)?;
     let flatcc = build_flatcc(root, &tools)?;
     generate_bindings(root, &flatc, &templates, &packages)?;
     check_rust_package(&packages.rust)?;
@@ -421,6 +427,56 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
         &root.join("target/xtask/docs"),
     )?;
 
+    Ok(())
+}
+
+const SEMANTIC_MANIFEST_PATH: &str = "synapse-schema.json";
+
+fn generate_semantic_command(root: &Path) -> Result<()> {
+    let tools = read_tools(root)?;
+    let flatc = build_flatc(root, &tools)?;
+    let templates = Templates::new(root)?;
+    generate_semantic_manifest(
+        root,
+        &flatc,
+        &templates,
+        &root.join(SEMANTIC_MANIFEST_PATH),
+        &tools.package_version,
+    )
+}
+
+fn generate_semantic_manifest(
+    root: &Path,
+    flatc: &Path,
+    templates: &Templates,
+    output_path: &Path,
+    version: &str,
+) -> Result<()> {
+    let reflection_dir = root.join("target/xtask/semantic-bfbs");
+    reset_dir(&reflection_dir)?;
+    generate_reflection_schemas(root, flatc, &reflection_dir)?;
+    let docs = parse_schema_docs(root)?;
+    let schema = semantic::load(&reflection_dir.join("all.bfbs"), &docs, version)?;
+    semantic::validate(&schema)?;
+    templates.render_to_file(
+        "xtask/semantic/schema.json.jinja",
+        context! { schema => &schema },
+        output_path,
+    )
+}
+
+fn check_semantic_artifact(
+    root: &Path,
+    flatc: &Path,
+    templates: &Templates,
+    version: &str,
+) -> Result<()> {
+    let generated = root.join("target/xtask/synapse-schema-check.json");
+    generate_semantic_manifest(root, flatc, templates, &generated, version)?;
+    let expected = root.join(SEMANTIC_MANIFEST_PATH);
+    if fs::read(&generated)? != fs::read(&expected)? {
+        return fail("generated semantic manifest is stale; run xtask semantic");
+    }
     Ok(())
 }
 
@@ -1258,9 +1314,17 @@ fn archive_context(
 }
 
 fn build_flatc(root: &Path, tools: &Tools) -> Result<PathBuf> {
-    println!("building pinned flatc {}", tools.flatbuffers_version);
-
     let workdir = root.join("target/xtask/flatc-bootstrap");
+    if workdir.join("target/debug/build").is_dir()
+        && let Ok(flatc) = find_file(&workdir.join("target/debug/build"), "flatc")
+        && output(Command::new(&flatc).arg("--version"))?.trim()
+            == format!("flatc version {}", tools.flatbuffers_version)
+    {
+        println!("using cached pinned flatc {}", tools.flatbuffers_version);
+        return Ok(flatc);
+    }
+
+    println!("building pinned flatc {}", tools.flatbuffers_version);
     reset_dir(&workdir)?;
     fs::create_dir_all(workdir.join("src"))?;
 
@@ -2496,6 +2560,18 @@ fn build_archives(
         "synapse_fbs-c.tar.gz",
     )?;
 
+    let semantic_artifact =
+        artifacts.join(format!("synapse-schema-{}.json", tools.package_version));
+    fs::copy(root.join(SEMANTIC_MANIFEST_PATH), &semantic_artifact)?;
+    let semantic_name = semantic_artifact
+        .file_name()
+        .and_then(|value| value.to_str())
+        .ok_or_else(|| io::Error::other("semantic artifact path has no file name"))?;
+    write_file(
+        &semantic_artifact.with_file_name(format!("{semantic_name}.sha256")),
+        &format!("{}  {semantic_name}\n", sha256_hex(&semantic_artifact)?),
+    )?;
+
     smoke_cpp_archive(root, &templates, &cpp_root)?;
     smoke_c_archive(&templates, &c_root)?;
     smoke_c_to_rust_mcap(root, &c_root)?;
@@ -2513,7 +2589,7 @@ fn build_archives(
 
 fn generate_reflection_schemas(root: &Path, flatc: &Path, output_dir: &Path) -> Result<()> {
     println!(
-        "generating FlatBuffers reflection schemas into {}",
+        "generating compact FlatBuffers reflection schemas into {}",
         output_dir.display()
     );
     fs::create_dir_all(output_dir)?;
@@ -2523,6 +2599,9 @@ fn generate_reflection_schemas(root: &Path, flatc: &Path, output_dir: &Path) -> 
         .current_dir(root)
         .arg("--schema")
         .arg("-b")
+        .arg("--bfbs-builtins")
+        .arg("--bfbs-filenames")
+        .arg(root)
         .arg("-I")
         .arg("fbs")
         .arg("-o")
@@ -2542,6 +2621,7 @@ fn generate_reflection_schemas(root: &Path, flatc: &Path, output_dir: &Path) -> 
                 bfbs.display()
             ));
         }
+        semantic::validate_compact_bfbs(&bfbs)?;
     }
 
     Ok(())
@@ -2964,15 +3044,22 @@ fn parse_schema_file(path: &Path, name: &str) -> Result<SchemaFileDoc> {
 
     for raw_line in content.lines() {
         let trimmed = raw_line.trim();
-        if let Some(comment) = trimmed.strip_prefix("//") {
+        if let Some(comment) = trimmed.strip_prefix("///") {
             pending_comments.push(comment.trim().to_string());
             continue;
         }
+        if trimmed.starts_with("//") {
+            pending_comments.clear();
+            continue;
+        }
 
-        let (code, trailing_comment) = trimmed
-            .split_once("//")
-            .map(|(before, comment)| (before.trim(), Some(comment.trim().to_string())))
-            .unwrap_or((trimmed, None));
+        let (code, trailing_comment) = if let Some((before, comment)) = trimmed.split_once("///") {
+            (before.trim(), Some(comment.trim().to_string()))
+        } else if let Some((before, _)) = trimmed.split_once("//") {
+            (before.trim(), None)
+        } else {
+            (trimmed, None)
+        };
         if code.is_empty() {
             continue;
         }
@@ -4016,6 +4103,8 @@ fn parse_schema_member(
         SchemaEntityKind::Struct | SchemaEntityKind::Table => {
             let member = code.trim_end_matches(';').trim();
             let (name, rest) = member.split_once(':')?;
+            let rest = strip_semantic_fbs_attributes(rest);
+            let rest = rest.as_ref();
             let (type_name, value) = rest
                 .split_once('=')
                 .map(|(type_name, value)| {
@@ -4071,6 +4160,105 @@ fn parse_schema_member(
             })
         }
     }
+}
+
+/// Remove only Synapse semantic attributes from a field declaration before
+/// computing the wire compatibility hash. Structural/built-in attributes are
+/// deliberately retained so `validate_canonicalizable` rejects them until the
+/// canonical wire model explicitly supports them.
+fn strip_semantic_fbs_attributes(value: &str) -> Cow<'_, str> {
+    let value = value.trim();
+    let Some(start) = trailing_fbs_attribute_start(value) else {
+        return Cow::Borrowed(value);
+    };
+    let attributes = &value[start + 1..value.len() - 1];
+    let retained = split_fbs_attributes(attributes)
+        .into_iter()
+        .map(str::trim)
+        .filter(|attribute| {
+            let name = attribute
+                .split_once(':')
+                .map_or(*attribute, |(name, _)| name)
+                .trim();
+            !matches!(
+                name,
+                "unit" | "min" | "max" | "frame" | "clock" | "scale" | "valid_if" | "logical_type"
+            )
+        })
+        .collect::<Vec<_>>();
+    if retained.is_empty() {
+        Cow::Borrowed(value[..start].trim())
+    } else {
+        Cow::Owned(format!(
+            "{} ({})",
+            value[..start].trim(),
+            retained.join(", ")
+        ))
+    }
+}
+
+fn trailing_fbs_attribute_start(value: &str) -> Option<usize> {
+    if !value.ends_with(')') {
+        return None;
+    }
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut depth = 0usize;
+    let mut start = None;
+    for (index, character) in value.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match character {
+            '"' => in_string = true,
+            '(' => {
+                if depth == 0
+                    && value[..index]
+                        .chars()
+                        .next_back()
+                        .is_some_and(char::is_whitespace)
+                {
+                    start = Some(index);
+                }
+                depth += 1;
+            }
+            ')' => depth = depth.checked_sub(1)?,
+            _ => {}
+        }
+    }
+    (depth == 0 && !in_string).then_some(start).flatten()
+}
+
+fn split_fbs_attributes(value: &str) -> Vec<&str> {
+    let mut attributes = Vec::new();
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut start = 0usize;
+    for (index, character) in value.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if character == '\\' {
+                escaped = true;
+            } else if character == '"' {
+                in_string = false;
+            }
+        } else if character == '"' {
+            in_string = true;
+        } else if character == ',' {
+            attributes.push(&value[start..index]);
+            start = index + character.len_utf8();
+        }
+    }
+    attributes.push(&value[start..]);
+    attributes
 }
 
 fn take_comments(comments: &mut Vec<String>) -> Vec<String> {
@@ -5286,6 +5474,9 @@ impl Templates {
         // Templates render config files (package.json, Cargo.toml, ...) with raw
         // substitution; disable auto-escaping so values are not JSON/HTML encoded.
         env.set_auto_escape_callback(|_| AutoEscape::None);
+        // Generated source and metadata files should follow normal text-file
+        // conventions even though MiniJinja drops the final newline by default.
+        env.set_keep_trailing_newline(true);
         add_templates(&mut env, &root.join("rust"), "rust")?;
         add_templates(&mut env, &root.join("python"), "python")?;
         add_templates(&mut env, &root.join("js"), "js")?;
@@ -5884,18 +6075,7 @@ fn write_file(path: &Path, content: &str) -> Result<()> {
 }
 
 fn sha256_hex(path: &Path) -> Result<String> {
-    let output = output(Command::new("sha256sum").arg(path))?;
-    output
-        .split_whitespace()
-        .next()
-        .map(ToString::to_string)
-        .ok_or_else(|| {
-            io::Error::other(format!(
-                "sha256sum produced no output for {}",
-                path.display()
-            ))
-            .into()
-        })
+    Ok(format!("{:x}", Sha256::digest(fs::read(path)?)))
 }
 
 fn command_succeeds(command: &mut Command) -> bool {
@@ -5953,4 +6133,32 @@ fn command_line(command: &Command) -> String {
 
 fn fail<T>(message: impl Into<String>) -> Result<T> {
     Err(io::Error::other(message.into()).into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_semantic_fbs_attributes;
+
+    #[test]
+    fn strips_only_semantic_field_attributes() {
+        assert_eq!(
+            strip_semantic_fbs_attributes(
+                r#"uint (id: 2, unit: "m", min: "0", max: "10", frame: "enu", clock: "monotonic_boot", scale: "1e-6", logical_type: "example", deprecated)"#,
+            ),
+            "uint (id: 2, deprecated)"
+        );
+        assert_eq!(
+            strip_semantic_fbs_attributes(r#"float (valid_if: "flags.A,flags.B")"#),
+            "float"
+        );
+    }
+
+    #[test]
+    fn leaves_nonsemantic_or_unattributed_fields_unchanged() {
+        assert_eq!(strip_semantic_fbs_attributes("uint = 3"), "uint = 3");
+        assert_eq!(
+            strip_semantic_fbs_attributes("uint (id: 2)"),
+            "uint (id: 2)"
+        );
+    }
 }
