@@ -312,15 +312,32 @@ fn main() -> Result<()> {
     let (command, options) = parse_args()?;
 
     match command.as_str() {
+        "build" => build(&root, &options),
         "ci" => ci(&root, &options),
         "js" => js(&root),
         "docs" => docs(&root, &options),
         "check" => check(&root),
         "update-compatibility" => update_compatibility(&root),
         _ => fail(format!(
-            "unknown command '{command}'. expected: ci, js, docs, check, or update-compatibility"
+            "unknown command '{command}'. expected: build, ci, js, docs, check, or update-compatibility"
         )),
     }
+}
+
+fn build(root: &Path, options: &Options) -> Result<()> {
+    let tools = read_tools(root)?;
+    check_release_version(&tools, &options.release_name)?;
+    let templates = Templates::new(root)?;
+
+    let packages = stage_packages(root, &templates, &tools)?;
+    check_pins(&packages, &tools)?;
+    let flatc = build_flatc(&tools)?;
+    let flatcc = build_flatcc(root, &tools)?;
+    generate_bindings(root, &flatc, &templates, &packages)?;
+    build_js_package(root, &templates, &packages.js, &flatc, &tools, false)?;
+    build_archives(root, &tools, &flatc, &flatcc, &options.release_name, true)?;
+
+    Ok(())
 }
 
 fn check(root: &Path) -> Result<()> {
@@ -407,13 +424,13 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
 
     let packages = stage_packages(root, &templates, &tools)?;
     check_pins(&packages, &tools)?;
-    let flatc = build_flatc(root, &tools)?;
+    let flatc = build_flatc(&tools)?;
     let flatcc = build_flatcc(root, &tools)?;
     generate_bindings(root, &flatc, &templates, &packages)?;
     check_rust_package(&packages.rust)?;
     build_python_package(root, &packages.python, &tools)?;
     build_js_package(root, &templates, &packages.js, &flatc, &tools, true)?;
-    build_archives(root, &tools, &flatc, &flatcc, &options.release_name)?;
+    build_archives(root, &tools, &flatc, &flatcc, &options.release_name, false)?;
     generate_docs_site(
         root,
         &tools,
@@ -594,7 +611,7 @@ fn js(root: &Path) -> Result<()> {
 
     let package = root.join("target/xtask/packages/js");
     stage_template_tree(root, "js", &package, &templates, package_context(&tools))?;
-    let flatc = build_flatc(root, &tools)?;
+    let flatc = build_flatc(&tools)?;
     build_js_package(root, &templates, &package, &flatc, &tools, false)?;
 
     println!("staged npm package at {}", package.display());
@@ -1257,62 +1274,21 @@ fn archive_context(
     }
 }
 
-fn build_flatc(root: &Path, tools: &Tools) -> Result<PathBuf> {
-    println!("building pinned flatc {}", tools.flatbuffers_version);
+fn build_flatc(tools: &Tools) -> Result<PathBuf> {
+    println!("using Nix-pinned flatc {}", tools.flatbuffers_version);
 
-    let workdir = root.join("target/xtask/flatc-bootstrap");
-    reset_dir(&workdir)?;
-    fs::create_dir_all(workdir.join("src"))?;
-
-    write_file(
-        &workdir.join("Cargo.toml"),
-        &format!(
-            r#"[package]
-name = "synapse-fbs-flatc-bootstrap"
-version = "0.0.0"
-edition = "2024"
-publish = false
-
-[build-dependencies]
-flatbuffers-build = {{ version = "={}", features = ["vendored"] }}
-"#,
-            tools.flatbuffers_build_version
-        ),
-    )?;
-    write_file(
-        &workdir.join("build.rs"),
-        &format!(
-            r#"fn main() {{
-    assert_eq!(flatbuffers_build::SUPPORTED_FLATC_VERSION, "{}");
-}}
-"#,
-            tools.flatbuffers_version
-        ),
-    )?;
-    write_file(&workdir.join("src/lib.rs"), "pub fn flatc_bootstrap() {}\n")?;
-
-    run(Command::new("cargo")
-        .arg("generate-lockfile")
-        .arg("--manifest-path")
-        .arg(workdir.join("Cargo.toml")))?;
-
-    let cargo_lock = fs::read_to_string(workdir.join("Cargo.lock"))?;
-    let lock_pin = format!("version = \"{}\"", tools.flatbuffers_build_version);
-    if !cargo_lock.contains(&lock_pin) {
+    let flatc = env::var_os("SYNAPSE_FBS_FLATC")
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            io::Error::other("SYNAPSE_FBS_FLATC is not set. Run inside `nix develop`.")
+        })?;
+    if !flatc.is_file() {
         return fail(format!(
-            "flatc bootstrap Cargo.lock does not contain {lock_pin}"
+            "SYNAPSE_FBS_FLATC does not point to a file: {}",
+            flatc.display()
         ));
     }
 
-    run(Command::new("cargo")
-        .env("CARGO_TARGET_DIR", workdir.join("target"))
-        .arg("check")
-        .arg("--locked")
-        .arg("--quiet")
-        .arg("--manifest-path")
-        .arg(workdir.join("Cargo.toml")))?;
-
-    let flatc = find_file(&workdir.join("target/debug/build"), "flatc")?;
     let version = output(Command::new(&flatc).arg("--version"))?;
     let expected = format!("flatc version {}", tools.flatbuffers_version);
     if version.trim() != expected {
@@ -2133,7 +2109,7 @@ fn build_js_package(
     package_root: &Path,
     flatc: &Path,
     tools: &Tools,
-    validate_cross_language: bool,
+    validate: bool,
 ) -> Result<()> {
     println!("building JavaScript schema-assets package");
 
@@ -2149,7 +2125,9 @@ fn build_js_package(
     write_schema_hashes(root, &package_root.join("schema.sha256"))?;
     write_bfbs_hashes(package_root, &package_root.join("bfbs.sha256"))?;
 
-    smoke_js_package(root, package_root, tools, validate_cross_language)?;
+    if validate {
+        smoke_js_package(root, package_root, tools, true)?;
+    }
 
     Ok(())
 }
@@ -2337,6 +2315,7 @@ fn build_archives(
     flatc: &Path,
     flatcc: &FlatccBuild,
     release_name: &str,
+    development_only: bool,
 ) -> Result<()> {
     println!("building generated C and C++ archives");
 
@@ -2350,94 +2329,96 @@ fn build_archives(
     validate_protocol(&docs)?;
     let topics = topic_entries(&docs)?;
 
-    let flatbuffers_source = workdir.join("flatbuffers");
-    fetch_git_commit(
-        "https://github.com/google/flatbuffers.git",
-        &tools.flatbuffers_commit,
-        &flatbuffers_source,
-    )?;
-    let mcap_source = workdir.join("mcap");
-    fetch_git_commit(
-        "https://github.com/foxglove/mcap.git",
-        &tools.mcap_cpp_commit,
-        &mcap_source,
-    )?;
+    if !development_only {
+        let flatbuffers_source = workdir.join("flatbuffers");
+        fetch_git_commit(
+            "https://github.com/google/flatbuffers.git",
+            &tools.flatbuffers_commit,
+            &flatbuffers_source,
+        )?;
+        let mcap_source = workdir.join("mcap");
+        fetch_git_commit(
+            "https://github.com/foxglove/mcap.git",
+            &tools.mcap_cpp_commit,
+            &mcap_source,
+        )?;
 
-    let cpp_root = workdir.join("synapse_fbs-cpp");
-    fs::create_dir_all(cpp_root.join("include/synapse"))?;
-    fs::create_dir_all(cpp_root.join("include"))?;
-    fs::create_dir_all(cpp_root.join("third_party/flatbuffers"))?;
-    fs::create_dir_all(cpp_root.join("third_party/mcap"))?;
-    fs::create_dir_all(cpp_root.join("src/bfbs"))?;
-    fs::create_dir_all(cpp_root.join("fbs"))?;
-    fs::create_dir_all(cpp_root.join("bfbs"))?;
+        let cpp_root = workdir.join("synapse_fbs-cpp");
+        fs::create_dir_all(cpp_root.join("include/synapse"))?;
+        fs::create_dir_all(cpp_root.join("include"))?;
+        fs::create_dir_all(cpp_root.join("third_party/flatbuffers"))?;
+        fs::create_dir_all(cpp_root.join("third_party/mcap"))?;
+        fs::create_dir_all(cpp_root.join("src/bfbs"))?;
+        fs::create_dir_all(cpp_root.join("fbs"))?;
+        fs::create_dir_all(cpp_root.join("bfbs"))?;
 
-    let mut cpp_gen = Command::new(flatc);
-    cpp_gen
-        .current_dir(root)
-        .arg("--cpp")
-        .arg("-I")
-        .arg("fbs")
-        .arg("-o")
-        .arg(cpp_root.join("include/synapse"))
-        .args(SCHEMAS);
-    run(&mut cpp_gen)?;
-    generate_reflection_schemas(root, flatc, &cpp_root.join("bfbs"))?;
+        let mut cpp_gen = Command::new(flatc);
+        cpp_gen
+            .current_dir(root)
+            .arg("--cpp")
+            .arg("-I")
+            .arg("fbs")
+            .arg("-o")
+            .arg(cpp_root.join("include/synapse"))
+            .args(SCHEMAS);
+        run(&mut cpp_gen)?;
+        generate_reflection_schemas(root, flatc, &cpp_root.join("bfbs"))?;
 
-    copy_dir_all(
-        &flatbuffers_source.join("include/flatbuffers"),
-        &cpp_root.join("include/flatbuffers"),
-    )?;
-    fs::copy(
-        flatbuffers_source.join("LICENSE"),
-        cpp_root.join("third_party/flatbuffers/LICENSE"),
-    )?;
-    copy_dir_all(
-        &mcap_source.join("cpp/mcap/include/mcap"),
-        &cpp_root.join("include/mcap"),
-    )?;
-    fs::copy(
-        mcap_source.join("LICENSE"),
-        cpp_root.join("third_party/mcap/LICENSE"),
-    )?;
-    copy_common_archive_files(root, &cpp_root)?;
-    write_c_topic_catalogs(&templates, &cpp_root, &docs, &topics)?;
-    write_cpp_mcap_topics(&templates, &cpp_root, &docs, &topics)?;
-    write_cpp_bfbs_assets(&cpp_root, &topics)?;
-    write_schema_hashes(root, &cpp_root.join("schema.sha256"))?;
-    write_bfbs_hashes(&cpp_root, &cpp_root.join("bfbs.sha256"))?;
-    let cpp_mcap_bfbs_source_paths = files_with_extension(&cpp_root.join("src/bfbs"), "cpp")?
-        .into_iter()
-        .map(|source| {
-            let name = source
-                .file_name()
-                .and_then(|value| value.to_str())
-                .expect("generated BFBS source must have a UTF-8 name");
-            format!("  \"${{_SYNAPSE_FBS_ROOT}}/src/bfbs/{name}\"")
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-    copy_render_template_tree(
-        "cpp",
-        &root.join("cpp"),
-        &cpp_root,
-        &templates,
-        archive_context(
+        copy_dir_all(
+            &flatbuffers_source.join("include/flatbuffers"),
+            &cpp_root.join("include/flatbuffers"),
+        )?;
+        fs::copy(
+            flatbuffers_source.join("LICENSE"),
+            cpp_root.join("third_party/flatbuffers/LICENSE"),
+        )?;
+        copy_dir_all(
+            &mcap_source.join("cpp/mcap/include/mcap"),
+            &cpp_root.join("include/mcap"),
+        )?;
+        fs::copy(
+            mcap_source.join("LICENSE"),
+            cpp_root.join("third_party/mcap/LICENSE"),
+        )?;
+        copy_common_archive_files(root, &cpp_root)?;
+        write_c_topic_catalogs(&templates, &cpp_root, &docs, &topics)?;
+        write_cpp_mcap_topics(&templates, &cpp_root, &docs, &topics)?;
+        write_cpp_bfbs_assets(&cpp_root, &topics)?;
+        write_schema_hashes(root, &cpp_root.join("schema.sha256"))?;
+        write_bfbs_hashes(&cpp_root, &cpp_root.join("bfbs.sha256"))?;
+        let cpp_mcap_bfbs_source_paths = files_with_extension(&cpp_root.join("src/bfbs"), "cpp")?
+            .into_iter()
+            .map(|source| {
+                let name = source
+                    .file_name()
+                    .and_then(|value| value.to_str())
+                    .expect("generated BFBS source must have a UTF-8 name");
+                format!("  \"${{_SYNAPSE_FBS_ROOT}}/src/bfbs/{name}\"")
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        copy_render_template_tree(
             "cpp",
-            release_name,
-            tools,
-            &sha256_hex(&cpp_root.join("schema.sha256"))?,
-            &sha256_hex(&cpp_root.join("bfbs.sha256"))?,
-            "",
-            &cpp_mcap_bfbs_source_paths,
-        ),
-    )?;
-    write_tar_gz(
-        &workdir,
-        &artifacts,
-        "synapse_fbs-cpp",
-        "synapse_fbs-cpp.tar.gz",
-    )?;
+            &root.join("cpp"),
+            &cpp_root,
+            &templates,
+            archive_context(
+                "cpp",
+                release_name,
+                tools,
+                &sha256_hex(&cpp_root.join("schema.sha256"))?,
+                &sha256_hex(&cpp_root.join("bfbs.sha256"))?,
+                "",
+                &cpp_mcap_bfbs_source_paths,
+            ),
+        )?;
+        write_tar_gz(
+            &workdir,
+            &artifacts,
+            "synapse_fbs-cpp",
+            "synapse_fbs-cpp.tar.gz",
+        )?;
+    }
 
     let c_root = workdir.join("synapse_fbs-c");
     fs::create_dir_all(c_root.join("include/synapse"))?;
@@ -2520,24 +2501,27 @@ fn build_archives(
             &mcap_bfbs_source_paths,
         ),
     )?;
-    write_tar_gz(
-        &workdir,
-        &artifacts,
-        "synapse_fbs-c",
-        "synapse_fbs-c.tar.gz",
-    )?;
+    if !development_only {
+        write_tar_gz(
+            &workdir,
+            &artifacts,
+            "synapse_fbs-c",
+            "synapse_fbs-c.tar.gz",
+        )?;
 
-    smoke_cpp_archive(root, &templates, &cpp_root)?;
-    smoke_c_archive(&templates, &c_root)?;
-    smoke_c_to_rust_mcap(root, &c_root)?;
-    smoke_cmake_fetch(
-        &templates,
-        &workdir,
-        &artifacts.join("synapse_fbs-c.tar.gz"),
-    )?;
-    smoke_cmake_find_package_c(&templates, tools, &workdir, &c_root)?;
-    smoke_cmake_find_package_cpp(&templates, tools, &workdir, &cpp_root)?;
-    print_artifacts(&artifacts)?;
+        let cpp_root = workdir.join("synapse_fbs-cpp");
+        smoke_cpp_archive(root, &templates, &cpp_root)?;
+        smoke_c_archive(&templates, &c_root)?;
+        smoke_c_to_rust_mcap(root, &c_root)?;
+        smoke_cmake_fetch(
+            &templates,
+            &workdir,
+            &artifacts.join("synapse_fbs-c.tar.gz"),
+        )?;
+        smoke_cmake_find_package_c(&templates, tools, &workdir, &c_root)?;
+        smoke_cmake_find_package_cpp(&templates, tools, &workdir, &cpp_root)?;
+        print_artifacts(&artifacts)?;
+    }
 
     Ok(())
 }
@@ -5859,29 +5843,6 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn find_file(root: &Path, file_name: &str) -> Result<PathBuf> {
-    if !root.is_dir() {
-        return fail(format!("{} is not a directory", root.display()));
-    }
-
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            if let Ok(found) = find_file(&path, file_name) {
-                return Ok(found);
-            }
-        } else if path.file_name().and_then(|value| value.to_str()) == Some(file_name) {
-            return Ok(path);
-        }
-    }
-
-    fail(format!(
-        "could not find file named {file_name} under {}",
-        root.display()
-    ))
 }
 
 fn reset_dir(path: &Path) -> Result<()> {

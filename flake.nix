@@ -76,6 +76,7 @@
               cargo
               clippy
               cmake
+              flatbuffers
               git
               github-cli
               mdbook
@@ -91,6 +92,7 @@
             SYNAPSE_FBS_FLATBUFFERS_VERSION = tools.flatbuffers.version;
             SYNAPSE_FBS_FLATCC_VERSION = tools.flatcc.version;
             SYNAPSE_FBS_MDBOOK_VERSION = tools.docs.mdbook;
+            SYNAPSE_FBS_FLATC = "${pkgs.flatbuffers}/bin/flatc";
             SYNAPSE_FBS_TOOLS_TOML = "${toolsToml}";
 
             shellHook = ''
