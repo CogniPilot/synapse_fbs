@@ -224,6 +224,14 @@ enum GnssFixType:ubyte {
   DeadReckoning = 7, // Dead-reckoning or combined solution without full GNSS observability.
 }
 
+// Discipline state of a node's clock, and therefore the meaning of the
+// timestamp_ns fields stamped against it.
+enum TimeStatus:ubyte {
+  LocalFreerun = 0, // Undisciplined monotonic boot clock; node-local, not cross-node comparable.
+  GptpSynced = 1, // Disciplined to the gPTP grandmaster; timestamps are in the shared GNSS-traceable domain.
+  GptpHoldover = 2, // Was disciplined, grandmaster lost; coasting on the last offset, accuracy degrading.
+}
+
 // Battery or power-source charging state.
 enum BatteryChargeState:ubyte {
   Unknown = 0, // Charge state is not reported.

@@ -104,7 +104,7 @@ enum HomeReferenceFlags:ubyte (bit_flags) {
 
 // Vehicle-wide state summary for operator displays and failsafe supervision.
 struct VehicleHealthData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   sensors_present:uint; // Bitmask of SensorComponentFlags bits for detected components.
   sensors_enabled:uint; // Bitmask of SensorComponentFlags bits enabled for use.
   sensors_health:uint; // Bitmask of SensorComponentFlags bits currently considered healthy.
@@ -122,27 +122,40 @@ struct VehicleHealthData {
   system_state:ubyte; // Producer-defined high-level system state.
   link_quality_pct:ubyte; // Command/control link quality from 0 to 100.
   flags:ubyte; // Bitmask of VehicleHealthFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
-// Pairing between Unix time and monotonic boot time.
+// Per-node clock descriptor: relates the node's timestamp_ns domain to absolute
+// time and reports the discipline state. When time_status is GptpSynced the
+// message timestamps are already in the shared TAI domain and time_tai_ns
+// equals timestamp_ns; the mapping then matters mainly for the UTC offset and
+// clock health, and it is what a free-running node uses to publish its offset.
 struct TimeReferenceData {
-  time_unix_us:ulong; // Unix epoch timestamp corresponding to time_boot_us.
-  time_boot_us:ulong; // Monotonic boot timestamp at which time_unix_us was sampled.
+  timestamp_ns:ulong; // Node timebase value (same domain as message timestamp_ns fields) at which the fields below were sampled.
+  time_tai_ns:ulong; // IEEE 1588 TAI epoch corresponding to timestamp_ns; 0 when unsynced.
+  time_unix_ns:ulong; // Unix/UTC epoch corresponding to timestamp_ns; 0 when unknown.
+  uncertainty_ns:uint; // One-sigma bound on this node's time relative to the grandmaster: near-zero when GptpSynced, growing as holdover_elapsed times the oscillator drift spec. Lets a consumer degrade gracefully instead of gating binary. Requires the holdover estimator; leave 0 if not computed.
+  utc_offset_s:short; // TAI minus UTC in seconds (leap-second count); 0 when unknown.
+  time_status:synapse.types.TimeStatus; // Clock discipline state of this node.
+  clock_class:ubyte; // IEEE 802.1AS clockClass of the served time: 6 GNSS-locked, 7 holdover, 248 free-running.
+  domain:ubyte; // gPTP domain number.
+  id:ubyte; // Node instance identifier; also the instance segment of the Zenoh key.
 }
 
 // Attitude estimate and angular velocity from the active estimator. The
 // quaternion is the only attitude representation on the wire; consumers
 // derive Euler angles locally when needed for display.
 struct AttitudeEstimateData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   attitude:synapse.types.Quaternionf; // Orientation rotating body FLU vectors into the ENU world frame.
   angular_velocity_flu_rad_s:synapse.types.RateTriplet; // Body angular velocity in the FLU frame.
   flags:ubyte; // Bitmask of AttitudeEstimateFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Local-frame position estimate for navigation and control.
 struct LocalPositionEstimateData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   position_enu_m:synapse.types.Vec3f; // Local position relative to the active local origin.
   velocity_enu_m_s:synapse.types.Vec3f; // Local velocity in the ENU frame.
   acceleration_enu_m_s2:synapse.types.Vec3f; // Local acceleration in the ENU frame.
@@ -151,11 +164,12 @@ struct LocalPositionEstimateData {
   flags:ubyte; // Bitmask of LocalPositionFlags bits.
   xy_reset_counter:ubyte; // Increments when the estimator resets or jumps the horizontal state.
   z_reset_counter:ubyte; // Increments when the estimator resets or jumps the vertical state.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Global geodetic position estimate with compact velocity and status fields.
 struct GlobalPositionEstimateData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
   longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
   altitude_msl_mm:int; // Height above mean sea level.
@@ -166,11 +180,12 @@ struct GlobalPositionEstimateData {
   yaw_cdeg:short; // Heading in the range -18000 to 18000; zero east and positive counter-clockwise per REP-0103.
   source:ubyte; // Producer-defined source identifier for this global estimate.
   flags:ubyte; // Bitmask of GlobalPositionFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Combined pose, twist, covariance, and estimator metadata.
 struct OdometryEstimateData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   position_enu_m:synapse.types.Vec3f; // Local position in the ENU frame.
   attitude:synapse.types.Quaternionf; // Orientation rotating body FLU vectors into the ENU world frame.
   velocity_enu_m_s:synapse.types.Vec3f; // Linear velocity in the ENU frame.
@@ -180,46 +195,52 @@ struct OdometryEstimateData {
   reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
   estimator_type:ubyte; // Producer-defined estimator implementation identifier.
   quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Unfiltered six-degree-of-freedom source pose measurement. Raw pose has no
 // covariance unless the source reports one through a future dedicated type.
 struct RawPoseData {
-  timestamp_us:ulong; // Source measurement timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Source measurement timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   pose:synapse.types.Posef; // Measured position and body-FLU-to-ENU quaternion attitude.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Filtered six-degree-of-freedom pose sample without covariance.
 struct PoseData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   pose:synapse.types.Posef; // Position and body-FLU-to-ENU quaternion attitude.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Pose sample with 6x6 tangent covariance ordered
 // [x, y, z, rotation_x, rotation_y, rotation_z].
 struct PoseWithCovarianceData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   pose:synapse.types.Posef; // Position and body-FLU-to-ENU quaternion attitude.
   covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular pose covariance.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Linear and angular velocity sample without covariance.
 struct TwistData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   twist:synapse.types.Twistf; // ENU linear velocity and body-FLU angular velocity.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Twist sample with 6x6 covariance ordered
 // [velocity_x, velocity_y, velocity_z, angular_x, angular_y, angular_z].
 struct TwistWithCovarianceData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   twist:synapse.types.Twistf; // ENU linear velocity and body-FLU angular velocity.
   covariance:synapse.types.CovarianceUpperTriangle21f; // Upper-triangular twist covariance.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Compact combined pose, twist, and estimator metadata without covariance.
 struct OdometryData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   pose:synapse.types.Posef; // Estimated position and attitude.
   twist:synapse.types.Twistf; // Estimated linear and angular velocity.
   flags:OdometryFlags; // Bitmask of OdometryFlags bits.
@@ -227,6 +248,7 @@ struct OdometryData {
   reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
   estimator_type:ubyte; // Producer-defined estimator implementation identifier.
   quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Odometry with the complete 12x12 tangent covariance, retaining pose-twist
@@ -234,7 +256,7 @@ struct OdometryData {
 // rotation_z, velocity_x, velocity_y, velocity_z, angular_x, angular_y,
 // angular_z].
 struct OdometryWithCovarianceData {
-  timestamp_us:ulong; // Estimate timestamp matching the contained state.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds matching the contained state. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   pose:synapse.types.Posef; // Estimated position and attitude.
   twist:synapse.types.Twistf; // Estimated linear and angular velocity.
   covariance:synapse.types.CovarianceUpperTriangle78f; // Upper-triangular 12x12 state covariance.
@@ -243,6 +265,7 @@ struct OdometryWithCovarianceData {
   reset_counter:ubyte; // Increments when the estimator resets or jumps the state.
   estimator_type:ubyte; // Producer-defined estimator implementation identifier.
   quality_pct:byte; // Overall odometry quality percentage, or negative when unknown.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // External pose and twist measurement for estimator input. Pose is expressed
@@ -250,7 +273,7 @@ struct OdometryWithCovarianceData {
 // This is the compact high-rate path; uncertainty and estimator diagnostics
 // are opt-in companion topics.
 struct ExternalOdometryData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   position_enu_m:synapse.types.Vec3f; // Measured local/world position in ENU.
   attitude:synapse.types.Quaternionf; // Measured orientation rotating body FLU vectors into ENU.
   linear_velocity_enu_m_s:synapse.types.Vec3f; // Measured linear velocity in ENU.
@@ -258,6 +281,7 @@ struct ExternalOdometryData {
   flags:ExternalOdometryFlags; // Bitmask of ExternalOdometryFlags bits.
   status:ExternalOdometryStatus; // Producer state quality and extrapolation status.
   source_id:ubyte; // External source instance identifier.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // Tracked rigid-body instance identifier; also the instance segment of the Zenoh key.
 }
 
@@ -268,9 +292,10 @@ struct ExternalOdometryData {
 // where theta is the attitude perturbation in the body-FLU tangent and
 // velocity/position are ENU.
 struct ExternalOdometryCovarianceData {
-  timestamp_us:ulong; // Estimate timestamp matching ExternalOdometryData.timestamp_us.
+  timestamp_ns:ulong; // Estimate timestamp in nanoseconds matching ExternalOdometryData.timestamp_ns. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   covariance:synapse.types.CovarianceUpperTriangle78f; // Upper-triangular covariance for the 12D tangent state.
   source_id:ubyte; // External source instance identifier.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // Tracked rigid-body instance identifier.
 }
 
@@ -278,7 +303,7 @@ struct ExternalOdometryCovarianceData {
 // deliberately producer-defined: estimator status models differ between
 // implementations and are standardized via discovery records, not the schema.
 struct EstimatorHealthData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   flags:ushort; // Producer-defined estimator status and fault bitmask.
   velocity_test_ratio:float; // Innovation test ratio for velocity observations.
   pos_horiz_test_ratio:float; // Innovation test ratio for horizontal position observations.
@@ -288,11 +313,12 @@ struct EstimatorHealthData {
   tas_test_ratio:float; // Innovation test ratio for true-airspeed observations.
   pos_horiz_accuracy_m:float; // Estimated one-sigma horizontal position accuracy.
   pos_vert_accuracy_m:float; // Estimated one-sigma vertical position accuracy.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Mission progress and mission database identifiers.
 struct MissionProgressData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   mission_id:uint; // Identifier that changes when the mission plan changes.
   fence_id:uint; // Identifier that changes when the geofence set changes.
   rally_points_id:uint; // Identifier that changes when the rally-point set changes.
@@ -300,12 +326,13 @@ struct MissionProgressData {
   total:ushort; // Total number of mission items known to the producer.
   mission_state:synapse.types.MissionState; // Mission execution state.
   mission_mode:ubyte; // Producer-defined mission mode or mission type.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Navigation controller target and tracking-error summary. Angles follow
 // REP-0103: zero east, positive counter-clockwise, range -18000 to 18000.
 struct NavigationTargetData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   altitude_error_m:float; // Target altitude minus estimated altitude.
   airspeed_error_m_s:float; // Target airspeed minus estimated airspeed.
   xtrack_error_m:float; // Cross-track error relative to the active path.
@@ -314,11 +341,12 @@ struct NavigationTargetData {
   desired_yaw_cdeg:short; // Navigation yaw command.
   target_yaw_cdeg:short; // Yaw toward the active target.
   distance_to_waypoint_m:ushort; // Remaining straight-line distance to the active waypoint.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Home position and local-origin reference.
 struct HomeReferenceData {
-  timestamp_us:ulong; // Reference timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Reference timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   latitude_deg_e7:int; // Home latitude in WGS-84 degrees scaled by 1e7.
   longitude_deg_e7:int; // Home longitude in WGS-84 degrees scaled by 1e7.
   altitude_msl_mm:int; // Home height above mean sea level.
@@ -326,6 +354,7 @@ struct HomeReferenceData {
   attitude:synapse.types.Quaternionf; // Map-to-local alignment rotating FLU vectors at home into ENU.
   approach_enu_m:synapse.types.Vec3f; // Preferred approach point or vector in the local ENU frame.
   flags:ubyte; // Bitmask of HomeReferenceFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // FlatBuffers root wrapper for VehicleHealthData.
