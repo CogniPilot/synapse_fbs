@@ -3918,6 +3918,11 @@ fn validate_protocol(docs: &SchemaDoc) -> Result<()> {
 fn lint_allowlisted(name: &str) -> bool {
     const EXACT: &[&str] = &[
         "id",
+        "quality",
+        "distance_quality",
+        "distance_pixel_ok",
+        "clock_class",
+        "domain",
         "buttons",
         "total",
         "residual",
@@ -4130,6 +4135,8 @@ fn unit_scale_note(name: &str) -> Option<String> {
         "centi-percent; percent = value / 100"
     } else if lower.ends_with("_raw_us") {
         "raw pulse width in microseconds"
+    } else if lower.ends_with("_ns") {
+        "nanoseconds"
     } else if lower.ends_with("_us") {
         "microseconds"
     } else if lower.ends_with("_ms") {
