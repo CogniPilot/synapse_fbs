@@ -106,6 +106,8 @@
             cargo fmt --check --manifest-path xtask/Cargo.toml
             cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
             cargo run --locked --manifest-path xtask/Cargo.toml -- check
+            cargo run --locked --manifest-path xtask/Cargo.toml -- wire-check --update
+            git diff --exit-code compatibility/wire-schema.toml
           '';
           packages = mkCommand pkgs tooling "synapse-fbs-packages" ''
             cargo run --locked --manifest-path xtask/Cargo.toml -- ci "$@"

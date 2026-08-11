@@ -893,6 +893,714 @@ fn validate_protocol(schema: &CompiledSchema) -> Result<()> {
     }
 }
 
+/// Committed wire-compatibility baseline: one structural, name-free descriptor
+/// per FlatBuffers type. Renaming a field, enum value, or union arm is wire
+/// safe, so names never enter a hash; struct leaf paths are the sole exception,
+/// kept inside the struct hash so a same-type field reorder is still caught.
+const WIRE_SCHEMA_PATH: &str = "compatibility/wire-schema.toml";
+
+/// Header prepended to the generated baseline so the file explains itself.
+const WIRE_SCHEMA_HEADER: &str = "\
+# Wire-compatibility baseline for synapse_fbs. Each entry pins the on-wire
+# structure of one FlatBuffers type by a name-free structural hash. Regenerate
+# with `cargo run --manifest-path xtask/Cargo.toml -- wire-check --update`.
+#
+# The file is append-only for published types: `wire-check` fails when a
+# recorded type is removed or changed in a wire-incompatible way. To evolve a
+# type, introduce a new wire type and topic instead of mutating an existing
+# one. `--update` refuses to rewrite a recorded hash unless the fully qualified
+# name is listed under [allow].break, which it then consumes (a single-use
+# bless of an intentional break).
+";
+
+type WireDescriptorSet = BTreeMap<String, WireType>;
+
+/// One type's wire descriptor. The `hash` field is the authoritative structural
+/// fingerprint; the extra per-kind fields let `breaking_reason` classify a hash
+/// difference as append-compatible or breaking without recompiling the schema.
+#[derive(Clone, Debug, Serialize, serde::Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+enum WireType {
+    Struct {
+        hash: String,
+    },
+    Table {
+        hash: String,
+        fields: Vec<String>,
+    },
+    Enum {
+        hash: String,
+        underlying: String,
+        bit_flags: bool,
+        values: Vec<i64>,
+    },
+    Union {
+        hash: String,
+        members: Vec<String>,
+    },
+}
+
+impl WireType {
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Struct { .. } => "struct",
+            Self::Table { .. } => "table",
+            Self::Enum { .. } => "enum",
+            Self::Union { .. } => "union",
+        }
+    }
+
+    fn hash(&self) -> &str {
+        match self {
+            Self::Struct { hash }
+            | Self::Table { hash, .. }
+            | Self::Enum { hash, .. }
+            | Self::Union { hash, .. } => hash,
+        }
+    }
+}
+
+#[derive(Default, Serialize, serde::Deserialize)]
+struct WireBaseline {
+    #[serde(default)]
+    allow: WireAllow,
+    #[serde(default)]
+    types: WireDescriptorSet,
+}
+
+/// Escape hatch for intentional breaks. Each fully qualified name here lets
+/// `--update` record a changed hash once; the entry is consumed on write.
+#[derive(Default, Serialize, serde::Deserialize)]
+struct WireAllow {
+    #[serde(default, rename = "break")]
+    break_: Vec<String>,
+}
+
+/// One flattened scalar of a fixed-layout struct: a dotted path (to catch a
+/// same-type reorder), the absolute byte offset, the scalar base name (an enum
+/// leaf collapses to its underlying scalar), and the fixed-array length if any.
+struct StructLeaf {
+    path: String,
+    offset: usize,
+    scalar_base: String,
+    array_len: Option<u16>,
+}
+
+/// Build the per-type wire descriptors from the fully include-expanded
+/// `all.bfbs` (the last SCHEMAS entry), so no cross-file dedup is needed. The
+/// walk is over raw reflection, not the reduced SchemaEntity, which drops
+/// Field.id and BaseType.
+fn build_wire_descriptors(bfbs_dir: &Path) -> Result<WireDescriptorSet> {
+    let path = bfbs_dir.join("all.bfbs");
+    let bytes = fs::read(&path)?;
+    let schema = reflection::root_as_schema(&bytes)
+        .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
+    let mut set = WireDescriptorSet::new();
+    for object in schema.objects() {
+        let desc = if object.is_struct() {
+            wire_struct(&schema, object)?
+        } else {
+            wire_table(&schema, object)?
+        };
+        set.insert(object.name().to_string(), desc);
+    }
+    for reflected_enum in schema.enums() {
+        let desc = if reflected_enum.is_union() {
+            wire_union(&schema, reflected_enum)?
+        } else {
+            wire_enum(&schema, reflected_enum)?
+        };
+        set.insert(reflected_enum.name().to_string(), desc);
+    }
+    Ok(set)
+}
+
+/// Flatten a fixed-layout struct into scalar leaves, recursing into nested
+/// structs (and fixed arrays of structs) with an accumulated base offset so a
+/// reorder of same-typed fields still moves at least one leaf offset.
+fn struct_leaves(
+    schema: &reflection::Schema<'_>,
+    object: reflection::Object<'_>,
+    prefix: &str,
+    base_offset: usize,
+    out: &mut Vec<StructLeaf>,
+) -> Result<()> {
+    let mut fields = object
+        .fields()
+        .into_iter()
+        .filter(|field| field.type_().base_type() != BaseType::UType)
+        .collect::<Vec<_>>();
+    fields.sort_by_key(|field| field.offset());
+    for field in fields {
+        let type_ = field.type_();
+        let offset = base_offset + usize::from(field.offset());
+        let path = if prefix.is_empty() {
+            field.name().to_string()
+        } else {
+            format!("{prefix}.{}", field.name())
+        };
+        match type_.base_type() {
+            BaseType::Obj => {
+                let nested = schema.objects().get(usize::try_from(type_.index())?);
+                struct_leaves(schema, nested, &path, offset, out)?;
+            }
+            BaseType::Array if type_.element() == BaseType::Obj => {
+                let nested = schema.objects().get(usize::try_from(type_.index())?);
+                let stride = usize::try_from(nested.bytesize())?;
+                for element in 0..type_.fixed_length() {
+                    let element_path = format!("{path}[{element}]");
+                    struct_leaves(
+                        schema,
+                        nested,
+                        &element_path,
+                        offset + usize::from(element) * stride,
+                        out,
+                    )?;
+                }
+            }
+            BaseType::Array => out.push(StructLeaf {
+                path,
+                offset,
+                scalar_base: reflected_scalar_name(type_.element())?.to_string(),
+                array_len: Some(type_.fixed_length()),
+            }),
+            base => out.push(StructLeaf {
+                path,
+                offset,
+                scalar_base: reflected_scalar_name(base)?.to_string(),
+                array_len: None,
+            }),
+        }
+    }
+    Ok(())
+}
+
+/// Struct descriptor: minalign, bytesize, and the offset-ordered scalar leaves.
+/// Any layout change (offset, type, size, alignment, reorder) is breaking.
+fn wire_struct(
+    schema: &reflection::Schema<'_>,
+    object: reflection::Object<'_>,
+) -> Result<WireType> {
+    let mut leaves = Vec::new();
+    struct_leaves(schema, object, "", 0, &mut leaves)?;
+    leaves.sort_by(|left, right| {
+        left.offset
+            .cmp(&right.offset)
+            .then_with(|| left.path.cmp(&right.path))
+    });
+
+    let mut digest = Sha256::new();
+    digest.update(b"synapse-wire-struct-v1\n");
+    digest.update(object.minalign().to_string());
+    digest.update(b"\t");
+    digest.update(object.bytesize().to_string());
+    digest.update(b"\n");
+    for leaf in &leaves {
+        digest.update(leaf.path.as_bytes());
+        digest.update(b"\t");
+        digest.update(leaf.offset.to_string());
+        digest.update(b"\t");
+        digest.update(leaf.scalar_base.as_bytes());
+        digest.update(b"\t");
+        digest.update(match leaf.array_len {
+            Some(length) => length.to_string(),
+            None => "-".to_string(),
+        });
+        digest.update(b"\n");
+    }
+    Ok(WireType::Struct {
+        hash: finish_wire_hash(digest),
+    })
+}
+
+/// Table descriptor: id-ordered field signatures, each name free. The stored
+/// signatures let `breaking_reason` tell an appended id from a retyped one.
+fn wire_table(
+    schema: &reflection::Schema<'_>,
+    object: reflection::Object<'_>,
+) -> Result<WireType> {
+    let mut fields = object
+        .fields()
+        .into_iter()
+        .filter(|field| field.type_().base_type() != BaseType::UType)
+        .collect::<Vec<_>>();
+    fields.sort_by_key(|field| field.id());
+
+    let mut signatures = Vec::new();
+    for field in fields {
+        signatures.push(wire_field_signature(schema, field)?);
+    }
+
+    let mut digest = Sha256::new();
+    digest.update(b"synapse-wire-table-v1\n");
+    for signature in &signatures {
+        digest.update(signature.as_bytes());
+        digest.update(b"\n");
+    }
+    Ok(WireType::Table {
+        hash: finish_wire_hash(digest),
+        fields: signatures,
+    })
+}
+
+/// Render one table field as `"<id> <type_ref>[=<default>][ required][ deprecated]"`.
+/// The default is the numeric value, never an enum member name, so renaming an
+/// enum value does not perturb the referencing table.
+fn wire_field_signature(
+    schema: &reflection::Schema<'_>,
+    field: reflection::Field<'_>,
+) -> Result<String> {
+    let type_ref = wire_type_ref(schema, field.type_())?;
+    let default = wire_field_default(field)
+        .map(|value| format!("={value}"))
+        .unwrap_or_default();
+    let required = if field.required() { " required" } else { "" };
+    let deprecated = if field.deprecated() { " deprecated" } else { "" };
+    Ok(format!(
+        "{} {type_ref}{default}{required}{deprecated}",
+        field.id()
+    ))
+}
+
+/// Numeric default of a table field, or None when it is the zero default. Enum
+/// and integer defaults collapse to the underlying integer; float defaults use
+/// the real value.
+fn wire_field_default(field: reflection::Field<'_>) -> Option<String> {
+    if field.default_integer() == 0 && field.default_real() == 0.0 {
+        return None;
+    }
+    if matches!(
+        field.type_().base_type(),
+        BaseType::Float | BaseType::Double
+    ) {
+        Some(field.default_real().to_string())
+    } else {
+        Some(field.default_integer().to_string())
+    }
+}
+
+/// Enum descriptor: underlying scalar, bit_flags attribute, and the sorted
+/// numeric values. Names are excluded; only the numeric surface is wire visible.
+fn wire_enum(
+    _schema: &reflection::Schema<'_>,
+    reflected_enum: reflection::Enum<'_>,
+) -> Result<WireType> {
+    let underlying = reflected_scalar_name(reflected_enum.underlying_type().base_type())?.to_string();
+    let bit_flags = reflected_enum.attributes().is_some_and(|attributes| {
+        attributes
+            .into_iter()
+            .any(|attribute| attribute.key() == "bit_flags")
+    });
+    let mut values = reflected_enum
+        .values()
+        .into_iter()
+        .map(|value| value.value())
+        .collect::<Vec<_>>();
+    values.sort_unstable();
+
+    let mut digest = Sha256::new();
+    digest.update(b"synapse-wire-enum-v1\n");
+    digest.update(underlying.as_bytes());
+    digest.update(if bit_flags { b"\t1\n" } else { b"\t0\n" });
+    for value in &values {
+        digest.update(value.to_string());
+        digest.update(b"\n");
+    }
+    Ok(WireType::Enum {
+        hash: finish_wire_hash(digest),
+        underlying,
+        bit_flags,
+        values,
+    })
+}
+
+/// Union descriptor: discriminator-ordered `"<disc> <qualified_target>"` arms.
+/// A retargeted or removed discriminator is breaking; a new higher one appends.
+fn wire_union(
+    schema: &reflection::Schema<'_>,
+    reflected_enum: reflection::Enum<'_>,
+) -> Result<WireType> {
+    let mut members = Vec::new();
+    for value in reflected_enum.values() {
+        let Some(target) = value
+            .union_type()
+            .filter(|type_| type_.base_type() != BaseType::None)
+        else {
+            continue;
+        };
+        members.push((value.value(), wire_type_ref(schema, target)?));
+    }
+    members.sort_by_key(|(discriminator, _)| *discriminator);
+    let members = members
+        .into_iter()
+        .map(|(discriminator, target)| format!("{discriminator} {target}"))
+        .collect::<Vec<_>>();
+
+    let mut digest = Sha256::new();
+    digest.update(b"synapse-wire-union-v1\n");
+    for member in &members {
+        digest.update(member.as_bytes());
+        digest.update(b"\n");
+    }
+    Ok(WireType::Union {
+        hash: finish_wire_hash(digest),
+        members,
+    })
+}
+
+/// Fully qualified, name-stable reference for a table field or union arm type.
+/// Vectors render as `[elem]`, fixed arrays as `[elem;N]`; an enum keeps its
+/// qualified name so its own descriptor pins the underlying representation.
+fn wire_type_ref(schema: &reflection::Schema<'_>, type_: reflection::Type<'_>) -> Result<String> {
+    let base_type = type_.base_type();
+    let element_base = match base_type {
+        BaseType::Vector | BaseType::Vector64 | BaseType::Array => type_.element(),
+        other => other,
+    };
+    let atom = if type_.index() >= 0 {
+        if element_base == BaseType::Obj {
+            schema
+                .objects()
+                .get(usize::try_from(type_.index())?)
+                .name()
+                .to_string()
+        } else {
+            schema
+                .enums()
+                .get(usize::try_from(type_.index())?)
+                .name()
+                .to_string()
+        }
+    } else {
+        reflected_scalar_name(element_base)?.to_string()
+    };
+    Ok(match base_type {
+        BaseType::Vector | BaseType::Vector64 => format!("[{atom}]"),
+        BaseType::Array => format!("[{atom};{}]", type_.fixed_length()),
+        _ => atom,
+    })
+}
+
+/// 32-hex (128-bit truncated SHA-256) of a per-kind, name-free structure. Same
+/// truncation as the schema-set handshake hash, but with a per-kind domain tag.
+fn finish_wire_hash(digest: Sha256) -> String {
+    let digest = digest.finalize();
+    digest[..16]
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+/// Load the committed baseline, or a friendly instruction when it is absent.
+fn parse_wire_baseline(root: &Path) -> Result<WireBaseline> {
+    let path = root.join(WIRE_SCHEMA_PATH);
+    if !path.is_file() {
+        return fail(format!(
+            "wire compatibility baseline {} is missing; run xtask wire-check --update to establish the baseline",
+            path.display()
+        ));
+    }
+    let content = fs::read_to_string(&path)?;
+    toml::from_str(&content)
+        .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())).into())
+}
+
+/// Compare freshly built descriptors against the committed baseline. A removed
+/// or wire-incompatibly changed type fails the build; a new type or an
+/// append-compatible change only prints an info line. `[allow].break` downgrades
+/// a specific breaking change to a warning.
+fn wire_check(root: &Path, current: &WireDescriptorSet) -> Result<()> {
+    let baseline = parse_wire_baseline(root)?;
+    let allow = baseline
+        .allow
+        .break_
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    let mut problems = Vec::new();
+
+    for (name, old) in &baseline.types {
+        let Some(new) = current.get(name) else {
+            problems.push(format!(
+                "REMOVED: {name}; run xtask wire-check --update after reviewing the removal"
+            ));
+            continue;
+        };
+        if old.hash() == new.hash() {
+            continue;
+        }
+        if let Some(reason) = breaking_reason(old, new) {
+            if allow.contains(name.as_str()) {
+                println!("WARNING: {name} breaking change blessed by [allow].break ({reason})");
+            } else {
+                problems.push(format!(
+                    "BREAKING: {name} changed from {} to {} ({reason}); introduce a new wire type and topic instead",
+                    old.hash(),
+                    new.hash()
+                ));
+            }
+        }
+    }
+
+    for (name, new) in current {
+        if !baseline.types.contains_key(name) {
+            println!(
+                "NEW: {name} ({}); review it, then run xtask wire-check --update",
+                new.hash()
+            );
+        }
+    }
+
+    if problems.is_empty() {
+        Ok(())
+    } else {
+        fail(format!(
+            "wire compatibility check failed:\n{}",
+            problems.join("\n")
+        ))
+    }
+}
+
+/// Classify a hash difference between two descriptors of the same name. Returns
+/// None for an append-only or deprecation-only change, Some(reason) otherwise.
+/// A kind change (for example struct becoming a table) is always breaking.
+fn breaking_reason(old: &WireType, new: &WireType) -> Option<String> {
+    match (old, new) {
+        (WireType::Struct { hash: old_hash }, WireType::Struct { hash: new_hash }) => {
+            (old_hash != new_hash).then(|| "struct layout changed".to_string())
+        }
+        (
+            WireType::Table {
+                fields: old_fields, ..
+            },
+            WireType::Table {
+                fields: new_fields, ..
+            },
+        ) => table_breaking_reason(old_fields, new_fields),
+        (
+            WireType::Enum {
+                underlying: old_underlying,
+                bit_flags: old_bit_flags,
+                values: old_values,
+                ..
+            },
+            WireType::Enum {
+                underlying: new_underlying,
+                bit_flags: new_bit_flags,
+                values: new_values,
+                ..
+            },
+        ) => enum_breaking_reason(
+            old_underlying,
+            *old_bit_flags,
+            old_values,
+            new_underlying,
+            *new_bit_flags,
+            new_values,
+        ),
+        (
+            WireType::Union {
+                members: old_members,
+                ..
+            },
+            WireType::Union {
+                members: new_members,
+                ..
+            },
+        ) => union_breaking_reason(old_members, new_members),
+        (old, new) => Some(format!("kind {} -> {}", old.kind(), new.kind())),
+    }
+}
+
+/// One parsed table field signature, name free. `default` is the numeric value.
+struct ParsedTableField {
+    type_ref: String,
+    default: Option<String>,
+    required: bool,
+    deprecated: bool,
+}
+
+fn parse_table_fields(fields: &[String]) -> BTreeMap<u16, ParsedTableField> {
+    let mut parsed = BTreeMap::new();
+    for signature in fields {
+        if let Some((id, field)) = parse_table_field(signature) {
+            parsed.insert(id, field);
+        }
+    }
+    parsed
+}
+
+fn parse_table_field(signature: &str) -> Option<(u16, ParsedTableField)> {
+    let (id, mut rest) = signature.split_once(' ')?;
+    let id = id.parse::<u16>().ok()?;
+    let mut deprecated = false;
+    let mut required = false;
+    if let Some(prefix) = rest.strip_suffix(" deprecated") {
+        deprecated = true;
+        rest = prefix;
+    }
+    if let Some(prefix) = rest.strip_suffix(" required") {
+        required = true;
+        rest = prefix;
+    }
+    let (type_ref, default) = match rest.split_once('=') {
+        Some((type_ref, default)) => (type_ref.to_string(), Some(default.to_string())),
+        None => (rest.to_string(), None),
+    };
+    Some((
+        id,
+        ParsedTableField {
+            type_ref,
+            default,
+            required,
+            deprecated,
+        },
+    ))
+}
+
+fn table_breaking_reason(old_fields: &[String], new_fields: &[String]) -> Option<String> {
+    let old = parse_table_fields(old_fields);
+    let new = parse_table_fields(new_fields);
+    for (id, old_field) in &old {
+        let Some(new_field) = new.get(id) else {
+            return Some(format!("field id {id} removed"));
+        };
+        if old_field.deprecated && !new_field.deprecated {
+            return Some(format!("field id {id} undeprecated"));
+        }
+        if old_field.deprecated {
+            continue;
+        }
+        if old_field.type_ref != new_field.type_ref {
+            return Some(format!(
+                "field id {id} type {} -> {}",
+                old_field.type_ref, new_field.type_ref
+            ));
+        }
+        if old_field.default != new_field.default {
+            return Some(format!(
+                "field id {id} default {} -> {}",
+                old_field.default.as_deref().unwrap_or("-"),
+                new_field.default.as_deref().unwrap_or("-")
+            ));
+        }
+        if old_field.required != new_field.required {
+            return Some(format!(
+                "field id {id} required {} -> {}",
+                old_field.required, new_field.required
+            ));
+        }
+    }
+    None
+}
+
+fn enum_breaking_reason(
+    old_underlying: &str,
+    old_bit_flags: bool,
+    old_values: &[i64],
+    new_underlying: &str,
+    new_bit_flags: bool,
+    new_values: &[i64],
+) -> Option<String> {
+    if old_underlying != new_underlying {
+        return Some(format!("underlying {old_underlying} -> {new_underlying}"));
+    }
+    if old_bit_flags != new_bit_flags {
+        return Some(format!("bit_flags {old_bit_flags} -> {new_bit_flags}"));
+    }
+    let new_set = new_values.iter().copied().collect::<BTreeSet<_>>();
+    for value in old_values {
+        if !new_set.contains(value) {
+            return Some(format!("enum value {value} removed"));
+        }
+    }
+    None
+}
+
+fn union_breaking_reason(old_members: &[String], new_members: &[String]) -> Option<String> {
+    let old = parse_union_members(old_members);
+    let new = parse_union_members(new_members);
+    for (discriminator, old_target) in &old {
+        match new.get(discriminator) {
+            None => return Some(format!("union discriminator {discriminator} removed")),
+            Some(new_target) if new_target != old_target => {
+                return Some(format!("union discriminator {discriminator} retargeted"));
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
+fn parse_union_members(members: &[String]) -> BTreeMap<i64, String> {
+    let mut parsed = BTreeMap::new();
+    for member in members {
+        if let Some((discriminator, target)) = member.split_once(' ')
+            && let Ok(discriminator) = discriminator.parse::<i64>()
+        {
+            parsed.insert(discriminator, target.to_string());
+        }
+    }
+    parsed
+}
+
+/// Rewrite the committed baseline from freshly built descriptors. Refuses to
+/// change any recorded hash unless the name is blessed under `[allow].break`,
+/// which it then consumes so a bless is single-use. New types are added and
+/// removed ones dropped.
+fn update_wire_baseline(root: &Path, current: &WireDescriptorSet) -> Result<()> {
+    let path = root.join(WIRE_SCHEMA_PATH);
+    let mut allow = WireAllow::default();
+    if path.is_file() {
+        let content = fs::read_to_string(&path)?;
+        let existing: WireBaseline = toml::from_str(&content)
+            .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
+        let blessed = existing
+            .allow
+            .break_
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        for (name, old) in &existing.types {
+            if let Some(new) = current.get(name)
+                && old.hash() != new.hash()
+                && !blessed.contains(name.as_str())
+            {
+                return fail(format!(
+                    "refusing to rewrite published {name}: {} -> {}; introduce a new wire type and topic, or add it to [allow].break to bless an intentional break",
+                    old.hash(),
+                    new.hash()
+                ));
+            }
+        }
+        // Keep only blesses that were not consumed by this rewrite, so a bless
+        // for a genuinely changed type is single-use.
+        allow.break_ = existing
+            .allow
+            .break_
+            .iter()
+            .filter(|name| match (existing.types.get(*name), current.get(*name)) {
+                (Some(old), Some(new)) => old.hash() == new.hash(),
+                _ => true,
+            })
+            .cloned()
+            .collect();
+    }
+
+    let baseline = WireBaseline {
+        allow,
+        types: current.clone(),
+    };
+    let body = toml::to_string_pretty(&baseline)?;
+    let content = format!("{WIRE_SCHEMA_HEADER}{body}");
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(&path, content)?;
+    println!("updated {}", path.display());
+    Ok(())
+}
+
 fn find_schema_entity<'a>(
     schema: &'a CompiledSchema,
     name: &str,
@@ -949,4 +1657,139 @@ fn type_lookup_name(type_name: &str) -> String {
         .unwrap_or(type_name)
         .trim()
         .to_string()
+}
+
+/// Pure-logic coverage for the wire-compatibility classifier. These build
+/// WireType values directly, so they need no compiled schema or FlatCC.
+#[cfg(test)]
+mod wire_tests {
+    use super::*;
+
+    fn struct_type(hash: &str) -> WireType {
+        WireType::Struct {
+            hash: hash.to_string(),
+        }
+    }
+
+    fn table_type(hash: &str, fields: &[&str]) -> WireType {
+        WireType::Table {
+            hash: hash.to_string(),
+            fields: fields.iter().map(|field| field.to_string()).collect(),
+        }
+    }
+
+    fn enum_type(hash: &str, underlying: &str, bit_flags: bool, values: &[i64]) -> WireType {
+        WireType::Enum {
+            hash: hash.to_string(),
+            underlying: underlying.to_string(),
+            bit_flags,
+            values: values.to_vec(),
+        }
+    }
+
+    fn union_type(hash: &str, members: &[&str]) -> WireType {
+        WireType::Union {
+            hash: hash.to_string(),
+            members: members.iter().map(|member| member.to_string()).collect(),
+        }
+    }
+
+    #[test]
+    fn struct_hash_change_is_breaking() {
+        assert!(breaking_reason(&struct_type("1111"), &struct_type("2222")).is_some());
+    }
+
+    #[test]
+    fn struct_same_hash_is_compatible() {
+        assert!(breaking_reason(&struct_type("1111"), &struct_type("1111")).is_none());
+    }
+
+    #[test]
+    fn table_append_id_is_compatible() {
+        let old = table_type("a", &["1 int", "2 float"]);
+        let new = table_type("b", &["1 int", "2 float", "3 synapse.type.Vec3f"]);
+        assert!(breaking_reason(&old, &new).is_none());
+    }
+
+    #[test]
+    fn table_remove_id_is_breaking() {
+        let old = table_type("a", &["1 int", "2 float"]);
+        let new = table_type("b", &["1 int"]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn table_retype_id_is_breaking() {
+        let old = table_type("a", &["1 int", "2 float"]);
+        let new = table_type("b", &["1 int", "2 uint"]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn table_deprecate_id_is_compatible() {
+        let old = table_type("a", &["1 int", "2 float"]);
+        let new = table_type("b", &["1 int", "2 float deprecated"]);
+        assert!(breaking_reason(&old, &new).is_none());
+    }
+
+    #[test]
+    fn table_undeprecate_id_is_breaking() {
+        let old = table_type("a", &["1 int", "2 float deprecated"]);
+        let new = table_type("b", &["1 int", "2 float"]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn enum_add_value_is_compatible() {
+        let old = enum_type("a", "ubyte", false, &[0, 1, 2]);
+        let new = enum_type("b", "ubyte", false, &[0, 1, 2, 3]);
+        assert!(breaking_reason(&old, &new).is_none());
+    }
+
+    #[test]
+    fn enum_remove_value_is_breaking() {
+        let old = enum_type("a", "ubyte", false, &[0, 1, 2]);
+        let new = enum_type("b", "ubyte", false, &[0, 1]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn enum_underlying_change_is_breaking() {
+        let old = enum_type("a", "ubyte", false, &[0, 1]);
+        let new = enum_type("b", "ushort", false, &[0, 1]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn enum_bit_flags_change_is_breaking() {
+        let old = enum_type("a", "ubyte", false, &[0, 1]);
+        let new = enum_type("b", "ubyte", true, &[0, 1]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn union_append_higher_discriminator_is_compatible() {
+        let old = union_type("a", &["1 synapse.msgs.A", "2 synapse.msgs.B"]);
+        let new = union_type("b", &["1 synapse.msgs.A", "2 synapse.msgs.B", "3 synapse.msgs.C"]);
+        assert!(breaking_reason(&old, &new).is_none());
+    }
+
+    #[test]
+    fn union_retarget_discriminator_is_breaking() {
+        let old = union_type("a", &["1 synapse.msgs.A", "2 synapse.msgs.B"]);
+        let new = union_type("b", &["1 synapse.msgs.A", "2 synapse.msgs.Z"]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn union_remove_discriminator_is_breaking() {
+        let old = union_type("a", &["1 synapse.msgs.A", "2 synapse.msgs.B"]);
+        let new = union_type("b", &["1 synapse.msgs.A"]);
+        assert!(breaking_reason(&old, &new).is_some());
+    }
+
+    #[test]
+    fn kind_mismatch_is_breaking() {
+        assert!(breaking_reason(&struct_type("a"), &table_type("b", &["1 int"])).is_some());
+    }
 }
