@@ -21,7 +21,7 @@ jobs:
           use-flakehub: false
           use-gha-cache: true
       - name: Build and verify
-        run: nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- ci --release-name "${GITHUB_REF_NAME}"
+        run: nix run .#packages -- --release-name "${GITHUB_REF_NAME}"
       - name: Pack npm package
         run: nix develop --command npm pack
         working-directory: target/xtask/packages/js

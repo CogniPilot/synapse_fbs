@@ -23,11 +23,5 @@ jobs:
         with:
           use-flakehub: false
           use-gha-cache: true
-      - name: Check formatting
-        run: nix develop --command cargo fmt --check --manifest-path xtask/Cargo.toml
-      - name: Lint
-        run: nix develop --command cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
-      - name: Schema checks
-        run: nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- check
-      - name: Build and verify
-        run: nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- ci
+      - name: Test and build packages
+        run: nix run .#ci

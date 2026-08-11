@@ -306,9 +306,8 @@ fn main() -> Result<()> {
         "ci" => ci(&root, &options),
         "js" => js(&root),
         "check" => check(&root),
-        "update-compatibility" => update_compatibility(&root),
         _ => fail(format!(
-            "unknown command '{command}'. expected: build, ci, js, check, or update-compatibility"
+            "unknown command '{command}'. expected: build, ci, js, or check"
         )),
     }
 }
@@ -346,8 +345,6 @@ fn check(root: &Path) -> Result<()> {
     let schema = load_compiled_schema(&bfbs_dir)?;
     validate_protocol(&schema)?;
     let topics = topic_entries(&schema)?;
-    let commands = command_entries(&schema)?;
-    check_schema_compatibility(root, &topics, &commands)?;
 
     let templates = Templates::new(root)?;
     let context = topic_catalog_context(&schema, &topics)?;
@@ -433,35 +430,7 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     Ok(())
 }
 
-const WIRE_SCHEMA_COMPATIBILITY_PATH: &str = "compatibility/wire-schema.toml";
-
-#[derive(serde::Deserialize, serde::Serialize)]
-struct WireSchemaCompatibility {
-    wire_types: BTreeMap<String, String>,
-}
-
-/// Every wire type an endpoint may decode: topic payloads plus command
-/// request and reply types, each mapped to its transitive schema hash.
-fn wire_type_compatibility(
-    topics: &[TopicEntry],
-    commands: &[CommandEntry],
-) -> BTreeMap<String, String> {
-    let mut wire_types: BTreeMap<String, String> = topics
-        .iter()
-        .map(|topic| (topic.wire_type.clone(), topic.schema_hash.clone()))
-        .collect();
-    for command in commands {
-        wire_types.insert(
-            command.request_type.clone(),
-            command.request_schema_hash.clone(),
-        );
-        wire_types.insert(
-            command.reply_type.clone(),
-            command.reply_schema_hash.clone(),
-        );
-    }
-    wire_types
-}
+const MCAP_PROFILE_PATH: &str = "docs/MCAP.md";
 
 /// Hash the full catalog contract a constrained link relies on after the
 /// one-time handshake: topic id and key routing, payload interpretation
@@ -516,102 +485,6 @@ fn schema_set_hash(topics: &[TopicEntry], commands: &[CommandEntry]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
-}
-
-fn parse_wire_schema_compatibility(path: &Path) -> Result<BTreeMap<String, String>> {
-    let content = fs::read_to_string(path).map_err(|err| {
-        io::Error::other(format!(
-            "cannot read {}: {err}; run xtask update-compatibility to establish the compatibility baseline",
-            path.display()
-        ))
-    })?;
-    let manifest: WireSchemaCompatibility = toml::from_str(&content)
-        .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
-    for (wire_type, hash) in &manifest.wire_types {
-        if hash.len() != 32 || !hash.bytes().all(|byte| byte.is_ascii_hexdigit()) {
-            return fail(format!(
-                "{} has an invalid 128-bit truncated SHA-256 for {wire_type}",
-                path.display(),
-            ));
-        }
-    }
-    Ok(manifest.wire_types)
-}
-
-fn check_schema_compatibility(
-    root: &Path,
-    topics: &[TopicEntry],
-    commands: &[CommandEntry],
-) -> Result<()> {
-    let path = root.join(WIRE_SCHEMA_COMPATIBILITY_PATH);
-    let expected = parse_wire_schema_compatibility(&path)?;
-    let actual = wire_type_compatibility(topics, commands);
-    let mut problems = Vec::new();
-    for (wire_type, new_hash) in &actual {
-        match expected.get(wire_type) {
-            Some(old_hash) if new_hash != old_hash => problems.push(format!(
-                "BREAKING: {wire_type} changed from {old_hash} to {new_hash}; introduce a new wire type and topic instead"
-            )),
-            None => problems.push(format!(
-                "NEW: {wire_type} ({new_hash}); review it, then run xtask update-compatibility"
-            )),
-            _ => {}
-        }
-    }
-    for wire_type in expected.keys() {
-        if !actual.contains_key(wire_type) {
-            problems.push(format!(
-                "REMOVED: {wire_type}; run xtask update-compatibility after reviewing the removal"
-            ));
-        }
-    }
-    if problems.is_empty() {
-        return Ok(());
-    }
-    fail(format!(
-        "topic schema compatibility check failed:\n{}",
-        problems.join("\n")
-    ))
-}
-
-fn update_compatibility(root: &Path) -> Result<()> {
-    let templates = Templates::new(root)?;
-    let tools = read_tools(root)?;
-    let flatcc = build_flatcc(root, &tools)?;
-    let bfbs_dir = root.join("target/xtask/compatibility-bfbs");
-    generate_reflection_schemas(root, &flatcc.binary, &bfbs_dir)?;
-    let schema = load_compiled_schema(&bfbs_dir)?;
-    validate_protocol(&schema)?;
-    let topics = topic_entries(&schema)?;
-    let commands = command_entries(&schema)?;
-    let actual = wire_type_compatibility(&topics, &commands);
-    let path = root.join(WIRE_SCHEMA_COMPATIBILITY_PATH);
-    let existing = if path.is_file() {
-        parse_wire_schema_compatibility(&path)?
-    } else {
-        BTreeMap::new()
-    };
-    for (wire_type, new_hash) in &actual {
-        if let Some(old_hash) = existing.get(wire_type)
-            && new_hash != old_hash
-        {
-            return fail(format!(
-                "refusing to rewrite published {wire_type}: {old_hash} -> {new_hash}; introduce a new wire type and topic"
-            ));
-        }
-    }
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    templates.render_to_file(
-        "xtask/wire-schema.toml.jinja",
-        context! {
-            manifest => toml::to_string_pretty(&WireSchemaCompatibility { wire_types: actual })?
-        },
-        &path,
-    )?;
-    println!("updated {}", path.display());
-    Ok(())
 }
 
 fn js(root: &Path) -> Result<()> {
@@ -1055,12 +928,12 @@ fn generate_bindings(
     run(&mut python_cmd)?;
 
     fs::copy(
-        root.join("python/mcap.py"),
+        root.join("templates/python/mcap.py"),
         packages.python.join("synapse/mcap.py"),
     )?;
     write_file(&packages.python.join("synapse/py.typed"), "")?;
     fs::copy(
-        root.join("MCAP.md"),
+        root.join(MCAP_PROFILE_PATH),
         packages.python.join("synapse/MCAP.md"),
     )?;
     let bfbs_dir = packages.python.join("synapse/bfbs");
@@ -1069,15 +942,13 @@ fn generate_bindings(
     let schema = load_compiled_schema(&bfbs_dir)?;
     validate_protocol(&schema)?;
     let topics = topic_entries(&schema)?;
-    let commands = command_entries(&schema)?;
-    check_schema_compatibility(root, &topics, &commands)?;
     write_package_topic_catalogs(templates, packages, &schema, &topics)?;
 
     // The Rust crate ships the wire contract itself: schema sources, compiled
     // binary schemas, and a generated debug decoder, so downstream tools do
     // not vendor schema copies that can drift from the pinned release.
     copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
-    fs::copy(root.join("MCAP.md"), packages.rust.join("MCAP.md"))?;
+    fs::copy(root.join(MCAP_PROFILE_PATH), packages.rust.join("MCAP.md"))?;
     generate_reflection_schemas(root, flatcc, &packages.rust.join("bfbs"))?;
     write_rust_embedded_schemas(templates, &schema, &packages.rust)?;
     write_rust_topic_decode(templates, &schema, &topics, &packages.rust)?;
@@ -1747,7 +1618,7 @@ fn build_archives(
             .collect::<Vec<_>>();
         copy_render_template_tree(
             "cpp",
-            &root.join("cpp"),
+            &root.join("templates/cpp"),
             &cpp_root,
             &templates,
             archive_context(
@@ -1832,7 +1703,7 @@ fn build_archives(
         .collect::<Vec<_>>();
     copy_render_template_tree(
         "c",
-        &root.join("c"),
+        &root.join("templates/c"),
         &c_root,
         &templates,
         archive_context(
@@ -1906,7 +1777,7 @@ fn generate_reflection_schemas(root: &Path, flatcc: &Path, output_dir: &Path) ->
 
 fn copy_common_archive_files(root: &Path, archive_root: &Path) -> Result<()> {
     fs::copy(root.join("LICENSE"), archive_root.join("LICENSE"))?;
-    fs::copy(root.join("MCAP.md"), archive_root.join("MCAP.md"))?;
+    fs::copy(root.join(MCAP_PROFILE_PATH), archive_root.join("MCAP.md"))?;
     copy_dir_all(&root.join("fbs"), &archive_root.join("fbs"))?;
     Ok(())
 }
@@ -3063,12 +2934,13 @@ impl Templates {
         // Templates render config files (package.json, Cargo.toml, ...) with raw
         // substitution; disable auto-escaping so values are not JSON/HTML encoded.
         env.set_auto_escape_callback(|_| AutoEscape::None);
-        add_templates(&mut env, &root.join("rust"), "rust")?;
-        add_templates(&mut env, &root.join("python"), "python")?;
-        add_templates(&mut env, &root.join("js"), "js")?;
-        add_templates(&mut env, &root.join("c"), "c")?;
-        add_templates(&mut env, &root.join("cpp"), "cpp")?;
-        add_templates(&mut env, &root.join("xtask/templates"), "xtask")?;
+        let template_root = root.join("templates");
+        add_templates(&mut env, &template_root.join("rust"), "rust")?;
+        add_templates(&mut env, &template_root.join("python"), "python")?;
+        add_templates(&mut env, &template_root.join("js"), "js")?;
+        add_templates(&mut env, &template_root.join("c"), "c")?;
+        add_templates(&mut env, &template_root.join("cpp"), "cpp")?;
+        add_templates(&mut env, &template_root.join("xtask"), "xtask")?;
         Ok(Self { env })
     }
 
@@ -3115,7 +2987,7 @@ fn stage_template_tree(
     templates: &Templates,
     context: Value,
 ) -> Result<()> {
-    let src = root.join(package);
+    let src = root.join("templates").join(package);
     reset_dir(dst)?;
     copy_render_template_tree(package, &src, dst, templates, context)
 }

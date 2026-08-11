@@ -44,9 +44,7 @@
             }
           )
         );
-    in
-    {
-      devShells = forAllSystems (
+      toolingFor =
         pkgs:
         let
           toolsToml = (pkgs.formats.toml { }).generate "synapse-fbs-tools.toml" tools;
@@ -58,32 +56,92 @@
           );
         in
         {
-          default = pkgs.mkShell {
-            packages = with pkgs; [
-              cargo
-              clippy
-              cmake
-              flatbuffers
-              git
-              github-cli
-              nodejs_24
-              python
-              rustc
-              rustfmt
-            ];
-            nativeBuildInputs = [ pkgs.pkg-config ];
-            buildInputs = [ pkgs.openssl ];
-
+          packages = with pkgs; [
+            cargo
+            clippy
+            cmake
+            flatbuffers
+            git
+            github-cli
+            gnumake
+            nodejs_24
+            pkg-config
+            python
+            rustc
+            rustfmt
+            stdenv.cc
+          ];
+          environment = {
             SYNAPSE_FBS_PACKAGE_VERSION = tools.package.version;
             SYNAPSE_FBS_FLATBUFFERS_VERSION = tools.flatbuffers.version;
             SYNAPSE_FBS_FLATCC_VERSION = tools.flatcc.version;
             SYNAPSE_FBS_FLATC = "${pkgs.flatbuffers}/bin/flatc";
             SYNAPSE_FBS_TOOLS_TOML = "${toolsToml}";
-
-            shellHook = ''
-              echo "synapse_fbs $SYNAPSE_FBS_PACKAGE_VERSION toolchain loaded"
+          };
+        };
+      mkApp =
+        pkgs: tooling: name: commands:
+        let
+          program = pkgs.writeShellApplication {
+            inherit name;
+            runtimeInputs = tooling.packages;
+            runtimeEnv = tooling.environment // {
+              PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            };
+            text = ''
+              repo_root="$(git rev-parse --show-toplevel)"
+              cd "$repo_root"
+              ${commands}
             '';
           };
+        in
+        {
+          type = "app";
+          program = "${program}/bin/${name}";
+        };
+    in
+    {
+      devShells = forAllSystems (
+        pkgs:
+        let
+          tooling = toolingFor pkgs;
+        in
+        {
+          default = pkgs.mkShell (
+            {
+              packages = tooling.packages;
+              buildInputs = [ pkgs.openssl ];
+              shellHook = ''
+                echo "synapse_fbs $SYNAPSE_FBS_PACKAGE_VERSION toolchain loaded"
+              '';
+            }
+            // tooling.environment
+          );
+        }
+      );
+
+      apps = forAllSystems (
+        pkgs:
+        let
+          tooling = toolingFor pkgs;
+          testCommands = ''
+            cargo fmt --check --manifest-path xtask/Cargo.toml
+            cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
+            cargo run --locked --manifest-path xtask/Cargo.toml -- check
+          '';
+          packageCommands = ''
+            cargo run --locked --manifest-path xtask/Cargo.toml -- ci "$@"
+          '';
+          testApp = mkApp pkgs tooling "synapse-fbs-test" testCommands;
+          packagesApp = mkApp pkgs tooling "synapse-fbs-packages" packageCommands;
+          ciApp = mkApp pkgs tooling "synapse-fbs-ci" (testCommands + packageCommands);
+        in
+        {
+          test = testApp;
+          packages = packagesApp;
+          build = packagesApp;
+          ci = ciApp;
+          default = ciApp;
         }
       );
 
