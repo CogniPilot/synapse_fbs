@@ -1,0 +1,1501 @@
+# Wire-compatibility baseline for synapse_fbs. Each entry pins the on-wire
+# structure of one FlatBuffers type by a name-free structural hash. Regenerate
+# with `cargo run --manifest-path xtask/Cargo.toml -- wire-check --update`.
+#
+# The file is append-only for published types: `wire-check` fails when a
+# recorded type is removed or changed in a wire-incompatible way. To evolve a
+# type, introduce a new wire type and topic instead of mutating an existing
+# one. `--update` refuses to rewrite a recorded hash unless the fully qualified
+# name is listed under [allow].break, which it then consumes (a single-use
+# bless of an intentional break).
+[allow]
+break = []
+
+[types."synapse.cmd.CmdId"]
+kind = "enum"
+hash = "ef8c967ddf3d308a21a94e70433558a4"
+underlying = "ushort"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+]
+
+[types."synapse.cmd.FirmwareAbortReply"]
+kind = "table"
+hash = "075a58104803f0226dba89dd78a3e2fe"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 string",
+    "2 synapse.cmd.FirmwareUpdateState",
+    "3 string",
+    "4 int",
+]
+
+[types."synapse.cmd.FirmwareAbortRequest"]
+kind = "table"
+hash = "cd305d5ecb07daca4e7d751d520305ba"
+fields = [
+    "0 string",
+    "1 string",
+]
+
+[types."synapse.cmd.FirmwareChunkReply"]
+kind = "table"
+hash = "603f8d236c5afa3dc554cb5c8618f6f8"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 string",
+    "2 synapse.cmd.FirmwareUpdateState",
+    "3 uint",
+    "4 ulong",
+    "5 uint",
+    "6 ubyte",
+    "7 string",
+    "8 int",
+]
+
+[types."synapse.cmd.FirmwareChunkRequest"]
+kind = "table"
+hash = "1721f8a3265daef710e121f9aa5791b6"
+fields = [
+    "0 string",
+    "1 uint",
+    "2 ulong",
+    "3 [ubyte]",
+    "4 string",
+    "5 bool",
+]
+
+[types."synapse.cmd.FirmwareCommitReply"]
+kind = "table"
+hash = "a339e4343f9f70ca3eff7f243d690749"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 string",
+    "2 synapse.cmd.FirmwareUpdateState",
+    "3 bool",
+    "4 string",
+    "5 int",
+]
+
+[types."synapse.cmd.FirmwareCommitRequest"]
+kind = "table"
+hash = "cd305d5ecb07daca4e7d751d520305ba"
+fields = [
+    "0 string",
+    "1 string",
+]
+
+[types."synapse.cmd.FirmwareInfoReply"]
+kind = "table"
+hash = "dd0cc569014263971c600acb4febcb38"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 string",
+    "2 string",
+    "3 string",
+    "4 string",
+    "5 synapse.cmd.FirmwareUpdateState",
+    "6 ushort",
+    "7 ulong",
+    "8 uint",
+    "9 string",
+    "10 int",
+]
+
+[types."synapse.cmd.FirmwareInfoRequest"]
+kind = "table"
+hash = "b20e8b2c172db8c940352ff89bdd54db"
+fields = ["0 string"]
+
+[types."synapse.cmd.FirmwareMaintenanceFlags"]
+kind = "enum"
+hash = "b3a2406aacceb83ea11770c98fb48713"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+]
+
+[types."synapse.cmd.FirmwarePrepareReply"]
+kind = "table"
+hash = "0491536ab2b3f9f44c4785ba537e0b1b"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 string",
+    "2 synapse.cmd.FirmwareUpdateState",
+    "3 uint",
+    "4 string",
+    "5 int",
+]
+
+[types."synapse.cmd.FirmwarePrepareRequest"]
+kind = "table"
+hash = "23e46edb90eaa1aa199d84df115c2b07"
+fields = [
+    "0 string",
+    "1 string",
+    "2 string",
+    "3 string",
+    "4 ulong",
+    "5 string",
+    "6 string",
+    "7 uint",
+    "8 uint",
+    "9 [ubyte]",
+    "10 string",
+]
+
+[types."synapse.cmd.FirmwareStatusReply"]
+kind = "table"
+hash = "76be3f626563dff31fa96e9f36505688"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 string",
+    "2 synapse.cmd.FirmwareUpdateState",
+    "3 ulong",
+    "4 ulong",
+    "5 uint",
+    "6 uint",
+    "7 ubyte",
+    "8 string",
+    "9 int",
+]
+
+[types."synapse.cmd.FirmwareStatusRequest"]
+kind = "table"
+hash = "b20e8b2c172db8c940352ff89bdd54db"
+fields = ["0 string"]
+
+[types."synapse.cmd.FirmwareUpdateState"]
+kind = "enum"
+hash = "9fd1144bc3fe858782eb42601336f0fa"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+]
+
+[types."synapse.cmd.MissionGetReply"]
+kind = "table"
+hash = "907fca8f173ab849120b5697f54371a0"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 uint",
+    "2 uint",
+    "3 uint",
+    "4 uint",
+    "5 int",
+    "6 uint",
+    "7 ushort",
+    "8 [synapse.cmd.MissionItemData]",
+]
+
+[types."synapse.cmd.MissionGetRequest"]
+kind = "table"
+hash = "e21dd4b5f8bb36cd5269037ae2972a8f"
+fields = [
+    "0 uint",
+    "1 uint",
+    "2 ushort",
+]
+
+[types."synapse.cmd.MissionItemData"]
+kind = "struct"
+hash = "8c94b0bbe72650682ca0b0d3f8f398c1"
+
+[types."synapse.cmd.MissionItemFlags"]
+kind = "enum"
+hash = "97fde3a619b99c26249cc2100efaeea3"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+]
+
+[types."synapse.cmd.MissionItemKind"]
+kind = "enum"
+hash = "166d335c1cfcd03c0b62c655b146788d"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+]
+
+[types."synapse.cmd.MissionSetReply"]
+kind = "table"
+hash = "04dc16acaa8e3f8945725cceaed66fd3"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 uint",
+    "2 uint",
+    "3 int",
+    "4 uint",
+    "5 ushort",
+]
+
+[types."synapse.cmd.MissionSetRequest"]
+kind = "table"
+hash = "a644647fcfc18ea5dc903e1ccda00730"
+fields = [
+    "0 uint",
+    "1 uint",
+    "2 uint",
+    "3 uint",
+    "4 uint",
+    "5 uint",
+    "6 ushort",
+    "7 [synapse.cmd.MissionItemData]",
+]
+
+[types."synapse.cmd.ParamGetReply"]
+kind = "table"
+hash = "fd55be73d9875a2d667ba7cd933f388c"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 [synapse.cmd.ParamValue]",
+    "2 uint",
+    "3 uint",
+    "4 int",
+    "5 ushort",
+]
+
+[types."synapse.cmd.ParamGetRequest"]
+kind = "table"
+hash = "06216dfcbd7ab5830bc8571ecc539394"
+fields = [
+    "0 string",
+    "1 uint",
+    "2 ushort",
+]
+
+[types."synapse.cmd.ParamKind"]
+kind = "enum"
+hash = "166d335c1cfcd03c0b62c655b146788d"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+]
+
+[types."synapse.cmd.ParamSetReply"]
+kind = "table"
+hash = "1803c8a41e32161f72de72be97adf65f"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 synapse.cmd.ParamValue",
+    "2 int",
+]
+
+[types."synapse.cmd.ParamSetRequest"]
+kind = "table"
+hash = "f152d940c5d2d6ff2ee5de4c3a47437c"
+fields = ["0 synapse.cmd.ParamValue"]
+
+[types."synapse.cmd.ParamValue"]
+kind = "table"
+hash = "e148157b573a3b3d127a0b102ddd85e0"
+fields = [
+    "0 string",
+    "1 synapse.cmd.ParamKind",
+    "2 double",
+    "3 long",
+    "4 string",
+]
+
+[types."synapse.cmd.TrajectoryGetReply"]
+kind = "table"
+hash = "148d8204f37d4b7dcf7f3118ded266db"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 uint",
+    "2 uint",
+    "3 uint",
+    "4 uint",
+    "5 int",
+    "6 uint",
+    "7 ushort",
+    "8 [synapse.topic.TrajectorySegmentData]",
+]
+
+[types."synapse.cmd.TrajectoryGetRequest"]
+kind = "table"
+hash = "e21dd4b5f8bb36cd5269037ae2972a8f"
+fields = [
+    "0 uint",
+    "1 uint",
+    "2 ushort",
+]
+
+[types."synapse.cmd.TrajectorySetReply"]
+kind = "table"
+hash = "04dc16acaa8e3f8945725cceaed66fd3"
+fields = [
+    "0 synapse.types.CommandResultCode",
+    "1 uint",
+    "2 uint",
+    "3 int",
+    "4 uint",
+    "5 ushort",
+]
+
+[types."synapse.cmd.TrajectorySetRequest"]
+kind = "table"
+hash = "e594087a32eed1e7d8594069007dddcc"
+fields = [
+    "0 uint",
+    "1 uint",
+    "2 uint",
+    "3 uint",
+    "4 uint",
+    "5 uint",
+    "6 ushort",
+    "7 [synapse.topic.TrajectorySegmentData]",
+]
+
+[types."synapse.cmd.TransferFlags"]
+kind = "enum"
+hash = "97fde3a619b99c26249cc2100efaeea3"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+]
+
+[types."synapse.topic.ActuatorCommand"]
+kind = "table"
+hash = "70acff02df5dafbaff7fcb31456925ab"
+fields = ["0 synapse.topic.ActuatorCommandData"]
+
+[types."synapse.topic.ActuatorCommandData"]
+kind = "struct"
+hash = "a55d1d3eabf16e68134e099c780ff636"
+
+[types."synapse.topic.ActuatorFeedback"]
+kind = "table"
+hash = "6321d4f259b391ee9644cb1248a83c24"
+fields = ["0 synapse.topic.ActuatorFeedbackData"]
+
+[types."synapse.topic.ActuatorFeedbackData"]
+kind = "struct"
+hash = "ab4d265808cb2e26c6241ffdab763f23"
+
+[types."synapse.topic.AirData"]
+kind = "table"
+hash = "468fb53f0271f3ed8d7b10880ca1527d"
+fields = ["0 synapse.topic.AirDataData"]
+
+[types."synapse.topic.AirDataData"]
+kind = "struct"
+hash = "3706edd570cf5b8efcc3e651b10258d5"
+
+[types."synapse.topic.AirDataFlags"]
+kind = "enum"
+hash = "b9c2bf867477d2285a729da669229269"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+]
+
+[types."synapse.topic.AttitudeCommand"]
+kind = "table"
+hash = "5cfbe9ddf21d3a6be65cd443a77670ac"
+fields = ["0 synapse.topic.AttitudeCommandData"]
+
+[types."synapse.topic.AttitudeCommandData"]
+kind = "struct"
+hash = "c3ecb8534b32e0344733a61541314606"
+
+[types."synapse.topic.AttitudeCommandMask"]
+kind = "enum"
+hash = "0d690bcb037f0306f9a46976ffb35ba7"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+]
+
+[types."synapse.topic.AttitudeEstimate"]
+kind = "table"
+hash = "954805260f8b0ae4e6819ed379705f24"
+fields = ["0 synapse.topic.AttitudeEstimateData"]
+
+[types."synapse.topic.AttitudeEstimateData"]
+kind = "struct"
+hash = "5d3c921891168b8825b7143ba87680e0"
+
+[types."synapse.topic.AttitudeEstimateFlags"]
+kind = "enum"
+hash = "7eb1b6429d7fcc1ae202fc3067892eb1"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+]
+
+[types."synapse.topic.BatteryCellVoltages16"]
+kind = "struct"
+hash = "e37979a3f471579849c3532fe47f0f88"
+
+[types."synapse.topic.ControlLoopMetrics"]
+kind = "table"
+hash = "d160b5fe8452c08f089c9a6ed86e6ebe"
+fields = ["0 synapse.topic.ControlLoopMetricsData"]
+
+[types."synapse.topic.ControlLoopMetricsData"]
+kind = "struct"
+hash = "9d793ca93ac97bce51a9110f0e33476a"
+
+[types."synapse.topic.EstimatorHealth"]
+kind = "table"
+hash = "152739c72128be7b1ab31f015f02c6f5"
+fields = ["0 synapse.topic.EstimatorHealthData"]
+
+[types."synapse.topic.EstimatorHealthData"]
+kind = "struct"
+hash = "4e93775a4e9fd3b53351d5c5913656db"
+
+[types."synapse.topic.ExternalOdometry"]
+kind = "table"
+hash = "60ffc06a7df4ddea259676506c544ed0"
+fields = ["0 synapse.topic.ExternalOdometryData"]
+
+[types."synapse.topic.ExternalOdometryCovariance"]
+kind = "table"
+hash = "582daa969447d752f8ca92f5f6c828b6"
+fields = ["0 synapse.topic.ExternalOdometryCovarianceData"]
+
+[types."synapse.topic.ExternalOdometryCovarianceData"]
+kind = "struct"
+hash = "3466ac8238957a7e277e9cf85576062a"
+
+[types."synapse.topic.ExternalOdometryData"]
+kind = "struct"
+hash = "f6887cddb6b00ae768b26344d66079d7"
+
+[types."synapse.topic.ExternalOdometryFlags"]
+kind = "enum"
+hash = "b9c2bf867477d2285a729da669229269"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+]
+
+[types."synapse.topic.ExternalOdometryStatus"]
+kind = "enum"
+hash = "adba4f68946da9a3c8b7baec4a8ae811"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+]
+
+[types."synapse.topic.FirmwareProgress"]
+kind = "table"
+hash = "1ad8770d18cc18ea53ee8ea85fb809f0"
+fields = [
+    "0 ulong",
+    "1 string",
+    "2 synapse.cmd.FirmwareUpdateState",
+    "3 synapse.types.CommandResultCode",
+    "4 ulong",
+    "5 ulong",
+    "6 uint",
+    "7 uint",
+    "8 ubyte",
+    "9 string",
+    "10 int",
+    "11 synapse.types.TimeStatus",
+]
+
+[types."synapse.topic.FlowLightMode"]
+kind = "enum"
+hash = "166d335c1cfcd03c0b62c655b146788d"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+]
+
+[types."synapse.topic.Frame"]
+kind = "table"
+hash = "db0c2ad8b6075a4c76351ed232f2687d"
+fields = [
+    "0 synapse.topic.FrameHeader",
+    "2 synapse.topic.SynapseMessage",
+]
+
+[types."synapse.topic.FrameHeader"]
+kind = "struct"
+hash = "5e7ecfdb41d112231d5c300bb57f3430"
+
+[types."synapse.topic.GcsStatus"]
+kind = "table"
+hash = "1666922cca76ec8939752d50e9f1e934"
+fields = ["0 synapse.topic.GcsStatusData"]
+
+[types."synapse.topic.GcsStatusData"]
+kind = "struct"
+hash = "470f61f80da57e3a33a912f13e1bcb94"
+
+[types."synapse.topic.GcsStatusFlags"]
+kind = "enum"
+hash = "56530bb3fd20eb756715459596715f95"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+]
+
+[types."synapse.topic.GlobalPositionEstimate"]
+kind = "table"
+hash = "904712f1e549f347a0b3608ac706ccde"
+fields = ["0 synapse.topic.GlobalPositionEstimateData"]
+
+[types."synapse.topic.GlobalPositionEstimateData"]
+kind = "struct"
+hash = "da3427e06d24f17fb0aeaf3f4e0028e9"
+
+[types."synapse.topic.GlobalPositionFlags"]
+kind = "enum"
+hash = "7eb1b6429d7fcc1ae202fc3067892eb1"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+]
+
+[types."synapse.topic.GnssFix"]
+kind = "table"
+hash = "dd30c4c26989e1bcb1210cc30c5355ea"
+fields = ["0 synapse.topic.GnssFixData"]
+
+[types."synapse.topic.GnssFixData"]
+kind = "struct"
+hash = "a6219969bfbec63af7ebdcff7e341abd"
+
+[types."synapse.topic.GnssFixFlags"]
+kind = "enum"
+hash = "d83ddb1523e4ebe4c1fd754aa938bea3"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+]
+
+[types."synapse.topic.HomeReference"]
+kind = "table"
+hash = "ced8ad4d5c6a0f44d6f8edc1696f0147"
+fields = ["0 synapse.topic.HomeReferenceData"]
+
+[types."synapse.topic.HomeReferenceData"]
+kind = "struct"
+hash = "22e6d5dc4996c348e9374b08916f7c74"
+
+[types."synapse.topic.HomeReferenceFlags"]
+kind = "enum"
+hash = "c870ae4e61f4d06bc70fb8fb02f1a073"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+]
+
+[types."synapse.topic.InertialFieldFlags"]
+kind = "enum"
+hash = "c870ae4e61f4d06bc70fb8fb02f1a073"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+]
+
+[types."synapse.topic.InertialSample"]
+kind = "table"
+hash = "e3a97ad3d38df42f879fc87e6fea619f"
+fields = ["0 synapse.topic.InertialSampleData"]
+
+[types."synapse.topic.InertialSampleData"]
+kind = "struct"
+hash = "bac2a4ce33390d6c66b61f9e9c4f9086"
+
+[types."synapse.topic.LocalPositionCommand"]
+kind = "table"
+hash = "cb363b4683fb073c0df3cab8a8b4d8f9"
+fields = ["0 synapse.topic.LocalPositionCommandData"]
+
+[types."synapse.topic.LocalPositionCommandData"]
+kind = "struct"
+hash = "723beff61b7d6d39af561e6e7dd02f76"
+
+[types."synapse.topic.LocalPositionCommandMask"]
+kind = "enum"
+hash = "e0df6990c02a926c87f80d6a992acc31"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+]
+
+[types."synapse.topic.LocalPositionEstimate"]
+kind = "table"
+hash = "0b144eb8cfbb52039a39c65f6db6b98a"
+fields = ["0 synapse.topic.LocalPositionEstimateData"]
+
+[types."synapse.topic.LocalPositionEstimateData"]
+kind = "struct"
+hash = "bfdecea451cf481983125c00f07f53db"
+
+[types."synapse.topic.LocalPositionFlags"]
+kind = "enum"
+hash = "d83ddb1523e4ebe4c1fd754aa938bea3"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+]
+
+[types."synapse.topic.LockstepStatus"]
+kind = "table"
+hash = "3625181c92389ae995adbd364091c4c0"
+fields = ["0 synapse.topic.LockstepStatusData"]
+
+[types."synapse.topic.LockstepStatusData"]
+kind = "struct"
+hash = "6426a479f3b3ad7d4033b427d8707877"
+
+[types."synapse.topic.LockstepStatusState"]
+kind = "enum"
+hash = "adba4f68946da9a3c8b7baec4a8ae811"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+]
+
+[types."synapse.topic.LockstepTick"]
+kind = "table"
+hash = "8a6556ac05dc4bccdde2ea2045012696"
+fields = ["0 synapse.topic.LockstepTickData"]
+
+[types."synapse.topic.LockstepTickData"]
+kind = "struct"
+hash = "9c69ee7d628cf675f840e9a5c1a97d6b"
+
+[types."synapse.topic.LockstepTickFlags"]
+kind = "enum"
+hash = "66c9b1299c4e2b63bcdc6c814c5e00eb"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+]
+
+[types."synapse.topic.MagFieldFlags"]
+kind = "enum"
+hash = "3a5bb03d617a603a83a0105e6416a141"
+underlying = "ubyte"
+bit_flags = true
+values = [1]
+
+[types."synapse.topic.MagneticField"]
+kind = "table"
+hash = "30f969220292c6662a060b1bfbc92c74"
+fields = ["0 synapse.topic.MagneticFieldData"]
+
+[types."synapse.topic.MagneticFieldData"]
+kind = "struct"
+hash = "b9f5682d58a39fd944eabb7f6b7e81c5"
+
+[types."synapse.topic.ManualControlAxes"]
+kind = "enum"
+hash = "1d9d350189222c8f429de522fa9a0a12"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+]
+
+[types."synapse.topic.ManualControlCommand"]
+kind = "table"
+hash = "7a6a52757fef1cced34bd951534a7a9c"
+fields = ["0 synapse.topic.ManualControlData"]
+
+[types."synapse.topic.ManualControlData"]
+kind = "struct"
+hash = "7014fa2129aabb7f64d7245eebca7c25"
+
+[types."synapse.topic.ManualControlFlags"]
+kind = "enum"
+hash = "d83ddb1523e4ebe4c1fd754aa938bea3"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+]
+
+[types."synapse.topic.MissionProgress"]
+kind = "table"
+hash = "75cdf896f5f9230cf7093962440f4a96"
+fields = ["0 synapse.topic.MissionProgressData"]
+
+[types."synapse.topic.MissionProgressData"]
+kind = "struct"
+hash = "42c23c893ca6dc17f310997eba980ff9"
+
+[types."synapse.topic.MocapFrame"]
+kind = "table"
+hash = "79a400ef2c15d5c95207f133f699cb74"
+fields = [
+    "0 ulong",
+    "1 uint",
+    "2 ushort",
+    "3 ushort",
+    "4 ubyte",
+    "5 ushort",
+    "6 [synapse.topic.MocapMarkerData]",
+    "7 [synapse.topic.MocapMarkerData]",
+    "8 [synapse.topic.MocapRigidBodyData]",
+    "9 synapse.types.TimeStatus",
+]
+
+[types."synapse.topic.MocapMarkerData"]
+kind = "struct"
+hash = "5cd277e0677e7afe281abbd4794b31b3"
+
+[types."synapse.topic.MocapPoseFrame"]
+kind = "table"
+hash = "7076cfbf399c86838e325d8fdd27a70f"
+fields = [
+    "0 ulong",
+    "1 uint",
+    "2 ushort",
+    "3 ushort",
+    "4 ubyte",
+    "5 ushort",
+    "6 [synapse.topic.MocapMarkerData]",
+    "7 [synapse.topic.MocapMarkerData]",
+    "8 [synapse.topic.MocapRigidBodyPoseData]",
+    "9 synapse.types.TimeStatus",
+]
+
+[types."synapse.topic.MocapRawComponent"]
+kind = "enum"
+hash = "166d335c1cfcd03c0b62c655b146788d"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+]
+
+[types."synapse.topic.MocapRawFlags"]
+kind = "enum"
+hash = "2616f2bcc794cef9f3b277eeaf8fc3d9"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+]
+
+[types."synapse.topic.MocapRigidBodyData"]
+kind = "struct"
+hash = "36a160dae6f17caef5ee839fb82a1172"
+
+[types."synapse.topic.MocapRigidBodyPoseData"]
+kind = "struct"
+hash = "79e4d1e5c32beeb599bc2512aa6156c3"
+
+[types."synapse.topic.NavigationTarget"]
+kind = "table"
+hash = "ceeb9ab511029468e09102efcaec21c5"
+fields = ["0 synapse.topic.NavigationTargetData"]
+
+[types."synapse.topic.NavigationTargetData"]
+kind = "struct"
+hash = "8799d2a9310e0ec7181be617cb607fb3"
+
+[types."synapse.topic.Odometry"]
+kind = "table"
+hash = "e47e1802a8c9d543211b840e7c6ef928"
+fields = ["0 synapse.topic.OdometryData"]
+
+[types."synapse.topic.OdometryData"]
+kind = "struct"
+hash = "7a51adb6a22caa2e3a6f78d5703b6752"
+
+[types."synapse.topic.OdometryEstimate"]
+kind = "table"
+hash = "f3b43c755b81fdeed28f857c66ea9120"
+fields = ["0 synapse.topic.OdometryEstimateData"]
+
+[types."synapse.topic.OdometryEstimateData"]
+kind = "struct"
+hash = "d38bfc584a7aa79d7095356b930a7a13"
+
+[types."synapse.topic.OdometryFlags"]
+kind = "enum"
+hash = "b9c2bf867477d2285a729da669229269"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+]
+
+[types."synapse.topic.OdometryStatus"]
+kind = "enum"
+hash = "adba4f68946da9a3c8b7baec4a8ae811"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+]
+
+[types."synapse.topic.OdometryWithCovariance"]
+kind = "table"
+hash = "baf3b87c0e8b27b1787cce1a12b2d797"
+fields = ["0 synapse.topic.OdometryWithCovarianceData"]
+
+[types."synapse.topic.OdometryWithCovarianceData"]
+kind = "struct"
+hash = "3dbc91bd13dab311cdcdc23cb39849a7"
+
+[types."synapse.topic.OpticalFlow"]
+kind = "table"
+hash = "3d60eed7b79e735d65c7813d86898837"
+fields = ["0 synapse.topic.OpticalFlowData"]
+
+[types."synapse.topic.OpticalFlowData"]
+kind = "struct"
+hash = "1743432ff933326fb2e57f61800200fe"
+
+[types."synapse.topic.OpticalFlowVelocity"]
+kind = "table"
+hash = "3da66ac61021ead118d1934ae3ba58ce"
+fields = ["0 synapse.topic.OpticalFlowVelocityData"]
+
+[types."synapse.topic.OpticalFlowVelocityData"]
+kind = "struct"
+hash = "ce546d5e9473324118c70020fa82dc9d"
+
+[types."synapse.topic.Pose"]
+kind = "table"
+hash = "e6de9e85843009994a9f59582eb7e9d9"
+fields = ["0 synapse.topic.PoseData"]
+
+[types."synapse.topic.PoseData"]
+kind = "struct"
+hash = "cb4981e34e293dd7946adde1471f9d08"
+
+[types."synapse.topic.PoseWithCovariance"]
+kind = "table"
+hash = "305aedd7459bea95de395f1c49ea3f82"
+fields = ["0 synapse.topic.PoseWithCovarianceData"]
+
+[types."synapse.topic.PoseWithCovarianceData"]
+kind = "struct"
+hash = "8054a0dd67782f019f5932a1b1b30b28"
+
+[types."synapse.topic.PowerFaultFlags"]
+kind = "enum"
+hash = "df990a169363c5d9aea04caa1139ce7d"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+]
+
+[types."synapse.topic.PowerStatus"]
+kind = "table"
+hash = "0b559908b36173630d8df63bbcbde0be"
+fields = ["0 synapse.topic.PowerStatusData"]
+
+[types."synapse.topic.PowerStatusData"]
+kind = "struct"
+hash = "2f072e64a10883ace56db0469cec9f7b"
+
+[types."synapse.topic.PwmSignalOutputs"]
+kind = "table"
+hash = "e35bdfced0ab7549708067513721bfec"
+fields = ["0 synapse.topic.PwmSignalOutputsData"]
+
+[types."synapse.topic.PwmSignalOutputsData"]
+kind = "struct"
+hash = "d1adf4eb576182cda34cddf60a130b47"
+
+[types."synapse.topic.RadioControl"]
+kind = "table"
+hash = "7646a19f322e14e3c50e7a82f9afe8f4"
+fields = ["0 synapse.topic.RadioControlData"]
+
+[types."synapse.topic.RadioControlData"]
+kind = "struct"
+hash = "c6bc2c11613e2698f6daf3664fb4dde0"
+
+[types."synapse.topic.RateCommand"]
+kind = "table"
+hash = "296c144a87c1765479eecac27713987f"
+fields = ["0 synapse.topic.RateCommandData"]
+
+[types."synapse.topic.RateCommandData"]
+kind = "struct"
+hash = "786b8532a251625dd278dadc2dd4e69f"
+
+[types."synapse.topic.RateCommandMask"]
+kind = "enum"
+hash = "d83ddb1523e4ebe4c1fd754aa938bea3"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+]
+
+[types."synapse.topic.RawPose"]
+kind = "table"
+hash = "f9ef8c8172829bb53256fcf073e86fab"
+fields = ["0 synapse.topic.RawPoseData"]
+
+[types."synapse.topic.RawPoseData"]
+kind = "struct"
+hash = "cb4981e34e293dd7946adde1471f9d08"
+
+[types."synapse.topic.SensorComponentFlags"]
+kind = "enum"
+hash = "e855ce77b7c4b83d0fcba9c3210452ab"
+underlying = "uint"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048,
+    4096,
+    8192,
+    16384,
+    32768,
+]
+
+[types."synapse.topic.SynapseMessage"]
+kind = "union"
+hash = "be7fb5bb18b168c7d184b983759cf669"
+members = [
+    "1 synapse.topic.VehicleHealth",
+    "2 synapse.topic.TimeReference",
+    "3 synapse.topic.RadioControl",
+    "4 synapse.topic.ManualControlCommand",
+    "5 synapse.topic.InertialSample",
+    "6 synapse.topic.AirData",
+    "7 synapse.topic.PowerStatus",
+    "8 synapse.topic.GnssFix",
+    "9 synapse.topic.OpticalFlow",
+    "10 synapse.topic.OpticalFlowVelocity",
+    "11 synapse.topic.AttitudeEstimate",
+    "12 synapse.topic.LocalPositionEstimate",
+    "13 synapse.topic.GlobalPositionEstimate",
+    "14 synapse.topic.OdometryEstimate",
+    "15 synapse.topic.EstimatorHealth",
+    "16 synapse.topic.MissionProgress",
+    "17 synapse.topic.NavigationTarget",
+    "18 synapse.topic.HomeReference",
+    "19 synapse.topic.AttitudeCommand",
+    "20 synapse.topic.RateCommand",
+    "21 synapse.topic.LocalPositionCommand",
+    "22 synapse.topic.TrajectorySegment",
+    "23 synapse.topic.ActuatorCommand",
+    "24 synapse.topic.ActuatorFeedback",
+    "25 synapse.topic.PwmSignalOutputs",
+    "26 synapse.topic.ControlLoopMetrics",
+    "27 synapse.topic.TextStatus",
+    "28 synapse.topic.GcsStatus",
+    "29 synapse.topic.ExternalOdometry",
+    "30 synapse.topic.ExternalOdometryCovariance",
+    "31 synapse.topic.MocapFrame",
+    "32 synapse.topic.LockstepTick",
+    "33 synapse.topic.LockstepStatus",
+    "34 synapse.topic.FirmwareProgress",
+    "35 synapse.topic.RawPose",
+    "36 synapse.topic.Pose",
+    "37 synapse.topic.PoseWithCovariance",
+    "38 synapse.topic.Twist",
+    "39 synapse.topic.TwistWithCovariance",
+    "40 synapse.topic.Odometry",
+    "41 synapse.topic.OdometryWithCovariance",
+    "42 synapse.topic.MocapPoseFrame",
+    "43 synapse.topic.MagneticField",
+]
+
+[types."synapse.topic.TextStatus"]
+kind = "table"
+hash = "12424c3e64ce32dc966a31f634ebb2ff"
+fields = [
+    "0 ulong",
+    "1 synapse.types.Severity=6",
+    "2 string",
+    "3 synapse.types.TimeStatus",
+]
+
+[types."synapse.topic.TimeReference"]
+kind = "table"
+hash = "21a46fff07d2040dd57189e68522384a"
+fields = ["0 synapse.topic.TimeReferenceData"]
+
+[types."synapse.topic.TimeReferenceData"]
+kind = "struct"
+hash = "43409688e97e3afd97bdc64051a98217"
+
+[types."synapse.topic.TopicId"]
+kind = "enum"
+hash = "1647f827759870bb1f8fce2ed8dc3875"
+underlying = "ushort"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+]
+
+[types."synapse.topic.TrajectoryDegree"]
+kind = "enum"
+hash = "bac93cab9e126368bd3f068e438d89a7"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    3,
+    5,
+    7,
+]
+
+[types."synapse.topic.TrajectorySegment"]
+kind = "table"
+hash = "17178e098f5d2c506152753ffcdf267b"
+fields = ["0 synapse.topic.TrajectorySegmentData"]
+
+[types."synapse.topic.TrajectorySegmentData"]
+kind = "struct"
+hash = "feed46a63427a8483c3847e52c628d42"
+
+[types."synapse.topic.TrajectorySegmentFlags"]
+kind = "enum"
+hash = "2616f2bcc794cef9f3b277eeaf8fc3d9"
+underlying = "ushort"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+]
+
+[types."synapse.topic.TrajectoryType"]
+kind = "enum"
+hash = "13e0fb5f0a01f5bd7913fd11b993e483"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+]
+
+[types."synapse.topic.Twist"]
+kind = "table"
+hash = "79461324223062e7c8fbb980e389b0bf"
+fields = ["0 synapse.topic.TwistData"]
+
+[types."synapse.topic.TwistData"]
+kind = "struct"
+hash = "89f042865a9c72d8284c6860c8098f0f"
+
+[types."synapse.topic.TwistWithCovariance"]
+kind = "table"
+hash = "08ddbab5dac9bba8418ed3b7376c57d7"
+fields = ["0 synapse.topic.TwistWithCovarianceData"]
+
+[types."synapse.topic.TwistWithCovarianceData"]
+kind = "struct"
+hash = "c746a4c3ef7e212e8dbbca2f73e46eff"
+
+[types."synapse.topic.VehicleHealth"]
+kind = "table"
+hash = "b377cc05128b19c71a2c3220b0b71d16"
+fields = ["0 synapse.topic.VehicleHealthData"]
+
+[types."synapse.topic.VehicleHealthData"]
+kind = "struct"
+hash = "606e7eaaea100b91d729e2496dcc8afd"
+
+[types."synapse.topic.VehicleHealthFlags"]
+kind = "enum"
+hash = "7eb1b6429d7fcc1ae202fc3067892eb1"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+]
+
+[types."synapse.types.BatteryChargeState"]
+kind = "enum"
+hash = "133ac5e276d6c57e4b0eff4fca547f4e"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+]
+
+[types."synapse.types.BatteryFunction"]
+kind = "enum"
+hash = "166d335c1cfcd03c0b62c655b146788d"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+]
+
+[types."synapse.types.BatteryType"]
+kind = "enum"
+hash = "fabe8728c4f517c3d5afe8fa6ac7d698"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+]
+
+[types."synapse.types.CommandResultCode"]
+kind = "enum"
+hash = "adba4f68946da9a3c8b7baec4a8ae811"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+]
+
+[types."synapse.types.CovarianceUpperTriangle21f"]
+kind = "struct"
+hash = "193682c38a9cbba0c1fd617b632a763c"
+
+[types."synapse.types.CovarianceUpperTriangle78f"]
+kind = "struct"
+hash = "b0547a4bba4deef08aeac7ff9163f025"
+
+[types."synapse.types.GeoAltitudeFrame"]
+kind = "enum"
+hash = "166d335c1cfcd03c0b62c655b146788d"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+]
+
+[types."synapse.types.GnssFixType"]
+kind = "enum"
+hash = "133ac5e276d6c57e4b0eff4fca547f4e"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+]
+
+[types."synapse.types.LocalFrame"]
+kind = "enum"
+hash = "9a39fad08f2cf41ad2ca37b1e6425977"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+]
+
+[types."synapse.types.MissionState"]
+kind = "enum"
+hash = "fc4aff00d04b94ef09df433926d6b4c1"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+]
+
+[types."synapse.types.Posef"]
+kind = "struct"
+hash = "d22977718785de8125a6c2b3f810f7c2"
+
+[types."synapse.types.Quaternionf"]
+kind = "struct"
+hash = "60ea7721691c4ccf82471a14e9bb0e9a"
+
+[types."synapse.types.RateTriplet"]
+kind = "struct"
+hash = "239e11564faa5ff080437573c47f9bce"
+
+[types."synapse.types.RotationMatrix3f"]
+kind = "struct"
+hash = "ad81786bbffc210d73063e2d8cbfe1ad"
+
+[types."synapse.types.Severity"]
+kind = "enum"
+hash = "133ac5e276d6c57e4b0eff4fca547f4e"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+]
+
+[types."synapse.types.TimeStatus"]
+kind = "enum"
+hash = "13e0fb5f0a01f5bd7913fd11b993e483"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+]
+
+[types."synapse.types.Twistf"]
+kind = "struct"
+hash = "f6b37a56f61cc98ab3781787e47b46af"
+
+[types."synapse.types.Vec2f"]
+kind = "struct"
+hash = "1ed0469946e7337a25d7dd7e14d9d87c"
+
+[types."synapse.types.Vec3f"]
+kind = "struct"
+hash = "cd3d5a6ccfa473a3facba1062146fece"
