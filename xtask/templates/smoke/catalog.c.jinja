@@ -1,0 +1,74 @@
+#include "topic_catalog.h"
+#include <assert.h>
+#include <stdio.h>
+
+int main(void) {
+    assert(strlen(SYNAPSE_SCHEMA_SET_HASH) == 32);
+    assert(strcmp(SYNAPSE_MCAP_PROFILE, "synapse/1") == 0);
+    assert(strcmp(SYNAPSE_MCAP_SCHEMA_ENCODING, "flatbuffer") == 0);
+    assert(strcmp(SYNAPSE_MCAP_MESSAGE_ENCODING, "flatbuffer") == 0);
+    assert(strcmp(SYNAPSE_MCAP_METADATA_NAME, "synapse") == 0);
+    assert(strcmp(SYNAPSE_MCAP_TIME_BASIS_MONOTONIC_BOOT,
+                  "monotonic_boot") == 0);
+    const char *ns = NULL;
+    size_t ns_len = 0;
+    int32_t instance = -2;
+
+    const synapse_topic_info_t *topic = synapse_topic_parse_key(
+        "cub1/imu/0", &ns, &ns_len, &instance);
+    assert(topic != NULL && strcmp(topic->name, "InertialSample") == 0);
+    assert(ns_len == 4 && strncmp(ns, "cub1", ns_len) == 0);
+    assert(instance == 0);
+
+    topic = synapse_topic_parse_key(
+        "/cub1/gnss", &ns, &ns_len, &instance);
+    assert(topic != NULL && strcmp(topic->name, "GnssFix") == 0);
+    assert(ns_len == 4 && strncmp(ns, "cub1", ns_len) == 0);
+    assert(instance == -1);
+
+    topic = synapse_topic_parse_key(
+        "qualisys/cub1/external_pose", &ns, &ns_len, &instance);
+    assert(topic != NULL && strcmp(topic->name, "ExternalOdometry") == 0);
+    assert(ns_len == 13 && strncmp(ns, "qualisys/cub1", ns_len) == 0);
+    assert(instance == -1);
+
+    topic = synapse_topic_parse_key("health/", NULL, NULL, NULL);
+    assert(topic != NULL && strcmp(topic->name, "VehicleHealth") == 0);
+
+    topic = synapse_topic_parse_key("health", &ns, &ns_len, &instance);
+    assert(topic != NULL && ns_len == 0 && instance == -1);
+
+    assert(synapse_topic_parse_key("imu/+1", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key(
+        "imu/4294967296", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key("cub1/nope", NULL, NULL, NULL) == NULL);
+    assert(synapse_topic_parse_key("imu/0/extra", NULL, NULL, NULL) == NULL);
+
+    const synapse_topic_info_t *by_key = synapse_topic_by_key("cub1/health");
+    assert(by_key != NULL && by_key->id == 1);
+
+    const synapse_topic_info_t *odom = synapse_topic_by_name("Odometry");
+    assert(odom != NULL &&
+           strcmp(odom->mcap_schema_name, "synapse.topic.Odometry") == 0 &&
+           strcmp(odom->mcap_schema_file, "bfbs/state.bfbs") == 0);
+
+    const synapse_command_info_t *command = synapse_command_by_name("param_get");
+    assert(command != NULL && command->id == 1 &&
+           strcmp(command->request_type, "synapse.cmd.ParamGetRequest") == 0);
+    assert(strcmp(command->request_encoding, "table") == 0 &&
+           command->request_size == 0);
+    assert(strlen(command->request_schema_hash) == 32 &&
+           strlen(command->reply_schema_hash) == 32);
+
+    command = synapse_command_by_name("firmware_prepare");
+    assert(command != NULL && command->id == 9 &&
+           strcmp(command->key, "cmd/firmware_prepare") == 0 &&
+           strcmp(command->request_type,
+                  "synapse.cmd.FirmwarePrepareRequest") == 0);
+
+    topic = synapse_topic_by_key("fw");
+    assert(topic != NULL && topic->id == 34 && !topic->fixed_layout);
+
+    printf("catalog c helpers ok\n");
+    return 0;
+}

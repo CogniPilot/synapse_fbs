@@ -24,8 +24,8 @@ incompatible change requires a new profile name such as `synapse/2`.
   timestamps in Message records and requires `TimeReference` samples that map
   that clock to Unix time.
 - `Message.log_time` is the time at which the logger accepted the sample,
-  expressed in the selected basis. A topic payload's `timestamp_us` becomes
-  `Message.publish_time = timestamp_us * 1000` without rounding. When the
+  expressed in the selected basis. A topic payload's `timestamp_ns` becomes
+  `Message.publish_time = timestamp_ns` without conversion. When the
   sample has no publication timestamp, `publish_time` equals `log_time`.
 
 ## Topic schemas and channels

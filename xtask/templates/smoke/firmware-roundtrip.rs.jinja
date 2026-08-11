@@ -1,0 +1,93 @@
+use flatbuffers::FlatBufferBuilder;
+use synapse_fbs::{
+    cmd::{FirmwarePrepareRequest, FirmwarePrepareRequestArgs, FirmwareUpdateState},
+    topic::{FirmwareProgress, FirmwareProgressArgs},
+    types::{CommandResultCode, TimeStatus},
+};
+
+#[test]
+fn firmware_prepare_request_round_trips() {
+    let mut builder = FlatBufferBuilder::new();
+    let update_id = builder.create_string("update-42");
+    let target = builder.create_string("cubs2");
+    let board_id = builder.create_string("mr_vmu_tropic");
+    let version = builder.create_string("candidate-1");
+    let image_hash = "a".repeat(64);
+    let selective_hash = "b".repeat(64);
+    let image_sha256 = builder.create_string(&image_hash);
+    let selective_sha256 = builder.create_string(&selective_hash);
+    let signature = builder.create_vector(&[0x10_u8, 0x20, 0x30, 0x40]);
+    let manifest = builder.create_string(r#"{"format":"bin"}"#);
+    let request = FirmwarePrepareRequest::create(
+        &mut builder,
+        &FirmwarePrepareRequestArgs {
+            update_id: Some(update_id),
+            target: Some(target),
+            board_id: Some(board_id),
+            version: Some(version),
+            image_size: 4096,
+            image_sha256: Some(image_sha256),
+            selective_sha256: Some(selective_sha256),
+            requested_chunk_size: 512,
+            chunk_count: 8,
+            signature: Some(signature),
+            manifest: Some(manifest),
+        },
+    );
+    builder.finish(request, None);
+
+    let decoded = flatbuffers::root::<FirmwarePrepareRequest>(builder.finished_data()).unwrap();
+    assert_eq!(decoded.update_id(), Some("update-42"));
+    assert_eq!(decoded.target(), Some("cubs2"));
+    assert_eq!(decoded.board_id(), Some("mr_vmu_tropic"));
+    assert_eq!(decoded.version(), Some("candidate-1"));
+    assert_eq!(decoded.image_size(), 4096);
+    assert_eq!(decoded.image_sha256(), Some(image_hash.as_str()));
+    assert_eq!(decoded.selective_sha256(), Some(selective_hash.as_str()));
+    assert_eq!(decoded.requested_chunk_size(), 512);
+    assert_eq!(decoded.chunk_count(), 8);
+    assert_eq!(
+        decoded.signature().unwrap().iter().collect::<Vec<_>>(),
+        [0x10, 0x20, 0x30, 0x40]
+    );
+    assert_eq!(decoded.manifest(), Some(r#"{"format":"bin"}"#));
+}
+
+#[test]
+fn firmware_progress_round_trips() {
+    let mut builder = FlatBufferBuilder::new();
+    let update_id = builder.create_string("update-42");
+    let message = builder.create_string("chunk accepted");
+    let progress = FirmwareProgress::create(
+        &mut builder,
+        &FirmwareProgressArgs {
+            timestamp_ns: 123_456_000,
+            update_id: Some(update_id),
+            state: FirmwareUpdateState::Receiving,
+            result: CommandResultCode::InProgress,
+            received_bytes: 512,
+            total_bytes: 4096,
+            received_chunks: 1,
+            total_chunks: 8,
+            progress_pct: 12,
+            message: Some(message),
+            result_detail: -7,
+            time_status: TimeStatus::GptpSynced,
+        },
+    );
+    builder.finish(progress, None);
+
+    let decoded = flatbuffers::root::<FirmwareProgress>(builder.finished_data()).unwrap();
+    assert_eq!(decoded.timestamp_ns(), 123_456_000);
+    assert_eq!(decoded.update_id(), Some("update-42"));
+    assert_eq!(decoded.state(), FirmwareUpdateState::Receiving);
+    assert_eq!(decoded.result(), CommandResultCode::InProgress);
+    assert_eq!(decoded.received_bytes(), 512);
+    assert_eq!(decoded.total_bytes(), 4096);
+    assert_eq!(decoded.received_chunks(), 1);
+    assert_eq!(decoded.total_chunks(), 8);
+    assert_eq!(decoded.progress_pct(), 12);
+    assert_eq!(decoded.message(), Some("chunk accepted"));
+    assert_eq!(decoded.result_detail(), -7);
+    assert_eq!(decoded.time_status(), TimeStatus::GptpSynced);
+}

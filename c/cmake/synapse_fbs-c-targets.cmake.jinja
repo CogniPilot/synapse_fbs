@@ -14,7 +14,9 @@ target_include_directories(synapse_fbs_c INTERFACE
 )
 
 add_library(synapse_fbs_flatcc_runtime STATIC EXCLUDE_FROM_ALL
-{{ runtime_source_paths }}
+{% for source in runtime_sources -%}
+{{ "  " }}"${_SYNAPSE_FBS_ROOT}/src/flatcc-runtime/{{ source }}"
+{% endfor -%}
 )
 add_library(synapse_fbs::flatcc_runtime ALIAS synapse_fbs_flatcc_runtime)
 
@@ -29,7 +31,9 @@ target_link_libraries(synapse_fbs_print PUBLIC synapse_fbs_c)
 
 add_library(synapse_fbs_mcap STATIC EXCLUDE_FROM_ALL
   "${_SYNAPSE_FBS_ROOT}/src/mcap.c"
-{{ mcap_bfbs_source_paths }}
+{% for source in mcap_bfbs_sources -%}
+{{ "  " }}"${_SYNAPSE_FBS_ROOT}/src/bfbs/{{ source }}"
+{% endfor -%}
 )
 add_library(synapse_fbs::mcap ALIAS synapse_fbs_mcap)
 

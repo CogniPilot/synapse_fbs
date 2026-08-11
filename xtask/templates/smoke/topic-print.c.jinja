@@ -1,0 +1,63 @@
+#include "topic_catalog.h"
+#include <synapse/topic_print.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    const synapse_topic_info_t *health = synapse_topic_by_name("VehicleHealth");
+    assert(health != NULL && health->fixed_layout);
+
+    const synapse_topic_fields_t *fields = synapse_topic_fields_by_id(health->id);
+    assert(fields != NULL);
+    assert(fields->payload_size == health->payload_size);
+    assert(fields->field_count > 0);
+
+    unsigned char payload[256] = {0};
+    assert(fields->payload_size <= sizeof(payload));
+
+    const synapse_field_desc_t *flight_mode = NULL;
+    for (uint16_t i = 0; i < fields->field_count; ++i) {
+        if (strcmp(fields->fields[i].name, "flight_mode") == 0) {
+            flight_mode = &fields->fields[i];
+        }
+    }
+    assert(flight_mode != NULL && flight_mode->kind == SYNAPSE_FIELD_U8);
+    payload[flight_mode->offset] = 7;
+
+    char line[512];
+    int written = synapse_topic_snprint(line, sizeof(line), health->id, payload,
+                                        fields->payload_size);
+    assert(written > 0 && (size_t)written == strlen(line));
+    assert(strstr(line, "flight_mode=7") != NULL);
+    assert(strstr(line, "timestamp_ns=0") != NULL);
+
+    const synapse_topic_info_t *attitude = synapse_topic_by_name("AttitudeEstimate");
+    assert(attitude != NULL);
+    const synapse_topic_fields_t *attitude_fields =
+        synapse_topic_fields_by_id(attitude->id);
+    assert(attitude_fields != NULL);
+    bool found_quat_w = false;
+    for (uint16_t i = 0; i < attitude_fields->field_count; ++i) {
+        if (strcmp(attitude_fields->fields[i].name, "attitude.w") == 0) {
+            found_quat_w = true;
+            assert(attitude_fields->fields[i].kind == SYNAPSE_FIELD_F32);
+        }
+    }
+    assert(found_quat_w);
+
+    const synapse_topic_info_t *text = synapse_topic_by_name("TextStatus");
+    assert(text != NULL && !text->fixed_layout);
+    assert(synapse_topic_fields_by_id(text->id) == NULL);
+    assert(synapse_topic_snprint(line, sizeof(line), health->id, payload,
+                                 fields->payload_size + 1) < 0);
+
+    char tiny[8];
+    int full = synapse_topic_snprint(tiny, sizeof(tiny), health->id, payload,
+                                     fields->payload_size);
+    assert(full == written);
+    assert(strlen(tiny) < sizeof(tiny));
+
+    printf("topic print c helpers ok\n");
+    return 0;
+}

@@ -5,7 +5,14 @@ edition = "2024"
 publish = false
 
 [dependencies]
+flatbuffers-reflection = "=0.1.0"
 minijinja = { version = "=2.19.0", features = ["json"] }
 serde = { version = "1.0.228", features = ["derive"] }
 sha2 = "0.10"
 toml = "=0.9.9"
+
+[lints.clippy]
+# Generated text belongs in MiniJinja templates, never in Rust string builders.
+format_push_string = "deny"
+string_add = "deny"
+string_add_assign = "deny"

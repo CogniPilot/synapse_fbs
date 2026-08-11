@@ -1,0 +1,9 @@
+#include <stddef.h>
+#include <stdint.h>
+
+const uint8_t synapse_bfbs_{{ stem }}[] = {
+{% for chunk in bytes|batch(12) -%}
+{{ "    " }}{% for byte in chunk %}0x{{ "%02x"|format(byte) }}, {% endfor %}
+{% endfor -%}
+};
+const size_t synapse_bfbs_{{ stem }}_size = sizeof(synapse_bfbs_{{ stem }});

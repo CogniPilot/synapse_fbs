@@ -1,7 +1,6 @@
 # synapse_fbs
 
 [![CI](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml)
-[![Schema docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://cognipilot.github.io/synapse_fbs/)
 [![crates.io](https://img.shields.io/crates/v/synapse_fbs)](https://crates.io/crates/synapse_fbs)
 [![PyPI](https://img.shields.io/pypi/v/synapse-fbs)](https://pypi.org/project/synapse-fbs/)
 [![npm](https://img.shields.io/npm/v/@cognipilot/synapse-fbs)](https://www.npmjs.com/package/@cognipilot/synapse-fbs)
@@ -12,11 +11,8 @@ This repository is the schema source of truth for Synapse messages. It keeps
 the checked-in source small and uses CI to generate the language bindings and
 release artifacts from the pinned Linux toolchain in `flake.nix`.
 
-## Documentation and Packages
+## Packages
 
-- Schema docs: <https://cognipilot.github.io/synapse_fbs/>
-- Main-branch schema docs: <https://cognipilot.github.io/synapse_fbs/main/>
-- Latest 0.7 schema docs: <https://cognipilot.github.io/synapse_fbs/0.7/>
 - Design use cases: [USE_CASES.md](USE_CASES.md)
 - GitHub releases: <https://github.com/CogniPilot/synapse_fbs/releases>
 - Rust crate: <https://crates.io/crates/synapse_fbs>
@@ -197,7 +193,7 @@ carry the high-rate geometry, while `PoseWithCovariance` and
 coherent pose/twist estimate with status metadata; `OdometryWithCovariance`
 adds the complete 12x12 covariance, including pose-twist cross-correlations.
 The nested `synapse.types.Posef` and `Twistf` structs are deliberately
-unstamped. Each top-level topic payload carries one `timestamp_us`, and nested
+unstamped. Each top-level topic payload carries one `timestamp_ns`, and nested
 state in one odometry or mocap frame inherits that outer timestamp.
 
 **Mocap has raw and estimator paths.** `MocapPoseFrame` preserves source-like
@@ -377,10 +373,10 @@ naturally variable-size, optional, or needs FlatBuffers root/union behavior:
 thin root wrappers around fixed structs, transport envelopes, text status,
 and request/reply transfer messages.
 
-Schema validation is enforced by `xtask`: every entity and field must be
-documented, quantitative fields must carry a recognized unit suffix, `TopicId`
-must be contiguous and mirror the `SynapseMessage` union, and payload struct
-sizes are computed and checked on every build.
+Schema validation starts with FlatCC. `xtask` consumes FlatCC's compiled BFBS
+reflection to verify that `TopicId` is contiguous and mirrors the
+`SynapseMessage` union, resolve command types, read payload sizes and field
+offsets, and enforce the published wire-schema hashes.
 
 ## Contents
 
@@ -419,12 +415,11 @@ from `fbs/all.fbs` before building release packages.
 
 ## Version Pins
 
-Generation is version-locked from `flake.nix`. CI builds a vendored `flatc`
-from `flatbuffers-build = "=0.2.4+flatc-25.12.19"` and verifies that the
-compiler reports `flatc version 25.12.19`. The Rust package depends on
-`flatbuffers = "=25.12.19"` and the Python package depends on
-`flatbuffers==25.12.19` so generated code and runtimes stay in lockstep. CI
-also builds pinned FlatCC, uses pinned `mdbook` for schema documentation, and
+Generation is version-locked from `flake.nix`. FlatCC generates the C bindings
+and every BFBS/reflection schema consumed by `xtask`. The Nix-pinned upstream
+`flatc` is used only for its Rust, Python, and C++ binding generators. The Rust
+package depends on `flatbuffers = "=25.12.19"` and the Python package depends
+on `flatbuffers==25.12.19` so generated code and runtimes stay in lockstep. CI
 publishes generated C and C++ archives for downstream CMake consumers.
 Release tags must match `package.version` in `flake.nix`; the build fails
 otherwise.
@@ -537,7 +532,7 @@ header-only.
 The repository is built from a pinned Linux toolchain in `flake.nix`. The flake
 targets `x86_64-linux` and `aarch64-linux`; on non-Linux hosts, use a Linux VM,
 container, or WSL environment. Install Nix with flakes enabled, then run
-commands through `nix develop` so Cargo, FlatBuffers, FlatCC, mdBook, Node,
+commands through `nix develop` so Cargo, FlatBuffers, FlatCC, Node,
 Python packaging tools, and GitHub CLI all come from the same pinned
 environment CI uses.
 
@@ -549,8 +544,8 @@ nix develop
 
 The examples below use the one-off `nix develop --command` form.
 
-Fast schema validation (parse, doc-comment enforcement, unit-suffix lint,
-TopicId/union consistency, payload sizes, catalog helper smoke tests):
+Fast schema validation (FlatCC compilation, TopicId/union consistency, payload
+sizes, compatibility checks, and catalog helper smoke tests):
 
 ```sh
 nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- check
@@ -567,18 +562,6 @@ packages under `target/xtask/packages/`, creates the C/C++ tarballs under
 `target/xtask/artifacts/`, includes pinned `bfbs/*.bfbs` reflection schemas
 and `bfbs.sha256` manifests in those archives, and smoke-tests the C archive
 through CMake `FetchContent`.
-
-Generate the static schema documentation locally:
-
-```sh
-nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- docs --version 0.7 --out-dir target/xtask/docs
-```
-
-The docs are generated from `fbs/*.fbs` into an mdBook site with sidebar
-navigation, search, selectable themes, and version selection. The generated
-site copies the source schemas alongside the HTML and infers unit/scale notes
-from field suffixes such as `_enu_`, `_flu_`, `_deg_e7`, `_mm`, `_cm_s`,
-`_da`, `_cv`, `_cdeg`, `_dpermille`, and `_milli`.
 
 ## Releases
 
@@ -605,15 +588,3 @@ release build fails before publishing if they differ.
 The generated C archive is intentionally generic. Downstream firmware projects
 that need it should consume a release tarball with `find_package` or fetch it
 directly from their own CMake using a versioned URL and `URL_HASH SHA256=...`.
-
-## Schema Docs
-
-The docs workflow publishes schema documentation to the `gh-pages` branch used
-by GitHub Pages. Pushes to `main` update `/main/`; release tags update the
-matching minor-version docs, so `v0.8.0` updates `/0.8/`. Only the latest patch
-for each published minor line is kept on GitHub Pages. Exact historical docs can
-be rebuilt from the corresponding tag.
-
-The root docs URL provides a version selector and forwards browsers to
-`/main/`. The mdBook version selector links back to the published release docs:
-<https://cognipilot.github.io/synapse_fbs/>.

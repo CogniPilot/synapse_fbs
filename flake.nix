@@ -29,7 +29,6 @@
           };
         };
         typescript.version = "7.0.2";
-        docs.mdbook = "0.5.3";
       };
       systems = [
         "x86_64-linux"
@@ -51,18 +50,6 @@
         pkgs:
         let
           toolsToml = (pkgs.formats.toml { }).generate "synapse-fbs-tools.toml" tools;
-          mdbook = pkgs.rustPlatform.buildRustPackage rec {
-            pname = "mdbook";
-            version = tools.docs.mdbook;
-            src = pkgs.fetchCrate {
-              inherit pname version;
-              hash = "sha256-2j22rRehYPpyPk1REPhHnRZ05WP0KXcv5mlpMxC83yg=";
-            };
-            cargoHash = "sha256-m5Vp2RAcqyesFH/+k5UHyLCePL2neTNwyei5czt3GyM=";
-            nativeBuildInputs = [ pkgs.pkg-config ];
-            buildInputs = [ pkgs.openssl ];
-            doCheck = false;
-          };
           python = pkgs.python3.withPackages (
             ps: with ps; [
               build
@@ -79,7 +66,6 @@
               flatbuffers
               git
               github-cli
-              mdbook
               nodejs_24
               python
               rustc
@@ -91,7 +77,6 @@
             SYNAPSE_FBS_PACKAGE_VERSION = tools.package.version;
             SYNAPSE_FBS_FLATBUFFERS_VERSION = tools.flatbuffers.version;
             SYNAPSE_FBS_FLATCC_VERSION = tools.flatcc.version;
-            SYNAPSE_FBS_MDBOOK_VERSION = tools.docs.mdbook;
             SYNAPSE_FBS_FLATC = "${pkgs.flatbuffers}/bin/flatc";
             SYNAPSE_FBS_TOOLS_TOML = "${toolsToml}";
 

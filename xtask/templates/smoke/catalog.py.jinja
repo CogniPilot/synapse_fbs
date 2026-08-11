@@ -1,0 +1,33 @@
+import sys
+sys.path.insert(0, ".")
+import topic_catalog as tc
+assert len(tc.SCHEMA_SET_HASH) == 32
+assert tc.MCAP_PROFILE == "synapse/1"
+assert tc.MCAP_SCHEMA_ENCODING == "flatbuffer"
+assert tc.MCAP_MESSAGE_ENCODING == "flatbuffer"
+assert tc.MCAP_METADATA_NAME == "synapse"
+assert tc.MCAP_TIME_BASIS_MONOTONIC_BOOT == "monotonic_boot"
+assert tc.topic_by_name("Odometry").mcap_schema_name == "synapse.topic.Odometry"
+assert tc.topic_by_name("Odometry").mcap_schema_file == "bfbs/state.bfbs"
+parsed = tc.parse_key("cub1/imu/0")
+assert parsed is not None and parsed.namespace == "cub1"
+assert parsed.topic.name == "InertialSample" and parsed.instance == 0
+assert tc.parse_key("health").namespace == ""
+assert tc.parse_key("qualisys/cub1/external_pose").namespace == "qualisys/cub1"
+assert tc.parse_key("cub1/nope") is None
+assert tc.parse_key("health/").topic.name == "VehicleHealth"
+assert tc.parse_key("imu/+1") is None
+assert tc.parse_key("imu/4294967296") is None
+assert tc.parse_key("imu/٢") is None
+assert tc.key_for_topic("VehicleHealth") == "health"
+assert tc.topic_by_key("/gnss").name == "GnssFix"
+assert tc.command_by_name("mission_set").key == "cmd/mission_set"
+assert tc.command_by_name("param_get").request_type == "synapse.cmd.ParamGetRequest"
+assert tc.command_by_name("param_get").request_encoding == "table"
+assert tc.command_by_name("param_get").request_size is None
+assert len(tc.command_by_name("param_get").request_schema_hash) == 32
+assert len(tc.command_by_name("param_get").reply_schema_hash) == 32
+assert tc.command_by_name("firmware_prepare").key == "cmd/firmware_prepare"
+assert tc.command_by_name("firmware_prepare").request_type == "synapse.cmd.FirmwarePrepareRequest"
+assert tc.topic_by_key("fw").id == 34
+print("catalog python helpers ok")

@@ -24,12 +24,12 @@ pub struct EmbeddedSchema {
 pub const SCHEMAS: &[EmbeddedSchema] = &[
 {%- for schema in schemas %}
     EmbeddedSchema {
-        name: {{ schema.name_literal }},
-        file: {{ schema.file_literal }},
-        fbs: include_str!({{ schema.fbs_include_literal }}),
-        bfbs: include_bytes!({{ schema.bfbs_include_literal }}),
-        root_type: {{ schema.root_type_rust }},
-        file_identifier: {{ schema.file_identifier_rust }},
+        name: {{ schema.name|tojson }},
+        file: {{ schema.file|tojson }},
+        fbs: include_str!({{ schema.fbs_include|tojson }}),
+        bfbs: include_bytes!({{ schema.bfbs_include|tojson }}),
+        root_type: {% if schema.root_type %}Some({{ schema.root_type|tojson }}){% else %}None{% endif %},
+        file_identifier: {% if schema.file_identifier %}Some({{ schema.file_identifier|tojson }}){% else %}None{% endif %},
     },
 {%- endfor %}
 ];

@@ -59,9 +59,9 @@ pub fn topic_wire_type(topic: &TopicInfo) -> Option<&'static str> {
     match topic.id {
 {%- for topic in topics %}
 {%- if topic.fixed_layout %}
-        {{ topic.id }} => Some({{ topic.payload_type_qualified_literal }}),
+        {{ topic.id }} => Some({{ topic.payload_type_qualified|tojson }}),
 {%- else %}
-        {{ topic.id }} => Some({{ topic.root_table_qualified_literal }}),
+        {{ topic.id }} => Some({{ topic.root_table_qualified|tojson }}),
 {%- endif %}
 {%- endfor %}
         _ => None,

@@ -1,0 +1,55 @@
+import importlib.metadata as metadata
+from io import BytesIO
+from mcap.writer import CompressionType, IndexType, Writer as ContainerWriter
+from synapse import topic_catalog
+from synapse.types.Vec3f import Vec3f
+from synapse.topic.GnssFixData import GnssFixData
+from synapse.cmd.ParamValue import ParamValue
+from synapse.cmd.FirmwarePrepareRequest import FirmwarePrepareRequest
+from synapse.topic.FirmwareProgress import FirmwareProgress
+from synapse.mcap import Reader, TimeBasis, Writer
+assert metadata.version("flatbuffers") == {{ flatbuffers_version|tojson }}
+assert metadata.version("mcap") == {{ mcap_version|tojson }}
+assert Vec3f is not None and GnssFixData is not None and ParamValue is not None
+assert FirmwarePrepareRequest is not None and FirmwareProgress is not None
+assert topic_catalog.key_for_topic("VehicleHealth") == "health"
+assert topic_catalog.topic_by_id(1).payload_type == "VehicleHealthData"
+parsed = topic_catalog.parse_key("cub1/imu/0")
+assert parsed is not None and parsed.namespace == "cub1"
+assert parsed.topic.name == "InertialSample" and parsed.instance == 0
+assert topic_catalog.topic_by_key("cub1/health").id == 1
+assert topic_catalog.command_by_name("param_get").key == "cmd/param_get"
+assert topic_catalog.command_by_name("firmware_prepare").key == "cmd/firmware_prepare"
+assert topic_catalog.topic_by_key("fw").id == 34
+assert topic_catalog.topic_by_name("GnssFix").payload_size is not None
+assert topic_catalog.MCAP_PROFILE == "synapse/1"
+assert topic_catalog.MCAP_SCHEMA_ENCODING == "flatbuffer"
+assert topic_catalog.MCAP_MESSAGE_ENCODING == "flatbuffer"
+assert topic_catalog.topic_by_name("Odometry").mcap_schema_name == "synapse.topic.Odometry"
+assert topic_catalog.topic_by_name("Odometry").mcap_schema_file == "bfbs/state.bfbs"
+topic = topic_catalog.topic_by_name("Odometry")
+with open({{ mcap_path|tojson }}, "wb") as output:
+    writer = Writer(output, "synapse-fbs-python-test/1", "0123456789abcdef0123456789abcdef", "test-python", TimeBasis.MONOTONIC_BOOT)
+    channel = writer.add_topic(topic, "test/odom")
+    writer.write_fixed(channel, 2000, 1000, bytes(topic.payload_size))
+    writer.finish()
+with open({{ mcap_path|tojson }}, "rb") as input_file:
+    reader = Reader(input_file)
+    messages = list(reader.messages(log_time_order=False))
+    assert len(messages) == 1
+    schema, channel, message = messages[0]
+    assert schema.name == "synapse.topic.Odometry" and schema.encoding == "flatbuffer"
+    assert channel.topic == "test/odom" and channel.message_encoding == "flatbuffer"
+    assert message.log_time == 2000 and message.publish_time == 1000
+historical = BytesIO()
+container_writer = ContainerWriter(historical, compression=CompressionType.NONE, index_types=IndexType.NONE, repeat_channels=False, repeat_schemas=False, use_chunking=False, use_statistics=False, use_summary_offsets=False, enable_crcs=False)
+container_writer.start(profile=topic_catalog.MCAP_PROFILE, library="historical-test")
+container_writer.add_metadata(topic_catalog.MCAP_METADATA_NAME, {
+    topic_catalog.MCAP_SCHEMA_SET_HASH_KEY: "0" * 32,
+    topic_catalog.MCAP_SESSION_ID_KEY: "fedcba9876543210fedcba9876543210",
+    topic_catalog.MCAP_SOURCE_KEY: "historical-test",
+    topic_catalog.MCAP_TIME_BASIS_KEY: topic_catalog.MCAP_TIME_BASIS_MONOTONIC_BOOT,
+})
+container_writer.finish()
+historical.seek(0)
+Reader(historical)

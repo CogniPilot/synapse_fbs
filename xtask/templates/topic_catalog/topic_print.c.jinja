@@ -9,7 +9,7 @@
 {%- for entry in structs %}
 static const synapse_field_desc_t synapse_fields_{{ entry.payload_type }}[] = {
 {%- for field in entry.fields %}
-    { {{ field.name_literal }}, {{ field.offset }}, {{ field.kind }} },
+    { {{ field.name|tojson }}, {{ field.offset }}, {{ field.kind }} },
 {%- endfor %}
 };
 {% endfor %}

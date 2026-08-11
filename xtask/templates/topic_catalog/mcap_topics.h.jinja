@@ -18,11 +18,11 @@ extern const size_t {{ schema.symbol }}_size;
 #define SYNAPSE_MCAP_TOPIC_{{ topic.name }}                                      \
     ((synapse_mcap_topic_t){                                                    \
         .topic_id = {{ topic.id }},                                             \
-        .schema_name = {{ topic.mcap_schema_name_literal }},                    \
+        .schema_name = {{ topic.mcap_schema_name|tojson }},                    \
         .schema_data = {{ topic.mcap_schema_symbol }},                          \
         .schema_size = {{ topic.mcap_schema_symbol }}_size,                    \
-        .payload_size = {{ topic.payload_size_c }},                            \
-        .fixed_layout = {{ topic.fixed_layout_c }},                            \
+        .payload_size = {% if topic.payload_size is not none %}{{ topic.payload_size }}{% else %}0{% endif %},                            \
+        .fixed_layout = {{ topic.fixed_layout }},                            \
     })
 {%- endfor %}
 

@@ -2,22 +2,22 @@
 from dataclasses import dataclass
 from typing import Optional, Union
 
-CMD_KEY_PREFIX = {{ cmd_key_prefix_literal }}
-META_KEY_PREFIX = {{ meta_key_prefix_literal }}
-LIVELINESS_KEY_PREFIX = {{ liveliness_key_prefix_literal }}
-SCHEMA_SET_HASH = {{ schema_set_hash_literal }}
-MCAP_PROFILE = {{ mcap_profile_literal }}
-MCAP_SCHEMA_ENCODING = {{ mcap_schema_encoding_literal }}
-MCAP_MESSAGE_ENCODING = {{ mcap_message_encoding_literal }}
-MCAP_METADATA_NAME = {{ mcap_metadata_name_literal }}
-MCAP_SCHEMA_SET_HASH_KEY = {{ mcap_schema_set_hash_key_literal }}
-MCAP_SESSION_ID_KEY = {{ mcap_session_id_key_literal }}
-MCAP_SOURCE_KEY = {{ mcap_source_key_literal }}
-MCAP_TIME_BASIS_KEY = {{ mcap_time_basis_key_literal }}
-MCAP_TIME_BASIS_MONOTONIC_BOOT = {{ mcap_time_basis_monotonic_boot_literal }}
-MCAP_TIME_BASIS_UNIX_EPOCH = {{ mcap_time_basis_unix_epoch_literal }}
-MCAP_TIME_BASIS_CORRELATED = {{ mcap_time_basis_correlated_literal }}
-MCAP_TOPIC_ID_KEY = {{ mcap_topic_id_key_literal }}
+CMD_KEY_PREFIX = {{ cmd_key_prefix|tojson }}
+META_KEY_PREFIX = {{ meta_key_prefix|tojson }}
+LIVELINESS_KEY_PREFIX = {{ liveliness_key_prefix|tojson }}
+SCHEMA_SET_HASH = {{ schema_set_hash|tojson }}
+MCAP_PROFILE = {{ mcap_profile|tojson }}
+MCAP_SCHEMA_ENCODING = {{ mcap_schema_encoding|tojson }}
+MCAP_MESSAGE_ENCODING = {{ mcap_message_encoding|tojson }}
+MCAP_METADATA_NAME = {{ mcap_metadata_name|tojson }}
+MCAP_SCHEMA_SET_HASH_KEY = {{ mcap_schema_set_hash_key|tojson }}
+MCAP_SESSION_ID_KEY = {{ mcap_session_id_key|tojson }}
+MCAP_SOURCE_KEY = {{ mcap_source_key|tojson }}
+MCAP_TIME_BASIS_KEY = {{ mcap_time_basis_key|tojson }}
+MCAP_TIME_BASIS_MONOTONIC_BOOT = {{ mcap_time_basis_monotonic_boot|tojson }}
+MCAP_TIME_BASIS_UNIX_EPOCH = {{ mcap_time_basis_unix_epoch|tojson }}
+MCAP_TIME_BASIS_CORRELATED = {{ mcap_time_basis_correlated|tojson }}
+MCAP_TOPIC_ID_KEY = {{ mcap_topic_id_key|tojson }}
 
 
 @dataclass(frozen=True)
@@ -67,21 +67,21 @@ TOPICS = (
 {%- for topic in topics %}
     TopicInfo(
         id={{ topic.id }},
-        name={{ topic.name_literal }},
-        key={{ topic.key_literal }},
-        root_table={{ topic.root_table_literal }},
-        payload_type={{ topic.payload_type_python }},
-        payload_size={{ topic.payload_size_python }},
-        schema_file={{ topic.schema_file_literal }},
-        mcap_schema_name={{ topic.mcap_schema_name_literal }},
-        mcap_schema_file={{ topic.mcap_schema_file_literal }},
-        wire_type={{ topic.wire_type_literal }},
-        schema_hash={{ topic.schema_hash_literal }},
-        fixed_layout={{ topic.fixed_layout_python }},
-        multi_instance={{ topic.multi_instance_python }},
-        scope={{ topic.scope_literal }},
-        encoding={{ topic.encoding_literal }},
-        description={{ topic.description_literal }},
+        name={{ topic.name|tojson }},
+        key={{ topic.key|tojson }},
+        root_table={{ topic.root_table|tojson }},
+        payload_type={% if topic.payload_type %}{{ topic.payload_type|tojson }}{% else %}None{% endif %},
+        payload_size={% if topic.payload_size is not none %}{{ topic.payload_size }}{% else %}None{% endif %},
+        schema_file={{ topic.schema_file|tojson }},
+        mcap_schema_name={{ topic.mcap_schema_name|tojson }},
+        mcap_schema_file={{ topic.mcap_schema_file|tojson }},
+        wire_type={{ topic.wire_type|tojson }},
+        schema_hash={{ topic.schema_hash|tojson }},
+        fixed_layout={% if topic.fixed_layout %}True{% else %}False{% endif %},
+        multi_instance={% if topic.multi_instance %}True{% else %}False{% endif %},
+        scope={{ topic.scope|tojson }},
+        encoding={{ topic.encoding|tojson }},
+        description={{ topic.description|tojson }},
     ),
 {%- endfor %}
 )
@@ -90,17 +90,17 @@ COMMANDS = (
 {%- for command in commands %}
     CommandInfo(
         id={{ command.id }},
-        name={{ command.name_literal }},
-        key={{ command.key_literal }},
-        request_type={{ command.request_type_literal }},
-        request_schema_hash={{ command.request_schema_hash_literal }},
-        reply_type={{ command.reply_type_literal }},
-        reply_schema_hash={{ command.reply_schema_hash_literal }},
-        request_encoding={{ command.request_encoding_literal }},
-        request_size={{ command.request_size_python }},
-        reply_encoding={{ command.reply_encoding_literal }},
-        reply_size={{ command.reply_size_python }},
-        description={{ command.description_literal }},
+        name={{ command.name|tojson }},
+        key={{ command.key|tojson }},
+        request_type={{ command.request_type|tojson }},
+        request_schema_hash={{ command.request_schema_hash|tojson }},
+        reply_type={{ command.reply_type|tojson }},
+        reply_schema_hash={{ command.reply_schema_hash|tojson }},
+        request_encoding={{ command.request_encoding|tojson }},
+        request_size={% if command.request_size is not none %}{{ command.request_size }}{% else %}None{% endif %},
+        reply_encoding={{ command.reply_encoding|tojson }},
+        reply_size={% if command.reply_size is not none %}{{ command.reply_size }}{% else %}None{% endif %},
+        description={{ command.description|tojson }},
     ),
 {%- endfor %}
 )

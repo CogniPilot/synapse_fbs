@@ -1,0 +1,51 @@
+include!("topic_catalog.rs");
+
+fn main() {
+    assert_eq!(SCHEMA_SET_HASH.len(), 32);
+    assert_eq!(MCAP_PROFILE, "synapse/1");
+    assert_eq!(MCAP_SCHEMA_ENCODING, "flatbuffer");
+    assert_eq!(MCAP_MESSAGE_ENCODING, "flatbuffer");
+    assert_eq!(MCAP_METADATA_NAME, "synapse");
+    assert_eq!(MCAP_TIME_BASIS_MONOTONIC_BOOT, "monotonic_boot");
+    let odom = topic_by_name("Odometry").unwrap();
+    assert_eq!(odom.mcap_schema_name, "synapse.topic.Odometry");
+    assert_eq!(odom.mcap_schema_file, "bfbs/state.bfbs");
+    let parsed = parse_key("cub1/imu/0").unwrap();
+    assert_eq!(parsed.namespace, "cub1");
+    assert_eq!(parsed.topic.name, "InertialSample");
+    assert_eq!(parsed.instance, Some(0));
+
+    let parsed = parse_key("/cub1/gnss").unwrap();
+    assert_eq!(parsed.namespace, "cub1");
+    assert_eq!(parsed.instance, None);
+
+    let parsed = parse_key("qualisys/cub1/external_pose").unwrap();
+    assert_eq!(parsed.namespace, "qualisys/cub1");
+    assert_eq!(parsed.topic.name, "ExternalOdometry");
+
+    assert_eq!(parse_key("health/").unwrap().topic.name, "VehicleHealth");
+    assert_eq!(parse_key("health").unwrap().namespace, "");
+    assert!(parse_key("imu/+1").is_none());
+    assert!(parse_key("imu/4294967296").is_none());
+    assert!(parse_key("cub1/nope").is_none());
+    assert!(parse_key("imu/0/extra").is_none());
+
+    assert_eq!(topic_by_key("cub1/health").unwrap().id, 1);
+    let command = command_by_name("param_get").unwrap();
+    assert_eq!(command.id, 1);
+    assert_eq!(command.request_type, "synapse.cmd.ParamGetRequest");
+    assert_eq!(command.request_encoding, "table");
+    assert_eq!(command.request_size, None);
+    assert_eq!(command.request_schema_hash.len(), 32);
+    assert_eq!(command.reply_schema_hash.len(), 32);
+
+    let command = command_by_name("firmware_prepare").unwrap();
+    assert_eq!(command.id, 9);
+    assert_eq!(command.key, "cmd/firmware_prepare");
+    assert_eq!(command.request_type, "synapse.cmd.FirmwarePrepareRequest");
+    let progress = topic_by_key("fw").unwrap();
+    assert_eq!(progress.id, 34);
+    assert!(!progress.fixed_layout);
+
+    println!("catalog rust helpers ok");
+}

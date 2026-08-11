@@ -11,22 +11,22 @@
 extern "C" {
 #endif
 
-#define SYNAPSE_CMD_KEY_PREFIX {{ cmd_key_prefix_literal }}
-#define SYNAPSE_META_KEY_PREFIX {{ meta_key_prefix_literal }}
-#define SYNAPSE_LIVELINESS_KEY_PREFIX {{ liveliness_key_prefix_literal }}
-#define SYNAPSE_SCHEMA_SET_HASH {{ schema_set_hash_literal }}
-#define SYNAPSE_MCAP_PROFILE {{ mcap_profile_literal }}
-#define SYNAPSE_MCAP_SCHEMA_ENCODING {{ mcap_schema_encoding_literal }}
-#define SYNAPSE_MCAP_MESSAGE_ENCODING {{ mcap_message_encoding_literal }}
-#define SYNAPSE_MCAP_METADATA_NAME {{ mcap_metadata_name_literal }}
-#define SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY {{ mcap_schema_set_hash_key_literal }}
-#define SYNAPSE_MCAP_SESSION_ID_KEY {{ mcap_session_id_key_literal }}
-#define SYNAPSE_MCAP_SOURCE_KEY {{ mcap_source_key_literal }}
-#define SYNAPSE_MCAP_TIME_BASIS_KEY {{ mcap_time_basis_key_literal }}
-#define SYNAPSE_MCAP_TIME_BASIS_MONOTONIC_BOOT {{ mcap_time_basis_monotonic_boot_literal }}
-#define SYNAPSE_MCAP_TIME_BASIS_UNIX_EPOCH {{ mcap_time_basis_unix_epoch_literal }}
-#define SYNAPSE_MCAP_TIME_BASIS_CORRELATED {{ mcap_time_basis_correlated_literal }}
-#define SYNAPSE_MCAP_TOPIC_ID_KEY {{ mcap_topic_id_key_literal }}
+#define SYNAPSE_CMD_KEY_PREFIX {{ cmd_key_prefix|tojson }}
+#define SYNAPSE_META_KEY_PREFIX {{ meta_key_prefix|tojson }}
+#define SYNAPSE_LIVELINESS_KEY_PREFIX {{ liveliness_key_prefix|tojson }}
+#define SYNAPSE_SCHEMA_SET_HASH {{ schema_set_hash|tojson }}
+#define SYNAPSE_MCAP_PROFILE {{ mcap_profile|tojson }}
+#define SYNAPSE_MCAP_SCHEMA_ENCODING {{ mcap_schema_encoding|tojson }}
+#define SYNAPSE_MCAP_MESSAGE_ENCODING {{ mcap_message_encoding|tojson }}
+#define SYNAPSE_MCAP_METADATA_NAME {{ mcap_metadata_name|tojson }}
+#define SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY {{ mcap_schema_set_hash_key|tojson }}
+#define SYNAPSE_MCAP_SESSION_ID_KEY {{ mcap_session_id_key|tojson }}
+#define SYNAPSE_MCAP_SOURCE_KEY {{ mcap_source_key|tojson }}
+#define SYNAPSE_MCAP_TIME_BASIS_KEY {{ mcap_time_basis_key|tojson }}
+#define SYNAPSE_MCAP_TIME_BASIS_MONOTONIC_BOOT {{ mcap_time_basis_monotonic_boot|tojson }}
+#define SYNAPSE_MCAP_TIME_BASIS_UNIX_EPOCH {{ mcap_time_basis_unix_epoch|tojson }}
+#define SYNAPSE_MCAP_TIME_BASIS_CORRELATED {{ mcap_time_basis_correlated|tojson }}
+#define SYNAPSE_MCAP_TOPIC_ID_KEY {{ mcap_topic_id_key|tojson }}
 
 typedef struct synapse_topic_info {
     uint16_t id;
@@ -66,21 +66,21 @@ static const synapse_topic_info_t synapse_topics[] = {
 {%- for topic in topics %}
     {
         {{ topic.id }},
-        {{ topic.name_literal }},
-        {{ topic.key_literal }},
-        {{ topic.root_table_literal }},
-        {{ topic.payload_type_c }},
-        {{ topic.payload_size_c }},
-        {{ topic.schema_file_literal }},
-        {{ topic.mcap_schema_name_literal }},
-        {{ topic.mcap_schema_file_literal }},
-        {{ topic.wire_type_literal }},
-        {{ topic.schema_hash_literal }},
-        {{ topic.fixed_layout_c }},
-        {{ topic.multi_instance_c }},
-        {{ topic.scope_literal }},
-        {{ topic.encoding_literal }},
-        {{ topic.description_literal }},
+        {{ topic.name|tojson }},
+        {{ topic.key|tojson }},
+        {{ topic.root_table|tojson }},
+        {% if topic.payload_type %}{{ topic.payload_type|tojson }}{% else %}NULL{% endif %},
+        {% if topic.payload_size is not none %}{{ topic.payload_size }}{% else %}0{% endif %},
+        {{ topic.schema_file|tojson }},
+        {{ topic.mcap_schema_name|tojson }},
+        {{ topic.mcap_schema_file|tojson }},
+        {{ topic.wire_type|tojson }},
+        {{ topic.schema_hash|tojson }},
+        {{ topic.fixed_layout }},
+        {{ topic.multi_instance }},
+        {{ topic.scope|tojson }},
+        {{ topic.encoding|tojson }},
+        {{ topic.description|tojson }},
     },
 {%- endfor %}
 };
@@ -92,17 +92,17 @@ static const synapse_command_info_t synapse_commands[] = {
 {%- for command in commands %}
     {
         {{ command.id }},
-        {{ command.name_literal }},
-        {{ command.key_literal }},
-        {{ command.request_type_literal }},
-        {{ command.request_schema_hash_literal }},
-        {{ command.reply_type_literal }},
-        {{ command.reply_schema_hash_literal }},
-        {{ command.request_encoding_literal }},
-        {{ command.request_size_c }},
-        {{ command.reply_encoding_literal }},
-        {{ command.reply_size_c }},
-        {{ command.description_literal }},
+        {{ command.name|tojson }},
+        {{ command.key|tojson }},
+        {{ command.request_type|tojson }},
+        {{ command.request_schema_hash|tojson }},
+        {{ command.reply_type|tojson }},
+        {{ command.reply_schema_hash|tojson }},
+        {{ command.request_encoding|tojson }},
+        {% if command.request_size is not none %}{{ command.request_size }}{% else %}0{% endif %},
+        {{ command.reply_encoding|tojson }},
+        {% if command.reply_size is not none %}{{ command.reply_size }}{% else %}0{% endif %},
+        {{ command.description|tojson }},
     },
 {%- endfor %}
 };

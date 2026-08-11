@@ -27,11 +27,11 @@ extern const std::size_t {{ schema.symbol }}_size;
 inline Topic {{ topic.name }}Topic() {
   return Topic{
       {{ topic.id }},
-      {{ topic.mcap_schema_name_literal }},
+      {{ topic.mcap_schema_name|tojson }},
       {{ topic.mcap_schema_symbol }},
       {{ topic.mcap_schema_symbol }}_size,
-      {{ topic.payload_size_c }},
-      {{ topic.fixed_layout_c }},
+      {% if topic.payload_size is not none %}{{ topic.payload_size }}{% else %}0{% endif %},
+      {{ topic.fixed_layout }},
   };
 }
 {%- endfor %}

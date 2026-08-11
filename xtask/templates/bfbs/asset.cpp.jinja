@@ -1,0 +1,14 @@
+#include <synapse/mcap_topics.hpp>
+
+namespace synapse {
+namespace mcap {
+
+extern const std::byte synapse_bfbs_{{ stem }}[] = {
+{% for chunk in bytes|batch(12) -%}
+{{ "  " }}{% for byte in chunk %}std::byte{0x{{ "%02x"|format(byte) }}}, {% endfor %}
+{% endfor -%}
+};
+extern const std::size_t synapse_bfbs_{{ stem }}_size = sizeof(synapse_bfbs_{{ stem }});
+
+}  // namespace mcap
+}  // namespace synapse
