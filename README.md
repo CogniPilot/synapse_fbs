@@ -57,8 +57,9 @@ Generated files are written only beneath `target/xtask/`:
 
 FlatCC generates C bindings and every BFBS reflection schema consumed by
 `xtask`. The pinned upstream `flatc` is used only for official Rust, Python,
-and C++ binding generation. All generated text owned by `xtask` is rendered
-from MiniJinja templates.
+and C++ binding generation. Nix supplies FlatCC directly—`xtask` does not clone
+or compile it. All generated text owned by `xtask` is rendered from MiniJinja
+templates.
 
 ## Build and test
 

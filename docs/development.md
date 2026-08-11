@@ -24,8 +24,7 @@ nix run .#test
 ```
 
 This performs `cargo fmt --check`, Clippy with warnings denied, FlatCC schema
-compilation, BFBS reflection checks, wire-compatibility validation, and the
-catalog smoke tests.
+compilation, BFBS reflection checks, and the catalog smoke tests.
 
 Build and verify release packages:
 
@@ -64,6 +63,15 @@ data to validate and generate metadata. It does not parse `.fbs` syntax itself.
 The pinned upstream `flatc` remains only for official Rust, Python, and C++
 binding generation; FlatCC generates C bindings and BFBS.
 
+Nix supplies both the pinned FlatCC executable and its source tree. `xtask`
+does not clone or compile a second FlatCC; the source tree is used only when
+the portable C archive needs FlatCC runtime source files.
+
+The Rust orchestration is split by responsibility: `main.rs` contains the CLI
+flow, `protocol.rs` contains declarative routing policy, `schema.rs` adapts BFBS
+reflection, `packaging.rs` builds packages, and `support.rs` contains shared
+I/O/process helpers.
+
 Generated outputs live below `target/xtask/` and are safe to remove:
 
 - `packages/rust`
@@ -74,10 +82,11 @@ Generated outputs live below `target/xtask/` and are safe to remove:
 
 ## Wire hashes
 
-Per-type and schema-set hashes are computed from FlatCC BFBS reflection on every
-build and rendered into generated catalogs. No checksum baseline is committed.
-Normal Zenoh consumers compare the per-type hash; constrained endpoints compare
-the schema-set hash before exchanging compact frames.
+Schema hashes are the first 128 bits of SHA-256 over the BFBS bytes emitted by
+FlatCC on every build. The schema-set hash is derived from those hashes and the
+routing catalog. No checksum baseline is committed. Normal Zenoh consumers
+compare the schema hash; constrained endpoints compare the schema-set hash
+before exchanging compact frames.
 
 Published wire-type names should remain immutable. An incompatible payload
 change gets a new wire type and topic so old and new consumers fail clearly
@@ -101,9 +110,9 @@ The package command:
 ## Version pins
 
 `flake.nix` is the single version manifest for the package version, FlatBuffers,
-FlatCC, MCAP implementations, and TypeScript. Git commits are pinned where a
-source build is required. Generated bindings and their runtimes remain in
-lockstep.
+FlatCC, MCAP implementations, and TypeScript. Nix supplies FlatCC directly;
+Git commits are pinned where another upstream source tree is packaged.
+Generated bindings and their runtimes remain in lockstep.
 
 ## Release workflow
 

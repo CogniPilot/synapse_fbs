@@ -61,6 +61,7 @@
             clippy
             cmake
             flatbuffers
+            flatcc
             git
             github-cli
             gnumake
@@ -75,6 +76,8 @@
             SYNAPSE_FBS_PACKAGE_VERSION = tools.package.version;
             SYNAPSE_FBS_FLATBUFFERS_VERSION = tools.flatbuffers.version;
             SYNAPSE_FBS_FLATCC_VERSION = tools.flatcc.version;
+            SYNAPSE_FBS_FLATCC = "${pkgs.flatcc}/bin/flatcc";
+            SYNAPSE_FBS_FLATCC_SOURCE = "${pkgs.flatcc.src}";
             SYNAPSE_FBS_FLATC = "${pkgs.flatbuffers}/bin/flatc";
             SYNAPSE_FBS_TOOLS_TOML = "${toolsToml}";
           };
