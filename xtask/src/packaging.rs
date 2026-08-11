@@ -168,6 +168,8 @@ fn generate_bindings(
     let schema = load_compiled_schema(&bfbs_dir)?;
     validate_protocol(&schema)?;
     let topics = topic_entries(&schema)?;
+    let wire = build_wire_descriptors(&bfbs_dir)?;
+    wire_check(root, &wire)?;
     write_package_topic_catalogs(templates, packages, &schema, &topics)?;
 
     // The Rust crate ships the wire contract itself: schema sources, compiled

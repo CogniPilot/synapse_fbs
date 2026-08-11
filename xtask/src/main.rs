@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     env, fs, io,
     path::{Path, PathBuf},
     process::{Command, Stdio},
@@ -86,6 +86,7 @@ struct TypescriptTools {
 #[derive(Debug)]
 struct Options {
     release_name: String,
+    update: bool,
 }
 
 fn main() -> Result<()> {
@@ -97,8 +98,9 @@ fn main() -> Result<()> {
         "ci" => ci(&root, &options),
         "js" => js(&root),
         "check" => check(&root),
+        "wire-check" => wire_check_command(&root, &options),
         _ => fail(format!(
-            "unknown command '{command}'. expected: build, ci, js, or check"
+            "unknown command '{command}'. expected: build, ci, js, check, or wire-check"
         )),
     }
 }
@@ -136,6 +138,8 @@ fn check(root: &Path) -> Result<()> {
     let schema = load_compiled_schema(&bfbs_dir)?;
     validate_protocol(&schema)?;
     let topics = topic_entries(&schema)?;
+    let wire = build_wire_descriptors(&bfbs_dir)?;
+    wire_check(root, &wire)?;
 
     let templates = Templates::new(root)?;
     let context = topic_catalog_context(&schema, &topics)?;
@@ -202,6 +206,24 @@ fn check(root: &Path) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// Regenerate the per-type wire descriptors from the pinned schema and either
+/// compare them against the committed baseline (default) or rewrite it
+/// (`--update`). Uses the same Nix-pinned FlatCC as `check` and `ci`.
+fn wire_check_command(root: &Path, options: &Options) -> Result<()> {
+    let tools = read_tools(root)?;
+    let flatcc = flatcc_tool(&tools)?;
+    let dir = root.join("target/xtask/wire-check");
+    reset_dir(&dir)?;
+    let bfbs_dir = dir.join("bfbs");
+    generate_reflection_schemas(root, &flatcc.binary, &bfbs_dir)?;
+    let current = build_wire_descriptors(&bfbs_dir)?;
+    if options.update {
+        update_wire_baseline(root, &current)
+    } else {
+        wire_check(root, &current)
+    }
 }
 
 fn ci(root: &Path, options: &Options) -> Result<()> {
@@ -295,6 +317,7 @@ fn parse_args() -> Result<(String, Options)> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "ci".to_string());
     let mut release_name = env::var("GITHUB_REF_NAME").unwrap_or_else(|_| "local".to_string());
+    let mut update = false;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -303,11 +326,18 @@ fn parse_args() -> Result<(String, Options)> {
                     .next()
                     .ok_or_else(|| io::Error::other("--release-name requires a value"))?;
             }
+            "--update" => update = true,
             other => return fail(format!("unknown argument '{other}'")),
         }
     }
 
-    Ok((command, Options { release_name }))
+    Ok((
+        command,
+        Options {
+            release_name,
+            update,
+        },
+    ))
 }
 
 fn find_repo_root(start: &Path) -> Result<PathBuf> {
@@ -513,5 +543,5 @@ fn require_git_sha(name: &str, value: &str) -> Result<()> {
 }
 
 include!("packaging.rs");
-include!("schema.rs");
 include!("support.rs");
+include!("schema.rs");
