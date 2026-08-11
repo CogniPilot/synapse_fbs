@@ -14,9 +14,12 @@ jobs:
     name: Publish Packages
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v12
+      - uses: DeterminateSystems/magic-nix-cache-action@v14
+        with:
+          use-flakehub: false
+          use-gha-cache: true
       - name: Build and verify
         run: nix develop --command cargo run --locked --manifest-path xtask/Cargo.toml -- ci --release-name "${GITHUB_REF_NAME}"
       - name: Pack npm package
@@ -25,25 +28,24 @@ jobs:
       - name: Upload GitHub Release artifacts
         env:
           GITHUB_TOKEN: ${{ github.token }}
+        shell: nix develop --command bash -e {0}
         run: |
-          nix develop --command bash -c '
-            set -euo pipefail
-            files=(
-              target/xtask/packages/python/dist/*.whl
-              target/xtask/packages/python/dist/*.tar.gz
-              target/xtask/packages/rust/target/package/*.crate
-              target/xtask/packages/js/*.tgz
-              target/xtask/artifacts/*.tar.gz
-              target/xtask/artifacts/*.sha256
-            )
-            if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-              gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
-            else
-              gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
-                --title "${GITHUB_REF_NAME}" \
-                --notes "Release ${GITHUB_REF_NAME}"
-            fi
-          '
+          set -euo pipefail
+          files=(
+            target/xtask/packages/python/dist/*.whl
+            target/xtask/packages/python/dist/*.tar.gz
+            target/xtask/packages/rust/target/package/*.crate
+            target/xtask/packages/js/*.tgz
+            target/xtask/artifacts/*.tar.gz
+            target/xtask/artifacts/*.sha256
+          )
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
+              --title "${GITHUB_REF_NAME}" \
+              --notes "Release ${GITHUB_REF_NAME}"
+          fi
       - name: Check published package versions
         id: published
         run: |
