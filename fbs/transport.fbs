@@ -27,7 +27,7 @@ union SynapseMessage {
   TimeReference, // Boot-time to Unix-time reference sample.
   RadioControl, // Raw receiver channel input sample.
   ManualControlCommand, // Normalized manual pilot intent command.
-  InertialSample, // IMU, magnetometer, static pressure, and temperature sample.
+  InertialSample, // IMU accelerometer, gyroscope, and temperature sample.
   AirData, // Barometric and aerodynamic measurement sample.
   PowerStatus, // Battery or power-source state sample.
   GnssFix, // GNSS fix and motion estimate.
@@ -65,6 +65,7 @@ union SynapseMessage {
   Odometry, // Compact pose, twist, and estimator status.
   OdometryWithCovariance, // Odometry with complete state covariance.
   MocapPoseFrame, // Raw motion-capture frame with quaternion rigid-body attitudes.
+  MagneticField, // Magnetometer sample in the body FLU frame.
 }
 
 // Fixed-layout header carried by the optional multiplexed Frame transport.

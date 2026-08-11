@@ -295,7 +295,7 @@ enum TopicId:ushort {
   TimeReference = 2, // Correlates boot-relative time with an absolute Unix time reference.
   RadioControl = 3, // Raw receiver channel input and link quality.
   ManualControlCommand = 4, // Normalized manual pilot intent after input mapping.
-  InertialSample = 5, // IMU, magnetometer, static pressure, and temperature sample.
+  InertialSample = 5, // IMU accelerometer, gyroscope, and temperature sample.
   AirData = 6, // Barometric and aerodynamic measurements used by fixed-wing control.
   PowerStatus = 7, // Battery, current, energy, and power-source state.
   GnssFix = 8, // Global navigation fix, accuracy, velocity, and heading information.
@@ -333,4 +333,5 @@ enum TopicId:ushort {
   Odometry = 40, // Compact combined pose, twist, and estimator status.
   OdometryWithCovariance = 41, // Odometry with complete 12x12 state covariance.
   MocapPoseFrame = 42, // Raw motion-capture frame with quaternion rigid-body attitudes.
+  MagneticField = 43, // Magnetometer sample in the body FLU frame.
 }

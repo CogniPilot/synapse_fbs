@@ -66,6 +66,7 @@ const TOPIC_KEYS: &[(&str, &str)] = &[
     ("RadioControl", "rc"),
     ("ManualControlCommand", "manual"),
     ("InertialSample", "imu"),
+    ("MagneticField", "mag"),
     ("AirData", "air"),
     ("PowerStatus", "power"),
     ("GnssFix", "gnss"),
