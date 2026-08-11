@@ -13,9 +13,10 @@ namespace synapse.topic;
 
 // Human-readable status text for diagnostics, operator messages, and logs.
 table TextStatus {
-  timestamp_us:ulong; // Message timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Message timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   severity:synapse.types.Severity = Informational; // RFC 5424 severity level.
   text:string; // UTF-8 status text; this table is variable-size by design.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Union of topic root tables supported by the optional multiplexed Frame
@@ -26,7 +27,7 @@ union SynapseMessage {
   TimeReference, // Boot-time to Unix-time reference sample.
   RadioControl, // Raw receiver channel input sample.
   ManualControlCommand, // Normalized manual pilot intent command.
-  InertialSample, // IMU, magnetometer, static pressure, and temperature sample.
+  InertialSample, // IMU accelerometer, gyroscope, and temperature sample.
   AirData, // Barometric and aerodynamic measurement sample.
   PowerStatus, // Battery or power-source state sample.
   GnssFix, // GNSS fix and motion estimate.
@@ -64,6 +65,7 @@ union SynapseMessage {
   Odometry, // Compact pose, twist, and estimator status.
   OdometryWithCovariance, // Odometry with complete state covariance.
   MocapPoseFrame, // Raw motion-capture frame with quaternion rigid-body attitudes.
+  MagneticField, // Magnetometer sample in the body FLU frame.
 }
 
 // Fixed-layout header carried by the optional multiplexed Frame transport.

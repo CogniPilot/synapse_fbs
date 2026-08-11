@@ -28,8 +28,8 @@ enum TrajectorySegmentFlags:ushort (bit_flags) {
 // Fixed-layout segment for high-rate trajectory exchange. Lower-degree
 // trajectories ignore the higher-index coefficient fields.
 struct TrajectorySegmentData {
-  timestamp_us:ulong; // Publication timestamp in monotonic boot time.
-  start_time_us:ulong; // Trajectory segment start time in the producer's monotonic boot time.
+  timestamp_ns:ulong; // Publication timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
+  start_time_ns:ulong; // Trajectory segment start time in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   p0_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 0 in local ENU meters.
   p1_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 1 in local ENU meters.
   p2_enu_m:synapse.types.Vec3f; // Position control point or polynomial coefficient 2 in local ENU meters.
@@ -54,6 +54,7 @@ struct TrajectorySegmentData {
   trajectory_type:TrajectoryType; // Bezier or polynomial coefficient interpretation.
   degree:TrajectoryDegree; // Highest coefficient index used by this segment.
   frame:synapse.types.LocalFrame; // Local frame for position control points or coefficients.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // Optional topic instance identifier for multiple trajectory streams.
 }
 
