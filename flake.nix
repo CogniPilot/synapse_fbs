@@ -79,7 +79,7 @@
             SYNAPSE_FBS_TOOLS_TOML = "${toolsToml}";
           };
         };
-      mkApp =
+      mkCommand =
         pkgs: tooling: name: commands:
         let
           program = pkgs.writeShellApplication {
@@ -95,24 +95,53 @@
             '';
           };
         in
+        program;
+      commandsFor =
+        pkgs: tooling:
+        let
+          test = mkCommand pkgs tooling "synapse-fbs-test" ''
+            cargo fmt --check --manifest-path xtask/Cargo.toml
+            cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
+            cargo run --locked --manifest-path xtask/Cargo.toml -- check
+          '';
+          packages = mkCommand pkgs tooling "synapse-fbs-packages" ''
+            cargo run --locked --manifest-path xtask/Cargo.toml -- ci "$@"
+          '';
+          ci = pkgs.writeShellApplication {
+            name = "synapse-fbs-ci";
+            runtimeInputs = [
+              test
+              packages
+            ];
+            text = ''
+              synapse-fbs-test
+              synapse-fbs-packages "$@"
+            '';
+          };
+        in
         {
-          type = "app";
-          program = "${program}/bin/${name}";
+          inherit ci packages test;
         };
+      asApp = name: program: {
+        type = "app";
+        program = "${program}/bin/${name}";
+      };
     in
     {
       devShells = forAllSystems (
         pkgs:
         let
           tooling = toolingFor pkgs;
+          commands = commandsFor pkgs tooling;
         in
         {
           default = pkgs.mkShell (
             {
-              packages = tooling.packages;
+              packages = tooling.packages ++ builtins.attrValues commands;
               buildInputs = [ pkgs.openssl ];
               shellHook = ''
                 echo "synapse_fbs $SYNAPSE_FBS_PACKAGE_VERSION toolchain loaded"
+                echo "Commands: synapse-fbs-test, synapse-fbs-packages, synapse-fbs-ci"
               '';
             }
             // tooling.environment
@@ -124,24 +153,14 @@
         pkgs:
         let
           tooling = toolingFor pkgs;
-          testCommands = ''
-            cargo fmt --check --manifest-path xtask/Cargo.toml
-            cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
-            cargo run --locked --manifest-path xtask/Cargo.toml -- check
-          '';
-          packageCommands = ''
-            cargo run --locked --manifest-path xtask/Cargo.toml -- ci "$@"
-          '';
-          testApp = mkApp pkgs tooling "synapse-fbs-test" testCommands;
-          packagesApp = mkApp pkgs tooling "synapse-fbs-packages" packageCommands;
-          ciApp = mkApp pkgs tooling "synapse-fbs-ci" (testCommands + packageCommands);
+          commands = commandsFor pkgs tooling;
         in
         {
-          test = testApp;
-          packages = packagesApp;
-          build = packagesApp;
-          ci = ciApp;
-          default = ciApp;
+          test = asApp "synapse-fbs-test" commands.test;
+          packages = asApp "synapse-fbs-packages" commands.packages;
+          build = asApp "synapse-fbs-packages" commands.packages;
+          ci = asApp "synapse-fbs-ci" commands.ci;
+          default = asApp "synapse-fbs-ci" commands.ci;
         }
       );
 

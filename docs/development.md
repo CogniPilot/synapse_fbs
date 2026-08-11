@@ -40,6 +40,10 @@ which lets the release workflow use:
 nix run .#packages -- --release-name v0.8.0
 ```
 
+Inside `nix develop`, the equivalent commands are `synapse-fbs-test`,
+`synapse-fbs-packages`, and `synapse-fbs-ci`. These are the same generated
+scripts used by the flake apps and CI, not separate shell aliases.
+
 Run the complete branch CI sequence:
 
 ```sh

@@ -84,8 +84,9 @@ Run both exactly as CI does:
 nix run .#ci
 ```
 
-`nix run .#build` is an alias for `nix run .#packages`. For an interactive
-toolchain shell, use `nix develop`.
+`nix run .#build` is an alias for `nix run .#packages`. `nix develop` provides
+the same pinned toolchain plus `synapse-fbs-test`, `synapse-fbs-packages`, and
+`synapse-fbs-ci` commands. The shell prints this list when it starts.
 
 To test a change without publishing, run `nix run .#packages`, then consume the
 staged output directly:
