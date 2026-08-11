@@ -959,7 +959,7 @@ int main(void) {
                                         fields->payload_size);
     assert(written > 0 && (size_t)written == strlen(line));
     assert(strstr(line, "flight_mode=7") != NULL);
-    assert(strstr(line, "timestamp_us=0") != NULL);
+    assert(strstr(line, "timestamp_ns=0") != NULL);
 
     const synapse_topic_info_t *attitude = synapse_topic_by_name("AttitudeEstimate");
     assert(attitude != NULL);
@@ -1113,7 +1113,7 @@ fn firmware_progress_round_trips() {
     let progress = FirmwareProgress::create(
         &mut builder,
         &FirmwareProgressArgs {
-            timestamp_us: 123_456,
+            timestamp_ns: 123_456,
             update_id: Some(update_id),
             state: FirmwareUpdateState::Receiving,
             result: CommandResultCode::InProgress,
@@ -1129,7 +1129,7 @@ fn firmware_progress_round_trips() {
     builder.finish(progress, None);
 
     let decoded = flatbuffers::root::<FirmwareProgress>(builder.finished_data()).unwrap();
-    assert_eq!(decoded.timestamp_us(), 123_456);
+    assert_eq!(decoded.timestamp_ns(), 123_456);
     assert_eq!(decoded.update_id(), Some("update-42"));
     assert_eq!(decoded.state(), FirmwareUpdateState::Receiving);
     assert_eq!(decoded.result(), CommandResultCode::InProgress);
