@@ -597,7 +597,7 @@ fields = [
 
 [types."synapse.topic.FrameHeader"]
 kind = "struct"
-hash = "5e7ecfdb41d112231d5c300bb57f3430"
+hash = "d58050e58b0ad7fb05324eca6e4596a8"
 
 [types."synapse.topic.GcsStatus"]
 kind = "table"
