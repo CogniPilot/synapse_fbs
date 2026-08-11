@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -187,7 +187,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Progress publication timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Progress publication timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this progress sample describes.</td></tr>
 <tr><td><code>state</code></td><td><a href="FirmwareUpdateState.html"><code>synapse.cmd.FirmwareUpdateState</code></a></td><td></td><td>Current firmware update state.</td></tr>
 <tr><td><code>result</code></td><td><a href="../types/CommandResultCode.html"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Current command result or progress result.</td></tr>
@@ -198,6 +198,7 @@
 <tr><td><code>progress_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Completion progress from 0 to 100.</td></tr>
 <tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
 <tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

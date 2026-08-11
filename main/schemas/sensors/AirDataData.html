@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>absolute_pressure_hpa</code></td><td><code>float</code></td><td>hectopascals</td><td>Static pressure used for altitude and air-density calculations.</td></tr>
 <tr><td><code>differential_pressure_hpa</code></td><td><code>float</code></td><td>hectopascals</td><td>Pitot/static differential pressure used for airspeed.</td></tr>
 <tr><td><code>pressure_altitude_m</code></td><td><code>float</code></td><td>meters</td><td>Pressure-derived altitude using the producer’s atmosphere model.</td></tr>
@@ -199,6 +199,7 @@
 <tr><td><code>temperature_cdeg</code></td><td><code>short</code></td><td>centi-degrees Celsius; degC = value / 100</td><td>Static-air temperature in centi-degrees Celsius.</td></tr>
 <tr><td><code>differential_pressure_temperature_cdeg</code></td><td><code>short</code></td><td>centi-degrees Celsius; degC = value / 100</td><td>Differential-pressure sensor temperature in centi-degrees Celsius.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of AirDataFlags bits valid in this sample.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -207,7 +208,7 @@
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../../schemas/sensors/InertialSampleData.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../schemas/sensors/MagneticFieldData.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -221,7 +222,7 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../../schemas/sensors/InertialSampleData.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../schemas/sensors/MagneticFieldData.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

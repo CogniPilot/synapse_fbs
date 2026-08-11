@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,7 +180,7 @@
                     <main>
                         <h1 id="struct-inertialsampledata"><a class="header" href="#struct-inertialsampledata"><code>struct</code> InertialSampleData</a></h1>
 <p><a href="../sensors.html">fbs/sensors.fbs</a> / <a href="../../fbs/sensors.fbs">Source schema</a></p>
-<p>Raw inertial and environmental sample from an IMU-class sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. Sensors updating at different rates set the matching flags bits.</p>
+<p>Raw accelerometer, gyroscope, and temperature sample from an IMU sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. The magnetometer and barometer are separate sensors with their own topics (MagneticField and AirData) at their own rates.</p>
 <p><strong>FlatBuffers root table:</strong> <code>InertialSample</code></p>
 <div class="table-wrapper">
 <table>
@@ -188,13 +188,12 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>accel_flu_m_s2</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), meters per second squared</td><td>Linear acceleration in the body FLU frame.</td></tr>
 <tr><td><code>gyro_flu_rad_s</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Angular rate in the body FLU frame.</td></tr>
-<tr><td><code>mag_flu_tesla</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), tesla</td><td>Raw magnetic field in the body FLU frame, not declination corrected.</td></tr>
-<tr><td><code>absolute_pressure_hpa</code></td><td><code>float</code></td><td>hectopascals</td><td>Static pressure from the sensor barometer.</td></tr>
-<tr><td><code>temperature_c</code></td><td><code>float</code></td><td>degrees Celsius</td><td>Sensor temperature in degrees Celsius.</td></tr>
+<tr><td><code>temperature_c</code></td><td><code>float</code></td><td>degrees Celsius</td><td>Sensor die temperature in degrees Celsius.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of InertialFieldFlags bits updated in this sample.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Sensor instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
@@ -208,7 +207,7 @@
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../../schemas/sensors/AirDataData.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../schemas/sensors/MagneticFieldData.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -222,7 +221,7 @@
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../../schemas/sensors/AirDataData.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../schemas/sensors/MagneticFieldData.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

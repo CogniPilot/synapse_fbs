@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-b9176271.js";
+            window.path_to_searchindex_js = "searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-cc9f6bc5.js"></script>
+        <script src="toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -390,7 +390,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>channel_count</code></td><td><code>ubyte</code></td><td></td><td>Number of valid channels in this sample, starting at channel 0.</td></tr>
 <tr><td><code>link_quality_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Receiver link quality from 0 to 100.</td></tr>
 <tr><td><code>chan0_raw_us</code></td><td><code>ushort</code></td><td>raw pulse width in microseconds</td><td>Raw channel 0 pulse width.</td></tr>
@@ -411,6 +411,7 @@
 <tr><td><code>chan15_raw_us</code></td><td><code>ushort</code></td><td>raw pulse width in microseconds</td><td>Raw channel 15 pulse width.</td></tr>
 <tr><td><code>chan16_raw_us</code></td><td><code>ushort</code></td><td>raw pulse width in microseconds</td><td>Raw channel 16 pulse width.</td></tr>
 <tr><td><code>chan17_raw_us</code></td><td><code>ushort</code></td><td>raw pulse width in microseconds</td><td>Raw channel 17 pulse width.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -425,7 +426,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>buttons</code></td><td><code>uint</code></td><td></td><td>Bitmask of active momentary buttons or switches, indexed from bit 0.</td></tr>
 <tr><td><code>active_axes</code></td><td><code>ushort</code></td><td></td><td>Bitmask of ManualControlAxes bits indicating meaningful axes.</td></tr>
 <tr><td><code>pitch_milli</code></td><td><code>short</code></td><td>normalized milli-units; value / 1000, usually [-1, 1]</td><td>Pitch command in milli-units over -1000 to 1000; positive pitches nose up.</td></tr>
@@ -440,6 +441,7 @@
 <tr><td><code>aux5_milli</code></td><td><code>short</code></td><td>normalized milli-units; value / 1000, usually [-1, 1]</td><td>Auxiliary axis 5 in milli-units over -1000 to 1000.</td></tr>
 <tr><td><code>flight_mode</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined requested flight mode.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of ManualControlFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -454,11 +456,12 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Desired orientation rotating body FLU vectors into the ENU world frame.</td></tr>
 <tr><td><code>body_rate_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Body-rate feed-forward in the FLU frame.</td></tr>
 <tr><td><code>thrust</code></td><td><code>float</code></td><td></td><td>Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.</td></tr>
 <tr><td><code>type_mask</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of AttitudeCommandMask bits for ignored fields.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -473,10 +476,11 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>body_rate_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Desired body angular rates in the FLU frame.</td></tr>
 <tr><td><code>thrust</code></td><td><code>float</code></td><td></td><td>Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.</td></tr>
 <tr><td><code>type_mask</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of RateCommandMask bits for ignored fields.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -491,7 +495,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Desired local position in the ENU frame.</td></tr>
 <tr><td><code>velocity_enu_m_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Desired local velocity in the ENU frame.</td></tr>
 <tr><td><code>acceleration_or_force_enu</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td></td><td>Desired ENU acceleration in m/s^2, or force in newtons when ForceSetpoint is set.</td></tr>
@@ -499,6 +503,7 @@
 <tr><td><code>yaw_rate_rad_s</code></td><td><code>float</code></td><td>radians per second</td><td>Desired yaw rate; positive counter-clockwise.</td></tr>
 <tr><td><code>type_mask</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of LocalPositionCommandMask bits.</td></tr>
 <tr><td><code>coordinate_frame</code></td><td><a href="#enum-localframe"><code>synapse.types.LocalFrame</code></a></td><td></td><td>Frame in which the setpoint is expressed.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -513,7 +518,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>active_mask</code></td><td><code>uint</code></td><td>bitmask</td><td>Bitmask indicating which control slots are valid, indexed from bit 0.</td></tr>
 <tr><td><code>control0</code></td><td><code>float</code></td><td></td><td>Normalized actuator control slot 0.</td></tr>
 <tr><td><code>control1</code></td><td><code>float</code></td><td></td><td>Normalized actuator control slot 1.</td></tr>
@@ -531,6 +536,7 @@
 <tr><td><code>control13</code></td><td><code>float</code></td><td></td><td>Normalized actuator control slot 13.</td></tr>
 <tr><td><code>control14</code></td><td><code>float</code></td><td></td><td>Normalized actuator control slot 14.</td></tr>
 <tr><td><code>control15</code></td><td><code>float</code></td><td></td><td>Normalized actuator control slot 15.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -545,7 +551,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Feedback timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Feedback timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>active_mask</code></td><td><code>uint</code></td><td>bitmask</td><td>Bitmask indicating which output slots are valid, indexed from bit 0.</td></tr>
 <tr><td><code>output0</code></td><td><code>float</code></td><td></td><td>Normalized actuator output slot 0.</td></tr>
 <tr><td><code>output1</code></td><td><code>float</code></td><td></td><td>Normalized actuator output slot 1.</td></tr>
@@ -579,6 +585,7 @@
 <tr><td><code>output29</code></td><td><code>float</code></td><td></td><td>Normalized actuator output slot 29.</td></tr>
 <tr><td><code>output30</code></td><td><code>float</code></td><td></td><td>Normalized actuator output slot 30.</td></tr>
 <tr><td><code>output31</code></td><td><code>float</code></td><td></td><td>Normalized actuator output slot 31.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -593,7 +600,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Output timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Output timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>active_mask</code></td><td><code>uint</code></td><td>bitmask</td><td>Bitmask indicating which PWM outputs are valid, indexed from bit 0.</td></tr>
 <tr><td><code>port</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined output bank or timer port.</td></tr>
 <tr><td><code>output0_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 0 pulse width.</td></tr>
@@ -612,6 +619,7 @@
 <tr><td><code>output13_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 13 pulse width.</td></tr>
 <tr><td><code>output14_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 14 pulse width.</td></tr>
 <tr><td><code>output15_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 15 pulse width.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -626,11 +634,12 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Metrics timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Metrics timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>period_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Measured loop period.</td></tr>
 <tr><td><code>latency_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Time from scheduled release to completion or publication.</td></tr>
 <tr><td><code>overrun_count</code></td><td><code>uint</code></td><td></td><td>Cumulative count of missed deadlines.</td></tr>
 <tr><td><code>load_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Loop load as deci-percent, where 1000 means 100%.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -943,7 +952,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Progress publication timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Progress publication timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>update_id</code></td><td><code>string</code></td><td></td><td>Update identifier this progress sample describes.</td></tr>
 <tr><td><code>state</code></td><td><a href="#enum-firmwareupdatestate"><code>synapse.cmd.FirmwareUpdateState</code></a></td><td></td><td>Current firmware update state.</td></tr>
 <tr><td><code>result</code></td><td><a href="#enum-commandresultcode"><code>synapse.types.CommandResultCode</code></a></td><td></td><td>Current command result or progress result.</td></tr>
@@ -954,6 +963,7 @@
 <tr><td><code>progress_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Completion progress from 0 to 100.</td></tr>
 <tr><td><code>message</code></td><td><code>string</code></td><td></td><td>Human-readable diagnostic text.</td></tr>
 <tr><td><code>result_detail</code></td><td><code>int</code></td><td></td><td>Producer-defined extended result or error detail.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1078,7 +1088,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Marker timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Marker timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Source frame number.</td></tr>
 <tr><td><code>drop_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame drop rate in deci-percent.</td></tr>
 <tr><td><code>out_of_sync_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame out-of-sync rate in deci-percent.</td></tr>
@@ -1087,6 +1097,7 @@
 <tr><td><code>markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
 <tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
 <tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#struct-mocaprigidbodydata"><code>MocapRigidBodyData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body samples.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1100,7 +1111,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Marker timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Marker timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Source frame number.</td></tr>
 <tr><td><code>drop_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame drop rate in deci-percent.</td></tr>
 <tr><td><code>out_of_sync_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame out-of-sync rate in deci-percent.</td></tr>
@@ -1109,6 +1120,7 @@
 <tr><td><code>markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
 <tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="#struct-mocapmarkerdata"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
 <tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="#struct-mocaprigidbodyposedata"><code>MocapRigidBodyPoseData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body pose samples.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1123,17 +1135,36 @@
 <tr><th>Kind</th><th>Name</th><th>Description</th></tr>
 </thead>
 <tbody>
-<tr><td><code>struct</code></td><td><a href="#struct-opticalflowdata"><code>OpticalFlowData</code></a></td><td>Integrated optical-flow sample from an image sensor or flow module. This is a raw-layer topic: flow is the sensor’s integrated angular image motion.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-opticalflowvelocitydata"><code>OpticalFlowVelocityData</code></a></td><td>Velocity estimate derived from optical flow.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-flowlightmode"><code>FlowLightMode</code></a></td><td>Automatic scene light mode reported by the flow sensor. Mirrors the PAA3905 mode so a consumer can down-weight noisier low-light frames beyond what the raw quality value conveys.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-opticalflowdata"><code>OpticalFlowData</code></a></td><td>Integrated optical-flow measurement from an image sensor or flow module. Raw layer: flow is the sensor’s integrated angular image motion, expressed in the body FLU frame so it subtracts directly from delta_angle_flu_rad. Range and its trust metrics are folded in so the sample is self-contained; a downstream estimator should fuse this rather than the derived velocity below. All time fields are nanoseconds.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-opticalflowvelocitydata"><code>OpticalFlowVelocityData</code></a></td><td>Body-frame velocity derived from optical flow. Convenience layer for a consumer that is not running a full estimator. velocity_flu_m_s is tilt-compensated using accelerometer-derived roll and pitch and is trustworthy only while OpticalFlowVelocityFlags.VelocityValid is set. There is no ENU velocity: that needs a yaw reference this producer does not have.</td></tr>
 <tr><td><code>table</code></td><td><code>OpticalFlow</code> -&gt; <a href="#struct-opticalflowdata"><code>OpticalFlowData</code></a></td><td>FlatBuffers root wrapper for OpticalFlowData.</td></tr>
 <tr><td><code>table</code></td><td><code>OpticalFlowVelocity</code> -&gt; <a href="#struct-opticalflowvelocitydata"><code>OpticalFlowVelocityData</code></a></td><td>FlatBuffers root wrapper for OpticalFlowVelocityData.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-flowlightmode"><a class="header" href="#enum-flowlightmode"><code>enum</code> FlowLightMode</a></h1>
+<p><a href="#fbsoptical_flowfbs">fbs/optical_flow.fbs</a> / <a href="fbs/optical_flow.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Automatic scene light mode reported by the flow sensor. Mirrors the PAA3905 mode so a consumer can down-weight noisier low-light frames beyond what the raw quality value conveys.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Mode not reported.</td></tr>
+<tr><td><code>Bright</code></td><td><code>1</code></td><td>Bright scene, full frame rate.</td></tr>
+<tr><td><code>LowLight</code></td><td><code>2</code></td><td>Low-light scene.</td></tr>
+<tr><td><code>SuperLowLight</code></td><td><code>3</code></td><td>Super-low-light scene, reduced frame rate and higher noise.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-opticalflowdata"><a class="header" href="#struct-opticalflowdata"><code>struct</code> OpticalFlowData</a></h1>
 <p><a href="#fbsoptical_flowfbs">fbs/optical_flow.fbs</a> / <a href="fbs/optical_flow.fbs">Source schema</a></p>
-<p>Integrated optical-flow sample from an image sensor or flow module. This is a raw-layer topic: flow is the sensor’s integrated angular image motion.</p>
+<p>Integrated optical-flow measurement from an image sensor or flow module. Raw layer: flow is the sensor’s integrated angular image motion, expressed in the body FLU frame so it subtracts directly from delta_angle_flu_rad. Range and its trust metrics are folded in so the sample is self-contained; a downstream estimator should fuse this rather than the derived velocity below. All time fields are nanoseconds.</p>
 <p><strong>FlatBuffers root table:</strong> <code>OpticalFlow</code></p>
 <div class="table-wrapper">
 <table>
@@ -1141,22 +1172,34 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
-<tr><td><code>flow_rad</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>radians</td><td>Integrated angular flow about the sensor X and Y axes in radians over integration_timespan_us.</td></tr>
-<tr><td><code>delta_angle_flu_rad</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>radians</td><td>Integrated body rotation in the FLU frame during the same interval.</td></tr>
-<tr><td><code>distance_m</code></td><td><code>float</code></td><td>meters</td><td>Measured distance to the observed surface.</td></tr>
-<tr><td><code>integration_timespan_us</code></td><td><code>uint</code></td><td>microseconds</td><td>Integration interval for flow_rad and delta_angle_flu_rad.</td></tr>
-<tr><td><code>max_flow_rate_rad_s</code></td><td><code>float</code></td><td>radians per second</td><td>Maximum measurable angular flow rate.</td></tr>
-<tr><td><code>min_ground_distance_m</code></td><td><code>float</code></td><td>meters</td><td>Minimum valid range for distance-compensated flow.</td></tr>
-<tr><td><code>max_ground_distance_m</code></td><td><code>float</code></td><td>meters</td><td>Maximum valid range for distance-compensated flow.</td></tr>
-<tr><td><code>quality_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Flow quality from 0 to 100.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Publish time in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
+<tr><td><code>timestamp_sample_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Center of the integration window, same domain as timestamp_ns. Use this for fusion and latency compensation.</td></tr>
+<tr><td><code>distance_timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Time of the range sample folded into distance_m, same domain; lets a consumer detect a stale range.</td></tr>
+<tr><td><code>flow_rad</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>radians</td><td>Integrated angular flow over the window in body FLU (x forward, y left), radians.</td></tr>
+<tr><td><code>delta_angle_flu_rad</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>radians</td><td>Integrated body rotation over the same window in FLU, radians. All three axes populated.</td></tr>
+<tr><td><code>distance_m</code></td><td><code>float</code></td><td>meters</td><td>Fused range to the observed surface. Trust only when OpticalFlowFlags.DistanceValid is set.</td></tr>
+<tr><td><code>distance_spread_m</code></td><td><code>float</code></td><td>meters</td><td>Range spread across the ranger pixel field; a high value flags an ambiguous or non-planar footprint, do not trust distance_m.</td></tr>
+<tr><td><code>integration_timespan_ns</code></td><td><code>uint</code></td><td>nanoseconds</td><td>Integration interval for flow_rad and delta_angle_flu_rad, nanoseconds.</td></tr>
+<tr><td><code>error_count</code></td><td><code>uint</code></td><td></td><td>Cumulative driver error count for health monitoring.</td></tr>
+<tr><td><code>max_flow_rate_rad_s</code></td><td><code>float</code></td><td>radians per second</td><td>Maximum measurable angular flow rate (sensor limit).</td></tr>
+<tr><td><code>min_ground_distance_m</code></td><td><code>float</code></td><td>meters</td><td>Minimum valid range for distance-compensated flow (sensor limit).</td></tr>
+<tr><td><code>max_ground_distance_m</code></td><td><code>float</code></td><td>meters</td><td>Maximum valid range for distance-compensated flow (sensor limit).</td></tr>
+<tr><td><code>field_of_view_rad</code></td><td><code>float</code></td><td>radians</td><td>Full field of view of the flow optics.</td></tr>
+<tr><td><code>temperature_c</code></td><td><code>float</code></td><td>degrees Celsius</td><td>Sensor temperature in degrees Celsius.</td></tr>
+<tr><td><code>quality</code></td><td><code>ubyte</code></td><td></td><td>Flow quality from 0 to 255.</td></tr>
+<tr><td><code>distance_quality</code></td><td><code>ubyte</code></td><td></td><td>Range signal quality from 0 to 255, independent of flow quality.</td></tr>
+<tr><td><code>distance_pixel_ok</code></td><td><code>ubyte</code></td><td></td><td>Count of valid ranger pixels used in the fused range (0 to 32); low counts flag an unreliable footprint.</td></tr>
+<tr><td><code>mode</code></td><td><a href="#enum-flowlightmode"><code>FlowLightMode</code></a></td><td></td><td>Automatic scene light mode.</td></tr>
+<tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of OpticalFlowFlags: bit0 FlowValid, bit1 DeltaAngleValid, bit2 DistanceValid, bit3 DistanceAmbiguous.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Flow sensor instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-opticalflowvelocitydata"><a class="header" href="#struct-opticalflowvelocitydata"><code>struct</code> OpticalFlowVelocityData</a></h1>
 <p><a href="#fbsoptical_flowfbs">fbs/optical_flow.fbs</a> / <a href="fbs/optical_flow.fbs">Source schema</a></p>
-<p>Velocity estimate derived from optical flow.</p>
+<p>Body-frame velocity derived from optical flow. Convenience layer for a consumer that is not running a full estimator. velocity_flu_m_s is tilt-compensated using accelerometer-derived roll and pitch and is trustworthy only while OpticalFlowVelocityFlags.VelocityValid is set. There is no ENU velocity: that needs a yaw reference this producer does not have.</p>
 <p><strong>FlatBuffers root table:</strong> <code>OpticalFlowVelocity</code></p>
 <div class="table-wrapper">
 <table>
@@ -1164,12 +1207,15 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
-<tr><td><code>velocity_flu_m_s</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>meters per second</td><td>Planar velocity estimate in the body FLU frame.</td></tr>
-<tr><td><code>velocity_enu_m_s</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Planar velocity estimate in the local ENU frame.</td></tr>
-<tr><td><code>flow_rate_uncompensated_rad_s</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>radians per second</td><td>Raw angular flow rate before gyro compensation.</td></tr>
-<tr><td><code>flow_rate_compensated_rad_s</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>radians per second</td><td>Angular flow rate after gyro compensation.</td></tr>
-<tr><td><code>gyro_flu_rad_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Body angular rate used for compensation.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate time in nanoseconds, same domain rules as OpticalFlowData.timestamp_ns.</td></tr>
+<tr><td><code>velocity_flu_m_s</code></td><td><a href="#struct-vec2f"><code>synapse.types.Vec2f</code></a></td><td>meters per second</td><td>Planar body-FLU velocity (x forward, y left), tilt-compensated.</td></tr>
+<tr><td><code>distance_m</code></td><td><code>float</code></td><td>meters</td><td>Range used for the projection, exposed for measurement-noise scaling.</td></tr>
+<tr><td><code>roll_rad</code></td><td><code>float</code></td><td>radians</td><td>Accelerometer-derived roll used to tilt-compensate the velocity.</td></tr>
+<tr><td><code>pitch_rad</code></td><td><code>float</code></td><td>radians</td><td>Accelerometer-derived pitch used to tilt-compensate the velocity.</td></tr>
+<tr><td><code>quality</code></td><td><code>ubyte</code></td><td></td><td>Combined flow-and-range confidence from 0 to 255.</td></tr>
+<tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of OpticalFlowVelocityFlags: bit0 VelocityValid, bit1 TiltCompensated, bit2 RangeTrusted.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind timestamp_ns.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Flow sensor instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1185,15 +1231,18 @@
 </thead>
 <tbody>
 <tr><td><code>enum</code></td><td><a href="#enum-inertialfieldflags"><code>InertialFieldFlags</code></a></td><td>Field-validity bits for InertialSampleData.flags.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-magfieldflags"><code>MagFieldFlags</code></a></td><td>Field-validity bits for MagneticFieldData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-airdataflags"><code>AirDataFlags</code></a></td><td>Field-validity bits for AirDataData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-gnssfixflags"><code>GnssFixFlags</code></a></td><td>Field-validity bits for GnssFixData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-powerfaultflags"><code>PowerFaultFlags</code></a></td><td>Fault bits for PowerStatusData.fault_flags.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-inertialsampledata"><code>InertialSampleData</code></a></td><td>Raw inertial and environmental sample from an IMU-class sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. Sensors updating at different rates set the matching flags bits.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-inertialsampledata"><code>InertialSampleData</code></a></td><td>Raw accelerometer, gyroscope, and temperature sample from an IMU sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. The magnetometer and barometer are separate sensors with their own topics (MagneticField and AirData) at their own rates.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-magneticfielddata"><code>MagneticFieldData</code></a></td><td>Raw magnetometer sample from a discrete magnetic-field sensor. Raw-layer topic: sensor-native field in the body FLU frame after driver axis alignment, not declination corrected.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-airdatadata"><code>AirDataData</code></a></td><td>Air-data sample used by fixed-wing estimators and controllers.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-batterycellvoltages16"><code>BatteryCellVoltages16</code></a></td><td>Per-cell battery voltages for packs with up to sixteen monitored cells. Unmonitored cell slots are zero; zero is physically impossible for a connected, monitored cell.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-powerstatusdata"><code>PowerStatusData</code></a></td><td>Battery or power-source state used for monitoring and failsafe decisions.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-gnssfixdata"><code>GnssFixData</code></a></td><td>Global navigation satellite receiver fix and motion estimate. This is a raw-layer topic: angles keep the receiver’s native convention (clockwise from true north) so logs stay faithful to the hardware; the estimator converts to REP-0103 conventions for estimate-layer topics.</td></tr>
 <tr><td><code>table</code></td><td><code>InertialSample</code> -&gt; <a href="#struct-inertialsampledata"><code>InertialSampleData</code></a></td><td>FlatBuffers root wrapper for InertialSampleData.</td></tr>
+<tr><td><code>table</code></td><td><code>MagneticField</code> -&gt; <a href="#struct-magneticfielddata"><code>MagneticFieldData</code></a></td><td>FlatBuffers root wrapper for MagneticFieldData.</td></tr>
 <tr><td><code>table</code></td><td><code>AirData</code> -&gt; <a href="#struct-airdatadata"><code>AirDataData</code></a></td><td>FlatBuffers root wrapper for AirDataData.</td></tr>
 <tr><td><code>table</code></td><td><code>PowerStatus</code> -&gt; <a href="#struct-powerstatusdata"><code>PowerStatusData</code></a></td><td>FlatBuffers root wrapper for PowerStatusData.</td></tr>
 <tr><td><code>table</code></td><td><code>GnssFix</code> -&gt; <a href="#struct-gnssfixdata"><code>GnssFixData</code></a></td><td>FlatBuffers root wrapper for GnssFixData.</td></tr>
@@ -1213,9 +1262,22 @@
 <tbody>
 <tr><td><code>Accel</code></td><td></td><td>Accelerometer fields were updated in this sample.</td></tr>
 <tr><td><code>Gyro</code></td><td></td><td>Gyroscope fields were updated in this sample.</td></tr>
-<tr><td><code>Mag</code></td><td></td><td>Magnetometer fields were updated in this sample.</td></tr>
-<tr><td><code>Pressure</code></td><td></td><td>Static pressure field was updated in this sample.</td></tr>
 <tr><td><code>Temperature</code></td><td></td><td>Temperature field was updated in this sample.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-magfieldflags"><a class="header" href="#enum-magfieldflags"><code>enum</code> MagFieldFlags</a></h1>
+<p><a href="#fbssensorsfbs">fbs/sensors.fbs</a> / <a href="fbs/sensors.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte (bit_flags)</code></p>
+<p>Field-validity bits for MagneticFieldData.flags.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>Temperature</code></td><td></td><td>Temperature field carries a valid sensor die temperature.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1252,7 +1314,7 @@
 <tr><th>Name</th><th>Value</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>TimeValid</code></td><td></td><td>time_unix_us carries a valid receiver time.</td></tr>
+<tr><td><code>TimeValid</code></td><td></td><td>time_unix_ns carries a valid receiver time.</td></tr>
 <tr><td><code>CourseValid</code></td><td></td><td>course_over_ground_cdeg is valid.</td></tr>
 <tr><td><code>YawValid</code></td><td></td><td>yaw_cdeg carries a valid receiver yaw.</td></tr>
 <tr><td><code>VelocityUpValid</code></td><td></td><td>velocity_up_cm_s is valid.</td></tr>
@@ -1284,7 +1346,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-inertialsampledata"><a class="header" href="#struct-inertialsampledata"><code>struct</code> InertialSampleData</a></h1>
 <p><a href="#fbssensorsfbs">fbs/sensors.fbs</a> / <a href="fbs/sensors.fbs">Source schema</a></p>
-<p>Raw inertial and environmental sample from an IMU-class sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. Sensors updating at different rates set the matching flags bits.</p>
+<p>Raw accelerometer, gyroscope, and temperature sample from an IMU sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. The magnetometer and barometer are separate sensors with their own topics (MagneticField and AirData) at their own rates.</p>
 <p><strong>FlatBuffers root table:</strong> <code>InertialSample</code></p>
 <div class="table-wrapper">
 <table>
@@ -1292,13 +1354,32 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>accel_flu_m_s2</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), meters per second squared</td><td>Linear acceleration in the body FLU frame.</td></tr>
 <tr><td><code>gyro_flu_rad_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Angular rate in the body FLU frame.</td></tr>
-<tr><td><code>mag_flu_tesla</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), tesla</td><td>Raw magnetic field in the body FLU frame, not declination corrected.</td></tr>
-<tr><td><code>absolute_pressure_hpa</code></td><td><code>float</code></td><td>hectopascals</td><td>Static pressure from the sensor barometer.</td></tr>
-<tr><td><code>temperature_c</code></td><td><code>float</code></td><td>degrees Celsius</td><td>Sensor temperature in degrees Celsius.</td></tr>
+<tr><td><code>temperature_c</code></td><td><code>float</code></td><td>degrees Celsius</td><td>Sensor die temperature in degrees Celsius.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of InertialFieldFlags bits updated in this sample.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Sensor instance identifier; also the instance segment of the Zenoh key.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="struct-magneticfielddata"><a class="header" href="#struct-magneticfielddata"><code>struct</code> MagneticFieldData</a></h1>
+<p><a href="#fbssensorsfbs">fbs/sensors.fbs</a> / <a href="fbs/sensors.fbs">Source schema</a></p>
+<p>Raw magnetometer sample from a discrete magnetic-field sensor. Raw-layer topic: sensor-native field in the body FLU frame after driver axis alignment, not declination corrected.</p>
+<p><strong>FlatBuffers root table:</strong> <code>MagneticField</code></p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
+<tr><td><code>mag_flu_tesla</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), tesla</td><td>Magnetic field in the body FLU frame, not declination corrected.</td></tr>
+<tr><td><code>temperature_c</code></td><td><code>float</code></td><td>degrees Celsius</td><td>Sensor die temperature in degrees Celsius; valid when MagFieldFlags.Temperature is set.</td></tr>
+<tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of MagFieldFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Sensor instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
@@ -1314,7 +1395,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>absolute_pressure_hpa</code></td><td><code>float</code></td><td>hectopascals</td><td>Static pressure used for altitude and air-density calculations.</td></tr>
 <tr><td><code>differential_pressure_hpa</code></td><td><code>float</code></td><td>hectopascals</td><td>Pitot/static differential pressure used for airspeed.</td></tr>
 <tr><td><code>pressure_altitude_m</code></td><td><code>float</code></td><td>meters</td><td>Pressure-derived altitude using the producer’s atmosphere model.</td></tr>
@@ -1325,6 +1406,7 @@
 <tr><td><code>temperature_cdeg</code></td><td><code>short</code></td><td>centi-degrees Celsius; degC = value / 100</td><td>Static-air temperature in centi-degrees Celsius.</td></tr>
 <tr><td><code>differential_pressure_temperature_cdeg</code></td><td><code>short</code></td><td>centi-degrees Celsius; degC = value / 100</td><td>Differential-pressure sensor temperature in centi-degrees Celsius.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of AirDataFlags bits valid in this sample.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1368,7 +1450,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>voltages</code></td><td><a href="#struct-batterycellvoltages16"><code>BatteryCellVoltages16</code></a></td><td></td><td>Per-cell voltages for the monitored pack.</td></tr>
 <tr><td><code>current_consumed_mah</code></td><td><code>int</code></td><td>milliamp-hours</td><td>Integrated discharged capacity since the producer’s reset point.</td></tr>
 <tr><td><code>energy_consumed_hj</code></td><td><code>int</code></td><td>hecto-joules; joules = value * 100</td><td>Integrated discharged energy since the producer’s reset point.</td></tr>
@@ -1377,6 +1459,7 @@
 <tr><td><code>current_battery_da</code></td><td><code>short</code></td><td>deci-amps; amps = value / 10</td><td>Battery current in deci-amps; positive means discharge.</td></tr>
 <tr><td><code>temperature_cdeg</code></td><td><code>short</code></td><td>centi-degrees Celsius; degC = value / 100</td><td>Battery or power-module temperature in centi-degrees Celsius.</td></tr>
 <tr><td><code>remaining_pct</code></td><td><code>byte</code></td><td>percent</td><td>Remaining state of charge, or negative when unknown.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Battery instance identifier; also the instance segment of the Zenoh key.</td></tr>
 <tr><td><code>battery_function</code></td><td><a href="#enum-batteryfunction"><code>synapse.types.BatteryFunction</code></a></td><td></td><td>Role of this power source on the vehicle.</td></tr>
 <tr><td><code>battery_type</code></td><td><a href="#enum-batterytype"><code>synapse.types.BatteryType</code></a></td><td></td><td>Battery chemistry or power-source type.</td></tr>
@@ -1396,8 +1479,8 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Fix timestamp in monotonic boot time.</td></tr>
-<tr><td><code>time_unix_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Receiver-reported Unix time of the fix; valid when GnssFixFlags.TimeValid is set.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Fix timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
+<tr><td><code>time_unix_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Receiver-reported Unix time of the fix in nanoseconds; valid when GnssFixFlags.TimeValid is set.</td></tr>
 <tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Latitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Longitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>altitude_msl_mm</code></td><td><code>int</code></td><td>millimeters</td><td>Height above mean sea level.</td></tr>
@@ -1416,6 +1499,7 @@
 <tr><td><code>fix_type</code></td><td><a href="#enum-gnssfixtype"><code>synapse.types.GnssFixType</code></a></td><td></td><td>Receiver fix quality.</td></tr>
 <tr><td><code>satellites_used</code></td><td><code>ubyte</code></td><td></td><td>Number of satellites used in the solution.</td></tr>
 <tr><td><code>satellites_visible</code></td><td><code>ubyte</code></td><td></td><td>Number of satellites tracked or visible.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>GNSS receiver instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
@@ -1423,6 +1507,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="fbssimfbs"><a class="header" href="#fbssimfbs"><code>fbs/sim.fbs</code></a></h1>
 <p><strong>Namespace:</strong> <code>synapse.topic</code></p>
+<p><strong>Includes:</strong> <a href="#fbstypesfbs"><code>types.fbs</code></a></p>
 <p><a href="fbs/sim.fbs">Source schema</a></p>
 <div class="table-wrapper">
 <table>
@@ -1432,7 +1517,7 @@
 <tbody>
 <tr><td><code>enum</code></td><td><a href="#enum-locksteptickflags"><code>LockstepTickFlags</code></a></td><td>Control bits for lockstep tick messages.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-lockstepstatusstate"><code>LockstepStatusState</code></a></td><td>Participant state for lockstep status messages.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-locksteptickdata"><code>LockstepTickData</code></a></td><td>Deterministic simulation barrier from a simulator to a controller or device under test. The receiver advances its monotonic boot clock until target_boot_time_us, runs work made ready by that time, then waits for the next tick.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-locksteptickdata"><code>LockstepTickData</code></a></td><td>Deterministic simulation barrier from a simulator to a controller or device under test. The receiver advances its monotonic boot clock until target_boot_time_ns, runs work made ready by that time, then waits for the next tick.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-lockstepstatusdata"><code>LockstepStatusData</code></a></td><td>Deterministic simulation status from a controller or device under test back to the simulator. The simulator waits for a matching completed sequence before publishing the next tick when strict lockstep is required.</td></tr>
 <tr><td><code>table</code></td><td><code>LockstepTick</code> -&gt; <a href="#struct-locksteptickdata"><code>LockstepTickData</code></a></td><td>FlatBuffers root wrapper for LockstepTickData.</td></tr>
 <tr><td><code>table</code></td><td><code>LockstepStatus</code> -&gt; <a href="#struct-lockstepstatusdata"><code>LockstepStatusData</code></a></td><td>FlatBuffers root wrapper for LockstepStatusData.</td></tr>
@@ -1479,7 +1564,7 @@
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-locksteptickdata"><a class="header" href="#struct-locksteptickdata"><code>struct</code> LockstepTickData</a></h1>
 <p><a href="#fbssimfbs">fbs/sim.fbs</a> / <a href="fbs/sim.fbs">Source schema</a></p>
-<p>Deterministic simulation barrier from a simulator to a controller or device under test. The receiver advances its monotonic boot clock until target_boot_time_us, runs work made ready by that time, then waits for the next tick.</p>
+<p>Deterministic simulation barrier from a simulator to a controller or device under test. The receiver advances its monotonic boot clock until target_boot_time_ns, runs work made ready by that time, then waits for the next tick.</p>
 <p><strong>FlatBuffers root table:</strong> <code>LockstepTick</code></p>
 <div class="table-wrapper">
 <table>
@@ -1487,10 +1572,11 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>target_boot_time_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Target receiver monotonic boot time for this step.</td></tr>
+<tr><td><code>target_boot_time_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Target receiver boot time in nanoseconds for this step. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>run_id</code></td><td><code>uint</code></td><td></td><td>Lockstep run identifier; changes when the simulator restarts the run.</td></tr>
 <tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Monotonic tick sequence used to pair status with this tick.</td></tr>
 <tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of LockstepTickFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1505,11 +1591,12 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Receiver monotonic boot time reached when this status was sampled.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Receiver boot time in nanoseconds reached when this status was sampled. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>run_id</code></td><td><code>uint</code></td><td></td><td>Lockstep run identifier copied from the accepted tick.</td></tr>
 <tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Most recent lockstep tick sequence accepted or completed.</td></tr>
 <tr><td><code>result_detail</code></td><td><code>ushort</code></td><td></td><td>Compact participant-defined detail for MissedTick or Error states.</td></tr>
 <tr><td><code>state</code></td><td><a href="#enum-lockstepstatusstate"><code>LockstepStatusState</code></a></td><td></td><td>Participant state for this sequence.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Lockstep participant instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
@@ -1536,7 +1623,7 @@
 <tr><td><code>enum</code></td><td><a href="#enum-globalpositionflags"><code>GlobalPositionFlags</code></a></td><td>Field-validity bits for GlobalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-homereferenceflags"><code>HomeReferenceFlags</code></a></td><td>Field-validity bits for HomeReferenceData.flags.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-vehiclehealthdata"><code>VehicleHealthData</code></a></td><td>Vehicle-wide state summary for operator displays and failsafe supervision.</td></tr>
-<tr><td><code>struct</code></td><td><a href="#struct-timereferencedata"><code>TimeReferenceData</code></a></td><td>Pairing between Unix time and monotonic boot time.</td></tr>
+<tr><td><code>struct</code></td><td><a href="#struct-timereferencedata"><code>TimeReferenceData</code></a></td><td>Per-node clock descriptor: relates the node’s timestamp_ns domain to absolute time and reports the discipline state. When time_status is GptpSynced the message timestamps are already in the shared TAI domain and time_tai_ns equals timestamp_ns; the mapping then matters mainly for the UTC offset and clock health, and it is what a free-running node uses to publish its offset.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-attitudeestimatedata"><code>AttitudeEstimateData</code></a></td><td>Attitude estimate and angular velocity from the active estimator. The quaternion is the only attitude representation on the wire; consumers derive Euler angles locally when needed for display.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-localpositionestimatedata"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="#struct-globalpositionestimatedata"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>
@@ -1786,7 +1873,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>sensors_present</code></td><td><code>uint</code></td><td></td><td>Bitmask of SensorComponentFlags bits for detected components.</td></tr>
 <tr><td><code>sensors_enabled</code></td><td><code>uint</code></td><td></td><td>Bitmask of SensorComponentFlags bits enabled for use.</td></tr>
 <tr><td><code>sensors_health</code></td><td><code>uint</code></td><td></td><td>Bitmask of SensorComponentFlags bits currently considered healthy.</td></tr>
@@ -1804,13 +1891,14 @@
 <tr><td><code>system_state</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined high-level system state.</td></tr>
 <tr><td><code>link_quality_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Command/control link quality from 0 to 100.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of VehicleHealthFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="struct-timereferencedata"><a class="header" href="#struct-timereferencedata"><code>struct</code> TimeReferenceData</a></h1>
 <p><a href="#fbsstatefbs">fbs/state.fbs</a> / <a href="fbs/state.fbs">Source schema</a></p>
-<p>Pairing between Unix time and monotonic boot time.</p>
+<p>Per-node clock descriptor: relates the node’s timestamp_ns domain to absolute time and reports the discipline state. When time_status is GptpSynced the message timestamps are already in the shared TAI domain and time_tai_ns equals timestamp_ns; the mapping then matters mainly for the UTC offset and clock health, and it is what a free-running node uses to publish its offset.</p>
 <p><strong>FlatBuffers root table:</strong> <code>TimeReference</code></p>
 <div class="table-wrapper">
 <table>
@@ -1818,8 +1906,15 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>time_unix_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Unix epoch timestamp corresponding to time_boot_us.</td></tr>
-<tr><td><code>time_boot_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Monotonic boot timestamp at which time_unix_us was sampled.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Node timebase value (same domain as message timestamp_ns fields) at which the fields below were sampled.</td></tr>
+<tr><td><code>time_tai_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>IEEE 1588 TAI epoch corresponding to timestamp_ns; 0 when unsynced.</td></tr>
+<tr><td><code>time_unix_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Unix/UTC epoch corresponding to timestamp_ns; 0 when unknown.</td></tr>
+<tr><td><code>uncertainty_ns</code></td><td><code>uint</code></td><td>nanoseconds</td><td>One-sigma bound on this node’s time relative to the grandmaster: near-zero when GptpSynced, growing as holdover_elapsed times the oscillator drift spec. Lets a consumer degrade gracefully instead of gating binary. Requires the holdover estimator; leave 0 if not computed.</td></tr>
+<tr><td><code>utc_offset_s</code></td><td><code>short</code></td><td>seconds</td><td>TAI minus UTC in seconds (leap-second count); 0 when unknown.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Clock discipline state of this node.</td></tr>
+<tr><td><code>clock_class</code></td><td><code>ubyte</code></td><td></td><td>IEEE 802.1AS clockClass of the served time: 6 GNSS-locked, 7 holdover, 248 free-running.</td></tr>
+<tr><td><code>domain</code></td><td><code>ubyte</code></td><td></td><td>gPTP domain number.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Node instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1834,10 +1929,11 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Orientation rotating body FLU vectors into the ENU world frame.</td></tr>
 <tr><td><code>angular_velocity_flu_rad_s</code></td><td><a href="#struct-ratetriplet"><code>synapse.types.RateTriplet</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Body angular velocity in the FLU frame.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of AttitudeEstimateFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1852,7 +1948,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Local position relative to the active local origin.</td></tr>
 <tr><td><code>velocity_enu_m_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Local velocity in the ENU frame.</td></tr>
 <tr><td><code>acceleration_enu_m_s2</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second squared</td><td>Local acceleration in the ENU frame.</td></tr>
@@ -1861,6 +1957,7 @@
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of LocalPositionFlags bits.</td></tr>
 <tr><td><code>xy_reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the horizontal state.</td></tr>
 <tr><td><code>z_reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the vertical state.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1875,7 +1972,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Latitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Longitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>altitude_msl_mm</code></td><td><code>int</code></td><td>millimeters</td><td>Height above mean sea level.</td></tr>
@@ -1886,6 +1983,7 @@
 <tr><td><code>yaw_cdeg</code></td><td><code>short</code></td><td>centidegrees; degrees = value / 100</td><td>Heading in the range -18000 to 18000; zero east and positive counter-clockwise per REP-0103.</td></tr>
 <tr><td><code>source</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined source identifier for this global estimate.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of GlobalPositionFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1900,7 +1998,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Local position in the ENU frame.</td></tr>
 <tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Orientation rotating body FLU vectors into the ENU world frame.</td></tr>
 <tr><td><code>velocity_enu_m_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Linear velocity in the ENU frame.</td></tr>
@@ -1910,6 +2008,7 @@
 <tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
 <tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
 <tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1924,8 +2023,9 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Source measurement timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Source measurement timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Measured position and body-FLU-to-ENU quaternion attitude.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1940,8 +2040,9 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Position and body-FLU-to-ENU quaternion attitude.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1956,9 +2057,10 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Position and body-FLU-to-ENU quaternion attitude.</td></tr>
 <tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular pose covariance.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1973,8 +2075,9 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>ENU linear velocity and body-FLU angular velocity.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -1989,9 +2092,10 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>ENU linear velocity and body-FLU angular velocity.</td></tr>
 <tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle21f"><code>synapse.types.CovarianceUpperTriangle21f</code></a></td><td></td><td>Upper-triangular twist covariance.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2006,7 +2110,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Estimated position and attitude.</td></tr>
 <tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>Estimated linear and angular velocity.</td></tr>
 <tr><td><code>flags</code></td><td><a href="#enum-odometryflags"><code>OdometryFlags</code></a></td><td>bitmask</td><td>Bitmask of OdometryFlags bits.</td></tr>
@@ -2014,6 +2118,7 @@
 <tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
 <tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
 <tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2028,7 +2133,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp matching the contained state.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds matching the contained state. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>pose</code></td><td><a href="#struct-posef"><code>synapse.types.Posef</code></a></td><td></td><td>Estimated position and attitude.</td></tr>
 <tr><td><code>twist</code></td><td><a href="#struct-twistf"><code>synapse.types.Twistf</code></a></td><td></td><td>Estimated linear and angular velocity.</td></tr>
 <tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>synapse.types.CovarianceUpperTriangle78f</code></a></td><td></td><td>Upper-triangular 12x12 state covariance.</td></tr>
@@ -2037,6 +2142,7 @@
 <tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
 <tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
 <tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2051,7 +2157,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>position_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Measured local/world position in ENU.</td></tr>
 <tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Measured orientation rotating body FLU vectors into ENU.</td></tr>
 <tr><td><code>linear_velocity_enu_m_s</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Measured linear velocity in ENU.</td></tr>
@@ -2059,6 +2165,7 @@
 <tr><td><code>flags</code></td><td><a href="#enum-externalodometryflags"><code>ExternalOdometryFlags</code></a></td><td>bitmask</td><td>Bitmask of ExternalOdometryFlags bits.</td></tr>
 <tr><td><code>status</code></td><td><a href="#enum-externalodometrystatus"><code>ExternalOdometryStatus</code></a></td><td></td><td>Producer state quality and extrapolation status.</td></tr>
 <tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>External source instance identifier.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Tracked rigid-body instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
@@ -2074,9 +2181,10 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp matching ExternalOdometryData.timestamp_us.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds matching ExternalOdometryData.timestamp_ns. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>covariance</code></td><td><a href="#struct-covarianceuppertriangle78f"><code>synapse.types.CovarianceUpperTriangle78f</code></a></td><td></td><td>Upper-triangular covariance for the 12D tangent state.</td></tr>
 <tr><td><code>source_id</code></td><td><code>ubyte</code></td><td></td><td>External source instance identifier.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Tracked rigid-body instance identifier.</td></tr>
 </tbody>
 </table>
@@ -2092,7 +2200,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>flags</code></td><td><code>ushort</code></td><td>bitmask</td><td>Producer-defined estimator status and fault bitmask.</td></tr>
 <tr><td><code>velocity_test_ratio</code></td><td><code>float</code></td><td>dimensionless ratio</td><td>Innovation test ratio for velocity observations.</td></tr>
 <tr><td><code>pos_horiz_test_ratio</code></td><td><code>float</code></td><td>dimensionless ratio</td><td>Innovation test ratio for horizontal position observations.</td></tr>
@@ -2102,6 +2210,7 @@
 <tr><td><code>tas_test_ratio</code></td><td><code>float</code></td><td>dimensionless ratio</td><td>Innovation test ratio for true-airspeed observations.</td></tr>
 <tr><td><code>pos_horiz_accuracy_m</code></td><td><code>float</code></td><td>meters</td><td>Estimated one-sigma horizontal position accuracy.</td></tr>
 <tr><td><code>pos_vert_accuracy_m</code></td><td><code>float</code></td><td>meters</td><td>Estimated one-sigma vertical position accuracy.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2116,7 +2225,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>mission_id</code></td><td><code>uint</code></td><td></td><td>Identifier that changes when the mission plan changes.</td></tr>
 <tr><td><code>fence_id</code></td><td><code>uint</code></td><td></td><td>Identifier that changes when the geofence set changes.</td></tr>
 <tr><td><code>rally_points_id</code></td><td><code>uint</code></td><td></td><td>Identifier that changes when the rally-point set changes.</td></tr>
@@ -2124,6 +2233,7 @@
 <tr><td><code>total</code></td><td><code>ushort</code></td><td></td><td>Total number of mission items known to the producer.</td></tr>
 <tr><td><code>mission_state</code></td><td><a href="#enum-missionstate"><code>synapse.types.MissionState</code></a></td><td></td><td>Mission execution state.</td></tr>
 <tr><td><code>mission_mode</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined mission mode or mission type.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2138,7 +2248,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>altitude_error_m</code></td><td><code>float</code></td><td>meters</td><td>Target altitude minus estimated altitude.</td></tr>
 <tr><td><code>airspeed_error_m_s</code></td><td><code>float</code></td><td>meters per second</td><td>Target airspeed minus estimated airspeed.</td></tr>
 <tr><td><code>xtrack_error_m</code></td><td><code>float</code></td><td>meters</td><td>Cross-track error relative to the active path.</td></tr>
@@ -2147,6 +2257,7 @@
 <tr><td><code>desired_yaw_cdeg</code></td><td><code>short</code></td><td>centidegrees; degrees = value / 100</td><td>Navigation yaw command.</td></tr>
 <tr><td><code>target_yaw_cdeg</code></td><td><code>short</code></td><td>centidegrees; degrees = value / 100</td><td>Yaw toward the active target.</td></tr>
 <tr><td><code>distance_to_waypoint_m</code></td><td><code>ushort</code></td><td>meters</td><td>Remaining straight-line distance to the active waypoint.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2161,7 +2272,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Reference timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Reference timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Home latitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Home longitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>altitude_msl_mm</code></td><td><code>int</code></td><td>millimeters</td><td>Home height above mean sea level.</td></tr>
@@ -2169,6 +2280,7 @@
 <tr><td><code>attitude</code></td><td><a href="#struct-quaternionf"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Map-to-local alignment rotating FLU vectors at home into ENU.</td></tr>
 <tr><td><code>approach_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Preferred approach point or vector in the local ENU frame.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of HomeReferenceFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2221,7 +2333,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>time_boot_ms</code></td><td><code>uint</code></td><td>milliseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>time_boot_ms</code></td><td><code>uint</code></td><td>milliseconds</td><td>Sample timestamp in milliseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Latitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Longitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>altitude_msl_m</code></td><td><code>short</code></td><td>meters</td><td>Height above mean sea level.</td></tr>
@@ -2240,6 +2352,7 @@
 <tr><td><code>satellites_used</code></td><td><code>ubyte</code></td><td></td><td>Number of GNSS satellites used in the solution.</td></tr>
 <tr><td><code>fix_type</code></td><td><a href="#enum-gnssfixtype"><code>synapse.types.GnssFixType</code></a></td><td></td><td>GNSS fix quality.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of GcsStatusFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2326,8 +2439,8 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Publication timestamp in monotonic boot time.</td></tr>
-<tr><td><code>start_time_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Trajectory segment start time in the producer’s monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Publication timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
+<tr><td><code>start_time_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Trajectory segment start time in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>p0_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 0 in local ENU meters.</td></tr>
 <tr><td><code>p1_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 1 in local ENU meters.</td></tr>
 <tr><td><code>p2_enu_m</code></td><td><a href="#struct-vec3f"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 2 in local ENU meters.</td></tr>
@@ -2352,6 +2465,7 @@
 <tr><td><code>trajectory_type</code></td><td><a href="#enum-trajectorytype"><code>TrajectoryType</code></a></td><td></td><td>Bezier or polynomial coefficient interpretation.</td></tr>
 <tr><td><code>degree</code></td><td><a href="#enum-trajectorydegree"><code>TrajectoryDegree</code></a></td><td></td><td>Highest coefficient index used by this segment.</td></tr>
 <tr><td><code>frame</code></td><td><a href="#enum-localframe"><code>synapse.types.LocalFrame</code></a></td><td></td><td>Local frame for position control points or coefficients.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Optional topic instance identifier for multiple trajectory streams.</td></tr>
 </tbody>
 </table>
@@ -2780,9 +2894,10 @@
 <tr><th>Name</th><th>Type</th><th>Default</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td></td><td>microseconds</td><td>Message timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td></td><td>nanoseconds</td><td>Message timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>severity</code></td><td><a href="#enum-severity"><code>synapse.types.Severity</code></a></td><td><code>Informational</code></td><td></td><td>RFC 5424 severity level.</td></tr>
 <tr><td><code>text</code></td><td><code>string</code></td><td></td><td></td><td>UTF-8 status text; this table is variable-size by design.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="#enum-timestatus"><code>synapse.types.TimeStatus</code></a></td><td></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2800,7 +2915,7 @@
 <tr><td><a href="#struct-timereferencedata"><code>TimeReference</code></a></td><td><a href="#struct-timereferencedata"><code>TimeReference</code></a></td><td>Boot-time to Unix-time reference sample.</td></tr>
 <tr><td><a href="#struct-radiocontroldata"><code>RadioControl</code></a></td><td><a href="#struct-radiocontroldata"><code>RadioControl</code></a></td><td>Raw receiver channel input sample.</td></tr>
 <tr><td><a href="#struct-manualcontroldata"><code>ManualControlCommand</code></a></td><td><a href="#struct-manualcontroldata"><code>ManualControlCommand</code></a></td><td>Normalized manual pilot intent command.</td></tr>
-<tr><td><a href="#struct-inertialsampledata"><code>InertialSample</code></a></td><td><a href="#struct-inertialsampledata"><code>InertialSample</code></a></td><td>IMU, magnetometer, static pressure, and temperature sample.</td></tr>
+<tr><td><a href="#struct-inertialsampledata"><code>InertialSample</code></a></td><td><a href="#struct-inertialsampledata"><code>InertialSample</code></a></td><td>IMU accelerometer, gyroscope, and temperature sample.</td></tr>
 <tr><td><a href="#struct-airdatadata"><code>AirData</code></a></td><td><a href="#struct-airdatadata"><code>AirData</code></a></td><td>Barometric and aerodynamic measurement sample.</td></tr>
 <tr><td><a href="#struct-powerstatusdata"><code>PowerStatus</code></a></td><td><a href="#struct-powerstatusdata"><code>PowerStatus</code></a></td><td>Battery or power-source state sample.</td></tr>
 <tr><td><a href="#struct-gnssfixdata"><code>GnssFix</code></a></td><td><a href="#struct-gnssfixdata"><code>GnssFix</code></a></td><td>GNSS fix and motion estimate.</td></tr>
@@ -2838,6 +2953,7 @@
 <tr><td><a href="#struct-odometrydata"><code>Odometry</code></a></td><td><a href="#struct-odometrydata"><code>Odometry</code></a></td><td>Compact pose, twist, and estimator status.</td></tr>
 <tr><td><a href="#struct-odometrywithcovariancedata"><code>OdometryWithCovariance</code></a></td><td><a href="#struct-odometrywithcovariancedata"><code>OdometryWithCovariance</code></a></td><td>Odometry with complete state covariance.</td></tr>
 <tr><td><a href="#table-mocapposeframe"><code>MocapPoseFrame</code></a></td><td><a href="#table-mocapposeframe"><code>MocapPoseFrame</code></a></td><td>Raw motion-capture frame with quaternion rigid-body attitudes.</td></tr>
+<tr><td><a href="#struct-magneticfielddata"><code>MagneticField</code></a></td><td><a href="#struct-magneticfielddata"><code>MagneticField</code></a></td><td>Magnetometer sample in the body FLU frame.</td></tr>
 </tbody>
 </table>
 </div>
@@ -2898,6 +3014,7 @@
 <tr><td><code>enum</code></td><td><a href="#enum-severity"><code>Severity</code></a></td><td>Text and diagnostic severity levels following RFC 5424 syslog numbering.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-commandresultcode"><code>CommandResultCode</code></a></td><td>Result of command or transfer request execution.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-gnssfixtype"><code>GnssFixType</code></a></td><td>GNSS receiver fix quality.</td></tr>
+<tr><td><code>enum</code></td><td><a href="#enum-timestatus"><code>TimeStatus</code></a></td><td>Discipline state of a node’s clock, and therefore the meaning of the timestamp_ns fields stamped against it.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-batterychargestate"><code>BatteryChargeState</code></a></td><td>Battery or power-source charging state.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-batteryfunction"><code>BatteryFunction</code></a></td><td>Role a battery or power source plays on the vehicle.</td></tr>
 <tr><td><code>enum</code></td><td><a href="#enum-batterytype"><code>BatteryType</code></a></td><td>Battery chemistry or power-source type.</td></tr>
@@ -3215,6 +3332,23 @@
 </table>
 </div>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="enum-timestatus"><a class="header" href="#enum-timestatus"><code>enum</code> TimeStatus</a></h1>
+<p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
+<p><strong>Backing type:</strong> <code>ubyte</code></p>
+<p>Discipline state of a node’s clock, and therefore the meaning of the timestamp_ns fields stamped against it.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Name</th><th>Value</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>LocalFreerun</code></td><td><code>0</code></td><td>Undisciplined monotonic boot clock; node-local, not cross-node comparable.</td></tr>
+<tr><td><code>GptpSynced</code></td><td><code>1</code></td><td>Disciplined to the gPTP grandmaster; timestamps are in the shared GNSS-traceable domain.</td></tr>
+<tr><td><code>GptpHoldover</code></td><td><code>2</code></td><td>Was disciplined, grandmaster lost; coasting on the last offset, accuracy degrading.</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="enum-batterychargestate"><a class="header" href="#enum-batterychargestate"><code>enum</code> BatteryChargeState</a></h1>
 <p><a href="#fbstypesfbs">fbs/types.fbs</a> / <a href="fbs/types.fbs">Source schema</a></p>
 <p><strong>Backing type:</strong> <code>ubyte</code></p>
@@ -3343,7 +3477,7 @@
 <tr><td><code>TimeReference</code></td><td><code>2</code></td><td>Correlates boot-relative time with an absolute Unix time reference.</td></tr>
 <tr><td><code>RadioControl</code></td><td><code>3</code></td><td>Raw receiver channel input and link quality.</td></tr>
 <tr><td><code>ManualControlCommand</code></td><td><code>4</code></td><td>Normalized manual pilot intent after input mapping.</td></tr>
-<tr><td><code>InertialSample</code></td><td><code>5</code></td><td>IMU, magnetometer, static pressure, and temperature sample.</td></tr>
+<tr><td><code>InertialSample</code></td><td><code>5</code></td><td>IMU accelerometer, gyroscope, and temperature sample.</td></tr>
 <tr><td><code>AirData</code></td><td><code>6</code></td><td>Barometric and aerodynamic measurements used by fixed-wing control.</td></tr>
 <tr><td><code>PowerStatus</code></td><td><code>7</code></td><td>Battery, current, energy, and power-source state.</td></tr>
 <tr><td><code>GnssFix</code></td><td><code>8</code></td><td>Global navigation fix, accuracy, velocity, and heading information.</td></tr>
@@ -3381,6 +3515,7 @@
 <tr><td><code>Odometry</code></td><td><code>40</code></td><td>Compact combined pose, twist, and estimator status.</td></tr>
 <tr><td><code>OdometryWithCovariance</code></td><td><code>41</code></td><td>Odometry with complete 12x12 state covariance.</td></tr>
 <tr><td><code>MocapPoseFrame</code></td><td><code>42</code></td><td>Raw motion-capture frame with quaternion rigid-body attitudes.</td></tr>
+<tr><td><code>MagneticField</code></td><td><code>43</code></td><td>Magnetometer sample in the body FLU frame.</td></tr>
 </tbody>
 </table>
 </div>

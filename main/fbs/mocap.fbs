@@ -50,7 +50,7 @@ struct MocapRigidBodyPoseData {
 // Raw mocap frame for logging, debugging, and bridge-level processing. This is
 // intentionally table-encoded; estimators should consume ExternalOdometry.
 table MocapFrame {
-  timestamp_us:ulong; // Marker timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Marker timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   frame_number:uint; // Source frame number.
   drop_rate_2d_dpermille:ushort; // Recent 2D camera-frame drop rate in deci-percent.
   out_of_sync_rate_2d_dpermille:ushort; // Recent 2D camera-frame out-of-sync rate in deci-percent.
@@ -59,13 +59,14 @@ table MocapFrame {
   markers:[MocapMarkerData]; // Labeled marker samples.
   unlabeled_markers:[MocapMarkerData]; // Unlabeled marker samples.
   rigid_bodies:[MocapRigidBodyData]; // Six-degree-of-freedom rigid-body samples.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Raw mocap frame using quaternion attitude for rigid bodies. This supersedes
 // MocapFrame for new publishers while the matrix-based wire type remains
 // available for compatibility with existing recordings and consumers.
 table MocapPoseFrame {
-  timestamp_us:ulong; // Marker timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Marker timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   frame_number:uint; // Source frame number.
   drop_rate_2d_dpermille:ushort; // Recent 2D camera-frame drop rate in deci-percent.
   out_of_sync_rate_2d_dpermille:ushort; // Recent 2D camera-frame out-of-sync rate in deci-percent.
@@ -74,4 +75,5 @@ table MocapPoseFrame {
   markers:[MocapMarkerData]; // Labeled marker samples.
   unlabeled_markers:[MocapMarkerData]; // Unlabeled marker samples.
   rigid_bodies:[MocapRigidBodyPoseData]; // Six-degree-of-freedom rigid-body pose samples.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }

@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Output timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Output timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>active_mask</code></td><td><code>uint</code></td><td>bitmask</td><td>Bitmask indicating which PWM outputs are valid, indexed from bit 0.</td></tr>
 <tr><td><code>port</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined output bank or timer port.</td></tr>
 <tr><td><code>output0_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 0 pulse width.</td></tr>
@@ -207,6 +207,7 @@
 <tr><td><code>output13_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 13 pulse width.</td></tr>
 <tr><td><code>output14_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 14 pulse width.</td></tr>
 <tr><td><code>output15_us</code></td><td><code>ushort</code></td><td>microseconds</td><td>PWM output 15 pulse width.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

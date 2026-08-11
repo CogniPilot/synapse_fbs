@@ -224,6 +224,14 @@ enum GnssFixType:ubyte {
   DeadReckoning = 7, // Dead-reckoning or combined solution without full GNSS observability.
 }
 
+// Discipline state of a node's clock, and therefore the meaning of the
+// timestamp_ns fields stamped against it.
+enum TimeStatus:ubyte {
+  LocalFreerun = 0, // Undisciplined monotonic boot clock; node-local, not cross-node comparable.
+  GptpSynced = 1, // Disciplined to the gPTP grandmaster; timestamps are in the shared GNSS-traceable domain.
+  GptpHoldover = 2, // Was disciplined, grandmaster lost; coasting on the last offset, accuracy degrading.
+}
+
 // Battery or power-source charging state.
 enum BatteryChargeState:ubyte {
   Unknown = 0, // Charge state is not reported.
@@ -287,7 +295,7 @@ enum TopicId:ushort {
   TimeReference = 2, // Correlates boot-relative time with an absolute Unix time reference.
   RadioControl = 3, // Raw receiver channel input and link quality.
   ManualControlCommand = 4, // Normalized manual pilot intent after input mapping.
-  InertialSample = 5, // IMU, magnetometer, static pressure, and temperature sample.
+  InertialSample = 5, // IMU accelerometer, gyroscope, and temperature sample.
   AirData = 6, // Barometric and aerodynamic measurements used by fixed-wing control.
   PowerStatus = 7, // Battery, current, energy, and power-source state.
   GnssFix = 8, // Global navigation fix, accuracy, velocity, and heading information.
@@ -325,4 +333,5 @@ enum TopicId:ushort {
   Odometry = 40, // Compact combined pose, twist, and estimator status.
   OdometryWithCovariance = 41, // Odometry with complete 12x12 state covariance.
   MocapPoseFrame = 42, // Raw motion-capture frame with quaternion rigid-body attitudes.
+  MagneticField = 43, // Magnetometer sample in the body FLU frame.
 }

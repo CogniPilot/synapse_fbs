@@ -60,7 +60,7 @@ enum LocalPositionCommandMask:ushort (bit_flags) {
 // Raw receiver channel sample before pilot-input normalization. This is a
 // raw-layer topic: channel values are the receiver's native pulse widths.
 struct RadioControlData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   channel_count:ubyte; // Number of valid channels in this sample, starting at channel 0.
   link_quality_pct:ubyte; // Receiver link quality from 0 to 100.
   chan0_raw_us:ushort; // Raw channel 0 pulse width.
@@ -81,6 +81,7 @@ struct RadioControlData {
   chan15_raw_us:ushort; // Raw channel 15 pulse width.
   chan16_raw_us:ushort; // Raw channel 16 pulse width.
   chan17_raw_us:ushort; // Raw channel 17 pulse width.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Normalized pilot intent after receiver decoding, mapping, and validity
@@ -89,7 +90,7 @@ struct RadioControlData {
 // unidirectional vehicles clamp negative throttle to zero. Axis validity is
 // carried only by active_axes; there are no sentinel values.
 struct ManualControlData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   buttons:uint; // Bitmask of active momentary buttons or switches, indexed from bit 0.
   active_axes:ushort; // Bitmask of ManualControlAxes bits indicating meaningful axes.
   pitch_milli:short; // Pitch command in milli-units over -1000 to 1000; positive pitches nose up.
@@ -104,28 +105,31 @@ struct ManualControlData {
   aux5_milli:short; // Auxiliary axis 5 in milli-units over -1000 to 1000.
   flight_mode:ubyte; // Producer-defined requested flight mode.
   flags:ubyte; // Bitmask of ManualControlFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Attitude setpoint with optional angular-rate and thrust feed-forward.
 struct AttitudeCommandData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   attitude:synapse.types.Quaternionf; // Desired orientation rotating body FLU vectors into the ENU world frame.
   body_rate_flu_rad_s:synapse.types.RateTriplet; // Body-rate feed-forward in the FLU frame.
   thrust:float; // Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.
   type_mask:ubyte; // Bitmask of AttitudeCommandMask bits for ignored fields.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Body-rate setpoint with optional thrust feed-forward.
 struct RateCommandData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   body_rate_flu_rad_s:synapse.types.RateTriplet; // Desired body angular rates in the FLU frame.
   thrust:float; // Normalized collective thrust command over 0 to 1, or -1 to 1 for reverse-capable vehicles.
   type_mask:ubyte; // Bitmask of RateCommandMask bits for ignored fields.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Local-frame position, velocity, acceleration, and yaw setpoint.
 struct LocalPositionCommandData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   position_enu_m:synapse.types.Vec3f; // Desired local position in the ENU frame.
   velocity_enu_m_s:synapse.types.Vec3f; // Desired local velocity in the ENU frame.
   acceleration_or_force_enu:synapse.types.Vec3f; // Desired ENU acceleration in m/s^2, or force in newtons when ForceSetpoint is set.
@@ -133,11 +137,12 @@ struct LocalPositionCommandData {
   yaw_rate_rad_s:float; // Desired yaw rate; positive counter-clockwise.
   type_mask:ushort; // Bitmask of LocalPositionCommandMask bits.
   coordinate_frame:synapse.types.LocalFrame; // Frame in which the setpoint is expressed.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Normalized actuator command for up to sixteen logical actuator controls.
 struct ActuatorCommandData {
-  timestamp_us:ulong; // Command timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   active_mask:uint; // Bitmask indicating which control slots are valid, indexed from bit 0.
   control0:float; // Normalized actuator control slot 0.
   control1:float; // Normalized actuator control slot 1.
@@ -155,13 +160,14 @@ struct ActuatorCommandData {
   control13:float; // Normalized actuator control slot 13.
   control14:float; // Normalized actuator control slot 14.
   control15:float; // Normalized actuator control slot 15.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Normalized actuator feedback for up to thirty-two physical outputs. The
 // command message carries sixteen logical controls while feedback covers
 // thirty-two physical outputs after mixing and allocation.
 struct ActuatorFeedbackData {
-  timestamp_us:ulong; // Feedback timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Feedback timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   active_mask:uint; // Bitmask indicating which output slots are valid, indexed from bit 0.
   output0:float; // Normalized actuator output slot 0.
   output1:float; // Normalized actuator output slot 1.
@@ -195,11 +201,12 @@ struct ActuatorFeedbackData {
   output29:float; // Normalized actuator output slot 29.
   output30:float; // Normalized actuator output slot 30.
   output31:float; // Normalized actuator output slot 31.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Raw PWM pulse-width outputs for servo and ESC drivers.
 struct PwmSignalOutputsData {
-  timestamp_us:ulong; // Output timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Output timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   active_mask:uint; // Bitmask indicating which PWM outputs are valid, indexed from bit 0.
   port:ubyte; // Producer-defined output bank or timer port.
   output0_us:ushort; // PWM output 0 pulse width.
@@ -218,15 +225,17 @@ struct PwmSignalOutputsData {
   output13_us:ushort; // PWM output 13 pulse width.
   output14_us:ushort; // PWM output 14 pulse width.
   output15_us:ushort; // PWM output 15 pulse width.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Runtime metrics for a control loop or scheduler slice.
 struct ControlLoopMetricsData {
-  timestamp_us:ulong; // Metrics timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Metrics timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   period_us:uint; // Measured loop period.
   latency_us:uint; // Time from scheduled release to completion or publication.
   overrun_count:uint; // Cumulative count of missed deadlines.
   load_dpermille:ushort; // Loop load as deci-percent, where 1000 means 100%.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // FlatBuffers root wrapper for RadioControlData.

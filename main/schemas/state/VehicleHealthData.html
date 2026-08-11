@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>sensors_present</code></td><td><code>uint</code></td><td></td><td>Bitmask of SensorComponentFlags bits for detected components.</td></tr>
 <tr><td><code>sensors_enabled</code></td><td><code>uint</code></td><td></td><td>Bitmask of SensorComponentFlags bits enabled for use.</td></tr>
 <tr><td><code>sensors_health</code></td><td><code>uint</code></td><td></td><td>Bitmask of SensorComponentFlags bits currently considered healthy.</td></tr>
@@ -206,6 +206,7 @@
 <tr><td><code>system_state</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined high-level system state.</td></tr>
 <tr><td><code>link_quality_pct</code></td><td><code>ubyte</code></td><td>percent</td><td>Command/control link quality from 0 to 100.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of VehicleHealthFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

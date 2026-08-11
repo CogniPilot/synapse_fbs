@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>pose</code></td><td><a href="../types/Posef.html"><code>synapse.types.Posef</code></a></td><td></td><td>Estimated position and attitude.</td></tr>
 <tr><td><code>twist</code></td><td><a href="../types/Twistf.html"><code>synapse.types.Twistf</code></a></td><td></td><td>Estimated linear and angular velocity.</td></tr>
 <tr><td><code>flags</code></td><td><a href="OdometryFlags.html"><code>OdometryFlags</code></a></td><td>bitmask</td><td>Bitmask of OdometryFlags bits.</td></tr>
@@ -196,6 +196,7 @@
 <tr><td><code>reset_counter</code></td><td><code>ubyte</code></td><td></td><td>Increments when the estimator resets or jumps the state.</td></tr>
 <tr><td><code>estimator_type</code></td><td><code>ubyte</code></td><td></td><td>Producer-defined estimator implementation identifier.</td></tr>
 <tr><td><code>quality_pct</code></td><td><code>byte</code></td><td>percent</td><td>Overall odometry quality percentage, or negative when unknown.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-cc9f6bc5.js"></script>
+        <script src="../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -199,7 +199,7 @@
 <tr><td><code>enum</code></td><td><a href="state/GlobalPositionFlags.html"><code>GlobalPositionFlags</code></a></td><td>Field-validity bits for GlobalPositionEstimateData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="state/HomeReferenceFlags.html"><code>HomeReferenceFlags</code></a></td><td>Field-validity bits for HomeReferenceData.flags.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/VehicleHealthData.html"><code>VehicleHealthData</code></a></td><td>Vehicle-wide state summary for operator displays and failsafe supervision.</td></tr>
-<tr><td><code>struct</code></td><td><a href="state/TimeReferenceData.html"><code>TimeReferenceData</code></a></td><td>Pairing between Unix time and monotonic boot time.</td></tr>
+<tr><td><code>struct</code></td><td><a href="state/TimeReferenceData.html"><code>TimeReferenceData</code></a></td><td>Per-node clock descriptor: relates the node’s timestamp_ns domain to absolute time and reports the discipline state. When time_status is GptpSynced the message timestamps are already in the shared TAI domain and time_tai_ns equals timestamp_ns; the mapping then matters mainly for the UTC offset and clock health, and it is what a free-running node uses to publish its offset.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/AttitudeEstimateData.html"><code>AttitudeEstimateData</code></a></td><td>Attitude estimate and angular velocity from the active estimator. The quaternion is the only attitude representation on the wire; consumers derive Euler angles locally when needed for display.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/LocalPositionEstimateData.html"><code>LocalPositionEstimateData</code></a></td><td>Local-frame position estimate for navigation and control.</td></tr>
 <tr><td><code>struct</code></td><td><a href="state/GlobalPositionEstimateData.html"><code>GlobalPositionEstimateData</code></a></td><td>Global geodetic position estimate with compact velocity and status fields.</td></tr>

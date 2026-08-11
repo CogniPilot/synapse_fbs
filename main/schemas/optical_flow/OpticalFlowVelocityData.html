@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -180,7 +180,7 @@
                     <main>
                         <h1 id="struct-opticalflowvelocitydata"><a class="header" href="#struct-opticalflowvelocitydata"><code>struct</code> OpticalFlowVelocityData</a></h1>
 <p><a href="../optical_flow.html">fbs/optical_flow.fbs</a> / <a href="../../fbs/optical_flow.fbs">Source schema</a></p>
-<p>Velocity estimate derived from optical flow.</p>
+<p>Body-frame velocity derived from optical flow. Convenience layer for a consumer that is not running a full estimator. velocity_flu_m_s is tilt-compensated using accelerometer-derived roll and pitch and is trustworthy only while OpticalFlowVelocityFlags.VelocityValid is set. There is no ENU velocity: that needs a yaw reference this producer does not have.</p>
 <p><strong>FlatBuffers root table:</strong> <code>OpticalFlowVelocity</code></p>
 <div class="table-wrapper">
 <table>
@@ -188,12 +188,15 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Estimate timestamp in monotonic boot time.</td></tr>
-<tr><td><code>velocity_flu_m_s</code></td><td><a href="../types/Vec2f.html"><code>synapse.types.Vec2f</code></a></td><td>meters per second</td><td>Planar velocity estimate in the body FLU frame.</td></tr>
-<tr><td><code>velocity_enu_m_s</code></td><td><a href="../types/Vec2f.html"><code>synapse.types.Vec2f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Planar velocity estimate in the local ENU frame.</td></tr>
-<tr><td><code>flow_rate_uncompensated_rad_s</code></td><td><a href="../types/Vec2f.html"><code>synapse.types.Vec2f</code></a></td><td>radians per second</td><td>Raw angular flow rate before gyro compensation.</td></tr>
-<tr><td><code>flow_rate_compensated_rad_s</code></td><td><a href="../types/Vec2f.html"><code>synapse.types.Vec2f</code></a></td><td>radians per second</td><td>Angular flow rate after gyro compensation.</td></tr>
-<tr><td><code>gyro_flu_rad_s</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>FLU body frame (x forward, y left, z up), radians per second</td><td>Body angular rate used for compensation.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Estimate time in nanoseconds, same domain rules as OpticalFlowData.timestamp_ns.</td></tr>
+<tr><td><code>velocity_flu_m_s</code></td><td><a href="../types/Vec2f.html"><code>synapse.types.Vec2f</code></a></td><td>meters per second</td><td>Planar body-FLU velocity (x forward, y left), tilt-compensated.</td></tr>
+<tr><td><code>distance_m</code></td><td><code>float</code></td><td>meters</td><td>Range used for the projection, exposed for measurement-noise scaling.</td></tr>
+<tr><td><code>roll_rad</code></td><td><code>float</code></td><td>radians</td><td>Accelerometer-derived roll used to tilt-compensate the velocity.</td></tr>
+<tr><td><code>pitch_rad</code></td><td><code>float</code></td><td>radians</td><td>Accelerometer-derived pitch used to tilt-compensate the velocity.</td></tr>
+<tr><td><code>quality</code></td><td><code>ubyte</code></td><td></td><td>Combined flow-and-range confidence from 0 to 255.</td></tr>
+<tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of OpticalFlowVelocityFlags: bit0 VelocityValid, bit1 TiltCompensated, bit2 RangeTrusted.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind timestamp_ns.</td></tr>
+<tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Flow sensor instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>
 </div>

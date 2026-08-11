@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Command timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Command timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>position_enu_m</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Desired local position in the ENU frame.</td></tr>
 <tr><td><code>velocity_enu_m_s</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters per second</td><td>Desired local velocity in the ENU frame.</td></tr>
 <tr><td><code>acceleration_or_force_enu</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td></td><td>Desired ENU acceleration in m/s^2, or force in newtons when ForceSetpoint is set.</td></tr>
@@ -196,6 +196,7 @@
 <tr><td><code>yaw_rate_rad_s</code></td><td><code>float</code></td><td>radians per second</td><td>Desired yaw rate; positive counter-clockwise.</td></tr>
 <tr><td><code>type_mask</code></td><td><code>ushort</code></td><td>bitmask</td><td>Bitmask of LocalPositionCommandMask bits.</td></tr>
 <tr><td><code>coordinate_frame</code></td><td><a href="../types/LocalFrame.html"><code>synapse.types.LocalFrame</code></a></td><td></td><td>Frame in which the setpoint is expressed.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

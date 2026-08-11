@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>time_boot_ms</code></td><td><code>uint</code></td><td>milliseconds</td><td>Sample timestamp in monotonic boot time.</td></tr>
+<tr><td><code>time_boot_ms</code></td><td><code>uint</code></td><td>milliseconds</td><td>Sample timestamp in milliseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Latitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Longitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>altitude_msl_m</code></td><td><code>short</code></td><td>meters</td><td>Height above mean sea level.</td></tr>
@@ -207,6 +207,7 @@
 <tr><td><code>satellites_used</code></td><td><code>ubyte</code></td><td></td><td>Number of GNSS satellites used in the solution.</td></tr>
 <tr><td><code>fix_type</code></td><td><a href="../types/GnssFixType.html"><code>synapse.types.GnssFixType</code></a></td><td></td><td>GNSS fix quality.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of GcsStatusFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

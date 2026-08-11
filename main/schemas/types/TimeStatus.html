@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>enum OdometryStatus - Synapse FlatBuffers main</title>
+        <title>enum TimeStatus - Synapse FlatBuffers main</title>
 
 
         <!-- Custom HTML head -->
@@ -178,23 +178,19 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="enum-odometrystatus"><a class="header" href="#enum-odometrystatus"><code>enum</code> OdometryStatus</a></h1>
-<p><a href="../state.html">fbs/state.fbs</a> / <a href="../../fbs/state.fbs">Source schema</a></p>
+                        <h1 id="enum-timestatus"><a class="header" href="#enum-timestatus"><code>enum</code> TimeStatus</a></h1>
+<p><a href="../types.html">fbs/types.fbs</a> / <a href="../../fbs/types.fbs">Source schema</a></p>
 <p><strong>Backing type:</strong> <code>ubyte</code></p>
-<p>Quality/status state for a producer-side odometry estimate.</p>
+<p>Discipline state of a node’s clock, and therefore the meaning of the timestamp_ns fields stamped against it.</p>
 <div class="table-wrapper">
 <table>
 <thead>
 <tr><th>Name</th><th>Value</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>Unknown</code></td><td><code>0</code></td><td>Producer did not report a quality/status state.</td></tr>
-<tr><td><code>Filtered</code></td><td><code>1</code></td><td>Current measurement was accepted into the estimate.</td></tr>
-<tr><td><code>ExtrapolatedShort</code></td><td><code>2</code></td><td>Short prediction-only gap after the last accepted measurement.</td></tr>
-<tr><td><code>ExtrapolatedLong</code></td><td><code>3</code></td><td>Extended prediction-only gap; downstream users should degrade behavior.</td></tr>
-<tr><td><code>Lost</code></td><td><code>4</code></td><td>Extrapolation exceeded the producer’s safe limit.</td></tr>
-<tr><td><code>OutlierRejected</code></td><td><code>5</code></td><td>Current measurement was rejected and the state was predicted.</td></tr>
-<tr><td><code>Degraded</code></td><td><code>6</code></td><td>Current measurement was accepted but quality is reduced.</td></tr>
+<tr><td><code>LocalFreerun</code></td><td><code>0</code></td><td>Undisciplined monotonic boot clock; node-local, not cross-node comparable.</td></tr>
+<tr><td><code>GptpSynced</code></td><td><code>1</code></td><td>Disciplined to the gPTP grandmaster; timestamps are in the shared GNSS-traceable domain.</td></tr>
+<tr><td><code>GptpHoldover</code></td><td><code>2</code></td><td>Was disciplined, grandmaster lost; coasting on the last offset, accuracy degrading.</td></tr>
 </tbody>
 </table>
 </div>
@@ -203,11 +199,11 @@
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../../schemas/state/OdometryFlags.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../../schemas/types/GnssFixType.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../../schemas/state/GlobalPositionFlags.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../schemas/types/BatteryChargeState.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -217,11 +213,11 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../../schemas/state/OdometryFlags.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../../schemas/types/GnssFixType.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../../schemas/state/GlobalPositionFlags.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../schemas/types/BatteryChargeState.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

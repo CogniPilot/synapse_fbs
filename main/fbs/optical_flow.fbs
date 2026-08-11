@@ -2,28 +2,61 @@ include "types.fbs";
 
 namespace synapse.topic;
 
-// Integrated optical-flow sample from an image sensor or flow module. This is
-// a raw-layer topic: flow is the sensor's integrated angular image motion.
-struct OpticalFlowData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
-  flow_rad:synapse.types.Vec2f; // Integrated angular flow about the sensor X and Y axes in radians over integration_timespan_us.
-  delta_angle_flu_rad:synapse.types.Vec3f; // Integrated body rotation in the FLU frame during the same interval.
-  distance_m:float; // Measured distance to the observed surface.
-  integration_timespan_us:uint; // Integration interval for flow_rad and delta_angle_flu_rad.
-  max_flow_rate_rad_s:float; // Maximum measurable angular flow rate.
-  min_ground_distance_m:float; // Minimum valid range for distance-compensated flow.
-  max_ground_distance_m:float; // Maximum valid range for distance-compensated flow.
-  quality_pct:ubyte; // Flow quality from 0 to 100.
+// Automatic scene light mode reported by the flow sensor. Mirrors the PAA3905
+// mode so a consumer can down-weight noisier low-light frames beyond what the
+// raw quality value conveys.
+enum FlowLightMode:ubyte {
+  Unknown = 0, // Mode not reported.
+  Bright = 1, // Bright scene, full frame rate.
+  LowLight = 2, // Low-light scene.
+  SuperLowLight = 3, // Super-low-light scene, reduced frame rate and higher noise.
 }
 
-// Velocity estimate derived from optical flow.
+// Integrated optical-flow measurement from an image sensor or flow module. Raw
+// layer: flow is the sensor's integrated angular image motion, expressed in the
+// body FLU frame so it subtracts directly from delta_angle_flu_rad. Range and
+// its trust metrics are folded in so the sample is self-contained; a downstream
+// estimator should fuse this rather than the derived velocity below. All time
+// fields are nanoseconds.
+struct OpticalFlowData {
+  timestamp_ns:ulong; // Publish time in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
+  timestamp_sample_ns:ulong; // Center of the integration window, same domain as timestamp_ns. Use this for fusion and latency compensation.
+  distance_timestamp_ns:ulong; // Time of the range sample folded into distance_m, same domain; lets a consumer detect a stale range.
+  flow_rad:synapse.types.Vec2f; // Integrated angular flow over the window in body FLU (x forward, y left), radians.
+  delta_angle_flu_rad:synapse.types.Vec3f; // Integrated body rotation over the same window in FLU, radians. All three axes populated.
+  distance_m:float; // Fused range to the observed surface. Trust only when OpticalFlowFlags.DistanceValid is set.
+  distance_spread_m:float; // Range spread across the ranger pixel field; a high value flags an ambiguous or non-planar footprint, do not trust distance_m.
+  integration_timespan_ns:uint; // Integration interval for flow_rad and delta_angle_flu_rad, nanoseconds.
+  error_count:uint; // Cumulative driver error count for health monitoring.
+  max_flow_rate_rad_s:float; // Maximum measurable angular flow rate (sensor limit).
+  min_ground_distance_m:float; // Minimum valid range for distance-compensated flow (sensor limit).
+  max_ground_distance_m:float; // Maximum valid range for distance-compensated flow (sensor limit).
+  field_of_view_rad:float; // Full field of view of the flow optics.
+  temperature_c:float; // Sensor temperature in degrees Celsius.
+  quality:ubyte; // Flow quality from 0 to 255.
+  distance_quality:ubyte; // Range signal quality from 0 to 255, independent of flow quality.
+  distance_pixel_ok:ubyte; // Count of valid ranger pixels used in the fused range (0 to 32); low counts flag an unreliable footprint.
+  mode:FlowLightMode; // Automatic scene light mode.
+  flags:ubyte; // Bitmask of OpticalFlowFlags: bit0 FlowValid, bit1 DeltaAngleValid, bit2 DistanceValid, bit3 DistanceAmbiguous.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
+  id:ubyte; // Flow sensor instance identifier; also the instance segment of the Zenoh key.
+}
+
+// Body-frame velocity derived from optical flow. Convenience layer for a
+// consumer that is not running a full estimator. velocity_flu_m_s is
+// tilt-compensated using accelerometer-derived roll and pitch and is
+// trustworthy only while OpticalFlowVelocityFlags.VelocityValid is set. There
+// is no ENU velocity: that needs a yaw reference this producer does not have.
 struct OpticalFlowVelocityData {
-  timestamp_us:ulong; // Estimate timestamp in monotonic boot time.
-  velocity_flu_m_s:synapse.types.Vec2f; // Planar velocity estimate in the body FLU frame.
-  velocity_enu_m_s:synapse.types.Vec2f; // Planar velocity estimate in the local ENU frame.
-  flow_rate_uncompensated_rad_s:synapse.types.Vec2f; // Raw angular flow rate before gyro compensation.
-  flow_rate_compensated_rad_s:synapse.types.Vec2f; // Angular flow rate after gyro compensation.
-  gyro_flu_rad_s:synapse.types.Vec3f; // Body angular rate used for compensation.
+  timestamp_ns:ulong; // Estimate time in nanoseconds, same domain rules as OpticalFlowData.timestamp_ns.
+  velocity_flu_m_s:synapse.types.Vec2f; // Planar body-FLU velocity (x forward, y left), tilt-compensated.
+  distance_m:float; // Range used for the projection, exposed for measurement-noise scaling.
+  roll_rad:float; // Accelerometer-derived roll used to tilt-compensate the velocity.
+  pitch_rad:float; // Accelerometer-derived pitch used to tilt-compensate the velocity.
+  quality:ubyte; // Combined flow-and-range confidence from 0 to 255.
+  flags:ubyte; // Bitmask of OpticalFlowVelocityFlags: bit0 VelocityValid, bit1 TiltCompensated, bit2 RangeTrusted.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind timestamp_ns.
+  id:ubyte; // Flow sensor instance identifier; also the instance segment of the Zenoh key.
 }
 
 // FlatBuffers root wrapper for OpticalFlowData.

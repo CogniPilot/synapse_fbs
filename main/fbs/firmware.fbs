@@ -154,7 +154,7 @@ namespace synapse.topic;
 // and FirmwareStatusReply remain authoritative; this topic supports UI and
 // logging updates while a long transfer is running.
 table FirmwareProgress {
-  timestamp_us:ulong; // Progress publication timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Progress publication timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   update_id:string; // Update identifier this progress sample describes.
   state:synapse.cmd.FirmwareUpdateState; // Current firmware update state.
   result:synapse.types.CommandResultCode; // Current command result or progress result.
@@ -165,4 +165,5 @@ table FirmwareProgress {
   progress_pct:ubyte; // Completion progress from 0 to 100.
   message:string; // Human-readable diagnostic text.
   result_detail:int; // Producer-defined extended result or error detail.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }

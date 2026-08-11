@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-cc9f6bc5.js"></script>
+        <script src="../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,15 +189,18 @@
 </thead>
 <tbody>
 <tr><td><code>enum</code></td><td><a href="sensors/InertialFieldFlags.html"><code>InertialFieldFlags</code></a></td><td>Field-validity bits for InertialSampleData.flags.</td></tr>
+<tr><td><code>enum</code></td><td><a href="sensors/MagFieldFlags.html"><code>MagFieldFlags</code></a></td><td>Field-validity bits for MagneticFieldData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="sensors/AirDataFlags.html"><code>AirDataFlags</code></a></td><td>Field-validity bits for AirDataData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="sensors/GnssFixFlags.html"><code>GnssFixFlags</code></a></td><td>Field-validity bits for GnssFixData.flags.</td></tr>
 <tr><td><code>enum</code></td><td><a href="sensors/PowerFaultFlags.html"><code>PowerFaultFlags</code></a></td><td>Fault bits for PowerStatusData.fault_flags.</td></tr>
-<tr><td><code>struct</code></td><td><a href="sensors/InertialSampleData.html"><code>InertialSampleData</code></a></td><td>Raw inertial and environmental sample from an IMU-class sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. Sensors updating at different rates set the matching flags bits.</td></tr>
+<tr><td><code>struct</code></td><td><a href="sensors/InertialSampleData.html"><code>InertialSampleData</code></a></td><td>Raw accelerometer, gyroscope, and temperature sample from an IMU sensor. This is a raw-layer topic: values are sensor-native measurements in the body FLU mounting frame after driver axis alignment; no estimator products belong here. The magnetometer and barometer are separate sensors with their own topics (MagneticField and AirData) at their own rates.</td></tr>
+<tr><td><code>struct</code></td><td><a href="sensors/MagneticFieldData.html"><code>MagneticFieldData</code></a></td><td>Raw magnetometer sample from a discrete magnetic-field sensor. Raw-layer topic: sensor-native field in the body FLU frame after driver axis alignment, not declination corrected.</td></tr>
 <tr><td><code>struct</code></td><td><a href="sensors/AirDataData.html"><code>AirDataData</code></a></td><td>Air-data sample used by fixed-wing estimators and controllers.</td></tr>
 <tr><td><code>struct</code></td><td><a href="sensors/BatteryCellVoltages16.html"><code>BatteryCellVoltages16</code></a></td><td>Per-cell battery voltages for packs with up to sixteen monitored cells. Unmonitored cell slots are zero; zero is physically impossible for a connected, monitored cell.</td></tr>
 <tr><td><code>struct</code></td><td><a href="sensors/PowerStatusData.html"><code>PowerStatusData</code></a></td><td>Battery or power-source state used for monitoring and failsafe decisions.</td></tr>
 <tr><td><code>struct</code></td><td><a href="sensors/GnssFixData.html"><code>GnssFixData</code></a></td><td>Global navigation satellite receiver fix and motion estimate. This is a raw-layer topic: angles keep the receiver’s native convention (clockwise from true north) so logs stay faithful to the hardware; the estimator converts to REP-0103 conventions for estimate-layer topics.</td></tr>
 <tr><td><code>table</code></td><td><code>InertialSample</code> -&gt; <a href="sensors/InertialSampleData.html"><code>InertialSampleData</code></a></td><td>FlatBuffers root wrapper for InertialSampleData.</td></tr>
+<tr><td><code>table</code></td><td><code>MagneticField</code> -&gt; <a href="sensors/MagneticFieldData.html"><code>MagneticFieldData</code></a></td><td>FlatBuffers root wrapper for MagneticFieldData.</td></tr>
 <tr><td><code>table</code></td><td><code>AirData</code> -&gt; <a href="sensors/AirDataData.html"><code>AirDataData</code></a></td><td>FlatBuffers root wrapper for AirDataData.</td></tr>
 <tr><td><code>table</code></td><td><code>PowerStatus</code> -&gt; <a href="sensors/PowerStatusData.html"><code>PowerStatusData</code></a></td><td>FlatBuffers root wrapper for PowerStatusData.</td></tr>
 <tr><td><code>table</code></td><td><code>GnssFix</code> -&gt; <a href="sensors/GnssFixData.html"><code>GnssFixData</code></a></td><td>FlatBuffers root wrapper for GnssFixData.</td></tr>

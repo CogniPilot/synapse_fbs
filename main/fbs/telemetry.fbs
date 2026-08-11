@@ -18,7 +18,7 @@ enum GcsStatusFlags:ubyte (bit_flags) {
 // summary published at 0.2 to 1 Hz; it is never used for control. Angles
 // follow REP-0103: zero east, positive counter-clockwise.
 struct GcsStatusData {
-  time_boot_ms:uint; // Sample timestamp in monotonic boot time.
+  time_boot_ms:uint; // Sample timestamp in milliseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
   longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
   altitude_msl_m:short; // Height above mean sea level.
@@ -37,6 +37,7 @@ struct GcsStatusData {
   satellites_used:ubyte; // Number of GNSS satellites used in the solution.
   fix_type:synapse.types.GnssFixType; // GNSS fix quality.
   flags:ubyte; // Bitmask of GcsStatusFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // FlatBuffers root wrapper for GcsStatusData.

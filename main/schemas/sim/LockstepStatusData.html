@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,11 +188,12 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Receiver monotonic boot time reached when this status was sampled.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Receiver boot time in nanoseconds reached when this status was sampled. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>run_id</code></td><td><code>uint</code></td><td></td><td>Lockstep run identifier copied from the accepted tick.</td></tr>
 <tr><td><code>sequence</code></td><td><code>uint</code></td><td></td><td>Most recent lockstep tick sequence accepted or completed.</td></tr>
 <tr><td><code>result_detail</code></td><td><code>ushort</code></td><td></td><td>Compact participant-defined detail for MissedTick or Error states.</td></tr>
 <tr><td><code>state</code></td><td><a href="LockstepStatusState.html"><code>LockstepStatusState</code></a></td><td></td><td>Participant state for this sequence.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Lockstep participant instance identifier; also the instance segment of the Zenoh key.</td></tr>
 </tbody>
 </table>

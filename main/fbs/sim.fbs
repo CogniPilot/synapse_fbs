@@ -1,3 +1,5 @@
+include "types.fbs";
+
 namespace synapse.topic;
 
 // Control bits for lockstep tick messages.
@@ -19,24 +21,26 @@ enum LockstepStatusState:ubyte {
 
 // Deterministic simulation barrier from a simulator to a controller or device
 // under test. The receiver advances its monotonic boot clock until
-// target_boot_time_us, runs work made ready by that time, then waits for the
+// target_boot_time_ns, runs work made ready by that time, then waits for the
 // next tick.
 struct LockstepTickData {
-  target_boot_time_us:ulong; // Target receiver monotonic boot time for this step.
+  target_boot_time_ns:ulong; // Target receiver boot time in nanoseconds for this step. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   run_id:uint; // Lockstep run identifier; changes when the simulator restarts the run.
   sequence:uint; // Monotonic tick sequence used to pair status with this tick.
   flags:ushort; // Bitmask of LockstepTickFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Deterministic simulation status from a controller or device under test back
 // to the simulator. The simulator waits for a matching completed sequence
 // before publishing the next tick when strict lockstep is required.
 struct LockstepStatusData {
-  timestamp_us:ulong; // Receiver monotonic boot time reached when this status was sampled.
+  timestamp_ns:ulong; // Receiver boot time in nanoseconds reached when this status was sampled. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   run_id:uint; // Lockstep run identifier copied from the accepted tick.
   sequence:uint; // Most recent lockstep tick sequence accepted or completed.
   result_detail:ushort; // Compact participant-defined detail for MissedTick or Error states.
   state:LockstepStatusState; // Participant state for this sequence.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // Lockstep participant instance identifier; also the instance segment of the Zenoh key.
 }
 

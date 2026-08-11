@@ -6,9 +6,12 @@ namespace synapse.topic;
 enum InertialFieldFlags:ubyte (bit_flags) {
   Accel, // Accelerometer fields were updated in this sample.
   Gyro, // Gyroscope fields were updated in this sample.
-  Mag, // Magnetometer fields were updated in this sample.
-  Pressure, // Static pressure field was updated in this sample.
   Temperature, // Temperature field was updated in this sample.
+}
+
+// Field-validity bits for MagneticFieldData.flags.
+enum MagFieldFlags:ubyte (bit_flags) {
+  Temperature, // Temperature field carries a valid sensor die temperature.
 }
 
 // Field-validity bits for AirDataData.flags.
@@ -25,7 +28,7 @@ enum AirDataFlags:ubyte (bit_flags) {
 
 // Field-validity bits for GnssFixData.flags.
 enum GnssFixFlags:ubyte (bit_flags) {
-  TimeValid, // time_unix_us carries a valid receiver time.
+  TimeValid, // time_unix_ns carries a valid receiver time.
   CourseValid, // course_over_ground_cdeg is valid.
   YawValid, // yaw_cdeg carries a valid receiver yaw.
   VelocityUpValid, // velocity_up_cm_s is valid.
@@ -43,24 +46,36 @@ enum PowerFaultFlags:ushort (bit_flags) {
   HardwareFailure, // Monitor or pack hardware failure.
 }
 
-// Raw inertial and environmental sample from an IMU-class sensor. This is a
-// raw-layer topic: values are sensor-native measurements in the body FLU
-// mounting frame after driver axis alignment; no estimator products belong
-// here. Sensors updating at different rates set the matching flags bits.
+// Raw accelerometer, gyroscope, and temperature sample from an IMU sensor.
+// This is a raw-layer topic: values are sensor-native measurements in the body
+// FLU mounting frame after driver axis alignment; no estimator products belong
+// here. The magnetometer and barometer are separate sensors with their own
+// topics (MagneticField and AirData) at their own rates.
 struct InertialSampleData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   accel_flu_m_s2:synapse.types.Vec3f; // Linear acceleration in the body FLU frame.
   gyro_flu_rad_s:synapse.types.Vec3f; // Angular rate in the body FLU frame.
-  mag_flu_tesla:synapse.types.Vec3f; // Raw magnetic field in the body FLU frame, not declination corrected.
-  absolute_pressure_hpa:float; // Static pressure from the sensor barometer.
-  temperature_c:float; // Sensor temperature in degrees Celsius.
+  temperature_c:float; // Sensor die temperature in degrees Celsius.
   flags:ubyte; // Bitmask of InertialFieldFlags bits updated in this sample.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
+  id:ubyte; // Sensor instance identifier; also the instance segment of the Zenoh key.
+}
+
+// Raw magnetometer sample from a discrete magnetic-field sensor. Raw-layer
+// topic: sensor-native field in the body FLU frame after driver axis
+// alignment, not declination corrected.
+struct MagneticFieldData {
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
+  mag_flu_tesla:synapse.types.Vec3f; // Magnetic field in the body FLU frame, not declination corrected.
+  temperature_c:float; // Sensor die temperature in degrees Celsius; valid when MagFieldFlags.Temperature is set.
+  flags:ubyte; // Bitmask of MagFieldFlags bits.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // Sensor instance identifier; also the instance segment of the Zenoh key.
 }
 
 // Air-data sample used by fixed-wing estimators and controllers.
 struct AirDataData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   absolute_pressure_hpa:float; // Static pressure used for altitude and air-density calculations.
   differential_pressure_hpa:float; // Pitot/static differential pressure used for airspeed.
   pressure_altitude_m:float; // Pressure-derived altitude using the producer's atmosphere model.
@@ -71,6 +86,7 @@ struct AirDataData {
   temperature_cdeg:short; // Static-air temperature in centi-degrees Celsius.
   differential_pressure_temperature_cdeg:short; // Differential-pressure sensor temperature in centi-degrees Celsius.
   flags:ubyte; // Bitmask of AirDataFlags bits valid in this sample.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Per-cell battery voltages for packs with up to sixteen monitored cells.
@@ -97,7 +113,7 @@ struct BatteryCellVoltages16 {
 
 // Battery or power-source state used for monitoring and failsafe decisions.
 struct PowerStatusData {
-  timestamp_us:ulong; // Sample timestamp in monotonic boot time.
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   voltages:BatteryCellVoltages16; // Per-cell voltages for the monitored pack.
   current_consumed_mah:int; // Integrated discharged capacity since the producer's reset point.
   energy_consumed_hj:int; // Integrated discharged energy since the producer's reset point.
@@ -106,6 +122,7 @@ struct PowerStatusData {
   current_battery_da:short; // Battery current in deci-amps; positive means discharge.
   temperature_cdeg:short; // Battery or power-module temperature in centi-degrees Celsius.
   remaining_pct:byte; // Remaining state of charge, or negative when unknown.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // Battery instance identifier; also the instance segment of the Zenoh key.
   battery_function:synapse.types.BatteryFunction; // Role of this power source on the vehicle.
   battery_type:synapse.types.BatteryType; // Battery chemistry or power-source type.
@@ -118,8 +135,8 @@ struct PowerStatusData {
 // from true north) so logs stay faithful to the hardware; the estimator
 // converts to REP-0103 conventions for estimate-layer topics.
 struct GnssFixData {
-  timestamp_us:ulong; // Fix timestamp in monotonic boot time.
-  time_unix_us:ulong; // Receiver-reported Unix time of the fix; valid when GnssFixFlags.TimeValid is set.
+  timestamp_ns:ulong; // Fix timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
+  time_unix_ns:ulong; // Receiver-reported Unix time of the fix in nanoseconds; valid when GnssFixFlags.TimeValid is set.
   latitude_deg_e7:int; // Latitude in WGS-84 degrees scaled by 1e7.
   longitude_deg_e7:int; // Longitude in WGS-84 degrees scaled by 1e7.
   altitude_msl_mm:int; // Height above mean sea level.
@@ -138,12 +155,18 @@ struct GnssFixData {
   fix_type:synapse.types.GnssFixType; // Receiver fix quality.
   satellites_used:ubyte; // Number of satellites used in the solution.
   satellites_visible:ubyte; // Number of satellites tracked or visible.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
   id:ubyte; // GNSS receiver instance identifier; also the instance segment of the Zenoh key.
 }
 
 // FlatBuffers root wrapper for InertialSampleData.
 table InertialSample {
   data:InertialSampleData; // Fixed-layout inertial payload.
+}
+
+// FlatBuffers root wrapper for MagneticFieldData.
+table MagneticField {
+  data:MagneticFieldData; // Fixed-layout magnetometer payload.
 }
 
 // FlatBuffers root wrapper for AirDataData.

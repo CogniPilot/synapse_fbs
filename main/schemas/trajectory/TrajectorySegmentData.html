@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,8 +188,8 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Publication timestamp in monotonic boot time.</td></tr>
-<tr><td><code>start_time_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Trajectory segment start time in the producer’s monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Publication timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
+<tr><td><code>start_time_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Trajectory segment start time in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>p0_enu_m</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 0 in local ENU meters.</td></tr>
 <tr><td><code>p1_enu_m</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 1 in local ENU meters.</td></tr>
 <tr><td><code>p2_enu_m</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Position control point or polynomial coefficient 2 in local ENU meters.</td></tr>
@@ -214,6 +214,7 @@
 <tr><td><code>trajectory_type</code></td><td><a href="TrajectoryType.html"><code>TrajectoryType</code></a></td><td></td><td>Bezier or polynomial coefficient interpretation.</td></tr>
 <tr><td><code>degree</code></td><td><a href="TrajectoryDegree.html"><code>TrajectoryDegree</code></a></td><td></td><td>Highest coefficient index used by this segment.</td></tr>
 <tr><td><code>frame</code></td><td><a href="../types/LocalFrame.html"><code>synapse.types.LocalFrame</code></a></td><td></td><td>Local frame for position control points or coefficients.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 <tr><td><code>id</code></td><td><code>ubyte</code></td><td></td><td>Optional topic instance identifier for multiple trajectory streams.</td></tr>
 </tbody>
 </table>

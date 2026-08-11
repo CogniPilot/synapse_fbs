@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -188,7 +188,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Reference timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Reference timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>latitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Home latitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>longitude_deg_e7</code></td><td><code>int</code></td><td>degrees scaled by 1e7; int32 preserves global-coordinate precision</td><td>Home longitude in WGS-84 degrees scaled by 1e7.</td></tr>
 <tr><td><code>altitude_msl_mm</code></td><td><code>int</code></td><td>millimeters</td><td>Home height above mean sea level.</td></tr>
@@ -196,6 +196,7 @@
 <tr><td><code>attitude</code></td><td><a href="../types/Quaternionf.html"><code>synapse.types.Quaternionf</code></a></td><td></td><td>Map-to-local alignment rotating FLU vectors at home into ENU.</td></tr>
 <tr><td><code>approach_enu_m</code></td><td><a href="../types/Vec3f.html"><code>synapse.types.Vec3f</code></a></td><td>ENU frame (x east, y north, z up), meters</td><td>Preferred approach point or vector in the local ENU frame.</td></tr>
 <tr><td><code>flags</code></td><td><code>ubyte</code></td><td>bitmask</td><td>Bitmask of HomeReferenceFlags bits.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>

@@ -36,10 +36,10 @@
             const path_to_root = "../../";
             const default_light_theme = "rust";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../../searchindex-b9176271.js";
+            window.path_to_searchindex_js = "../../searchindex-e7dee9da.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-cc9f6bc5.js"></script>
+        <script src="../../toc-9c5f15b2.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -187,7 +187,7 @@
 <tr><th>Name</th><th>Type</th><th>Unit / Scale</th><th>Notes</th></tr>
 </thead>
 <tbody>
-<tr><td><code>timestamp_us</code></td><td><code>ulong</code></td><td>microseconds</td><td>Marker timestamp in monotonic boot time.</td></tr>
+<tr><td><code>timestamp_ns</code></td><td><code>ulong</code></td><td>nanoseconds</td><td>Marker timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.</td></tr>
 <tr><td><code>frame_number</code></td><td><code>uint</code></td><td></td><td>Source frame number.</td></tr>
 <tr><td><code>drop_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame drop rate in deci-percent.</td></tr>
 <tr><td><code>out_of_sync_rate_2d_dpermille</code></td><td><code>ushort</code></td><td>deci-percent; percent = value / 10, 1000 means 100%</td><td>Recent 2D camera-frame out-of-sync rate in deci-percent.</td></tr>
@@ -196,6 +196,7 @@
 <tr><td><code>markers</code></td><td><code>[</code><a href="MocapMarkerData.html"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Labeled marker samples.</td></tr>
 <tr><td><code>unlabeled_markers</code></td><td><code>[</code><a href="MocapMarkerData.html"><code>MocapMarkerData</code></a><code>]</code></td><td></td><td>Unlabeled marker samples.</td></tr>
 <tr><td><code>rigid_bodies</code></td><td><code>[</code><a href="MocapRigidBodyData.html"><code>MocapRigidBodyData</code></a><code>]</code></td><td></td><td>Six-degree-of-freedom rigid-body samples.</td></tr>
+<tr><td><code>time_status</code></td><td><a href="../types/TimeStatus.html"><code>synapse.types.TimeStatus</code></a></td><td></td><td>Discipline state of the clock behind the timestamps.</td></tr>
 </tbody>
 </table>
 </div>
