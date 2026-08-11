@@ -52,7 +52,6 @@ const TOPIC_KEYS: &[(&str, &str)] = &[
     ("RadioControl", "rc"),
     ("ManualControlCommand", "manual"),
     ("InertialSample", "imu"),
-    ("MagneticField", "mag"),
     ("AirData", "air"),
     ("PowerStatus", "power"),
     ("GnssFix", "gnss"),
@@ -90,6 +89,7 @@ const TOPIC_KEYS: &[(&str, &str)] = &[
     ("Odometry", "odom"),
     ("OdometryWithCovariance", "odom_cov"),
     ("MocapPoseFrame", "mocap"),
+    ("MagneticField", "mag"),
 ];
 
 /// Queryable command and transfer services on the cmd key space. Ids mirror
