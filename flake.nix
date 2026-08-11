@@ -9,7 +9,7 @@
     { nixpkgs, ... }:
     let
       tools = {
-        package.version = "0.8.0";
+        package.version = "0.9.0";
         flatbuffers = {
           version = "25.12.19";
           commit = "7e163021e59cca4f8e1e35a7c828b5c6b7915953";
