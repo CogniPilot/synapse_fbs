@@ -1,0 +1,156 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Per-pixel result status bits for the AFBR-S50 time-of-flight imager,
+// mirroring the sensor SDK pixel status word. A zero value marks a fully
+// valid pixel measurement.
+enum ArgusPixelStatusFlags:ubyte (bit_flags) {
+  Off, // Pixel is disabled by the pixel-enable mask.
+  Saturated, // Pixel saturated; range and amplitude are unreliable.
+  BinningExcluded, // Pixel was excluded from the 1D binned result.
+  Invalid, // Pixel result is invalid.
+  Prefiltered, // Pixel was discarded by the static prefilter.
+  NoSignal, // Pixel has no detectable return signal.
+  OutOfSync, // Pixel lost measurement synchronization.
+  Stalled, // Pixel processing stalled.
+}
+
+// Per-pixel ranges for the 32-zone AFBR-S50 field, in device pixel order.
+// Disabled or invalid pixels carry their last computed value; consult the
+// matching status byte before using a pixel.
+struct ArgusPixelRanges32 {
+  px0_m:float; // Pixel 0 range in meters.
+  px1_m:float; // Pixel 1 range in meters.
+  px2_m:float; // Pixel 2 range in meters.
+  px3_m:float; // Pixel 3 range in meters.
+  px4_m:float; // Pixel 4 range in meters.
+  px5_m:float; // Pixel 5 range in meters.
+  px6_m:float; // Pixel 6 range in meters.
+  px7_m:float; // Pixel 7 range in meters.
+  px8_m:float; // Pixel 8 range in meters.
+  px9_m:float; // Pixel 9 range in meters.
+  px10_m:float; // Pixel 10 range in meters.
+  px11_m:float; // Pixel 11 range in meters.
+  px12_m:float; // Pixel 12 range in meters.
+  px13_m:float; // Pixel 13 range in meters.
+  px14_m:float; // Pixel 14 range in meters.
+  px15_m:float; // Pixel 15 range in meters.
+  px16_m:float; // Pixel 16 range in meters.
+  px17_m:float; // Pixel 17 range in meters.
+  px18_m:float; // Pixel 18 range in meters.
+  px19_m:float; // Pixel 19 range in meters.
+  px20_m:float; // Pixel 20 range in meters.
+  px21_m:float; // Pixel 21 range in meters.
+  px22_m:float; // Pixel 22 range in meters.
+  px23_m:float; // Pixel 23 range in meters.
+  px24_m:float; // Pixel 24 range in meters.
+  px25_m:float; // Pixel 25 range in meters.
+  px26_m:float; // Pixel 26 range in meters.
+  px27_m:float; // Pixel 27 range in meters.
+  px28_m:float; // Pixel 28 range in meters.
+  px29_m:float; // Pixel 29 range in meters.
+  px30_m:float; // Pixel 30 range in meters.
+  px31_m:float; // Pixel 31 range in meters.
+}
+
+// Per-pixel return amplitudes for the 32-zone AFBR-S50 field: the intensity
+// channel of the point cloud, in sensor LSB.
+struct ArgusPixelAmplitudes32 {
+  px0_lsb:float; // Pixel 0 amplitude in LSB.
+  px1_lsb:float; // Pixel 1 amplitude in LSB.
+  px2_lsb:float; // Pixel 2 amplitude in LSB.
+  px3_lsb:float; // Pixel 3 amplitude in LSB.
+  px4_lsb:float; // Pixel 4 amplitude in LSB.
+  px5_lsb:float; // Pixel 5 amplitude in LSB.
+  px6_lsb:float; // Pixel 6 amplitude in LSB.
+  px7_lsb:float; // Pixel 7 amplitude in LSB.
+  px8_lsb:float; // Pixel 8 amplitude in LSB.
+  px9_lsb:float; // Pixel 9 amplitude in LSB.
+  px10_lsb:float; // Pixel 10 amplitude in LSB.
+  px11_lsb:float; // Pixel 11 amplitude in LSB.
+  px12_lsb:float; // Pixel 12 amplitude in LSB.
+  px13_lsb:float; // Pixel 13 amplitude in LSB.
+  px14_lsb:float; // Pixel 14 amplitude in LSB.
+  px15_lsb:float; // Pixel 15 amplitude in LSB.
+  px16_lsb:float; // Pixel 16 amplitude in LSB.
+  px17_lsb:float; // Pixel 17 amplitude in LSB.
+  px18_lsb:float; // Pixel 18 amplitude in LSB.
+  px19_lsb:float; // Pixel 19 amplitude in LSB.
+  px20_lsb:float; // Pixel 20 amplitude in LSB.
+  px21_lsb:float; // Pixel 21 amplitude in LSB.
+  px22_lsb:float; // Pixel 22 amplitude in LSB.
+  px23_lsb:float; // Pixel 23 amplitude in LSB.
+  px24_lsb:float; // Pixel 24 amplitude in LSB.
+  px25_lsb:float; // Pixel 25 amplitude in LSB.
+  px26_lsb:float; // Pixel 26 amplitude in LSB.
+  px27_lsb:float; // Pixel 27 amplitude in LSB.
+  px28_lsb:float; // Pixel 28 amplitude in LSB.
+  px29_lsb:float; // Pixel 29 amplitude in LSB.
+  px30_lsb:float; // Pixel 30 amplitude in LSB.
+  px31_lsb:float; // Pixel 31 amplitude in LSB.
+}
+
+// Per-pixel status bytes for the 32-zone AFBR-S50 field.
+struct ArgusPixelStatus32 {
+  px0:ubyte; // Pixel 0 ArgusPixelStatusFlags bits.
+  px1:ubyte; // Pixel 1 ArgusPixelStatusFlags bits.
+  px2:ubyte; // Pixel 2 ArgusPixelStatusFlags bits.
+  px3:ubyte; // Pixel 3 ArgusPixelStatusFlags bits.
+  px4:ubyte; // Pixel 4 ArgusPixelStatusFlags bits.
+  px5:ubyte; // Pixel 5 ArgusPixelStatusFlags bits.
+  px6:ubyte; // Pixel 6 ArgusPixelStatusFlags bits.
+  px7:ubyte; // Pixel 7 ArgusPixelStatusFlags bits.
+  px8:ubyte; // Pixel 8 ArgusPixelStatusFlags bits.
+  px9:ubyte; // Pixel 9 ArgusPixelStatusFlags bits.
+  px10:ubyte; // Pixel 10 ArgusPixelStatusFlags bits.
+  px11:ubyte; // Pixel 11 ArgusPixelStatusFlags bits.
+  px12:ubyte; // Pixel 12 ArgusPixelStatusFlags bits.
+  px13:ubyte; // Pixel 13 ArgusPixelStatusFlags bits.
+  px14:ubyte; // Pixel 14 ArgusPixelStatusFlags bits.
+  px15:ubyte; // Pixel 15 ArgusPixelStatusFlags bits.
+  px16:ubyte; // Pixel 16 ArgusPixelStatusFlags bits.
+  px17:ubyte; // Pixel 17 ArgusPixelStatusFlags bits.
+  px18:ubyte; // Pixel 18 ArgusPixelStatusFlags bits.
+  px19:ubyte; // Pixel 19 ArgusPixelStatusFlags bits.
+  px20:ubyte; // Pixel 20 ArgusPixelStatusFlags bits.
+  px21:ubyte; // Pixel 21 ArgusPixelStatusFlags bits.
+  px22:ubyte; // Pixel 22 ArgusPixelStatusFlags bits.
+  px23:ubyte; // Pixel 23 ArgusPixelStatusFlags bits.
+  px24:ubyte; // Pixel 24 ArgusPixelStatusFlags bits.
+  px25:ubyte; // Pixel 25 ArgusPixelStatusFlags bits.
+  px26:ubyte; // Pixel 26 ArgusPixelStatusFlags bits.
+  px27:ubyte; // Pixel 27 ArgusPixelStatusFlags bits.
+  px28:ubyte; // Pixel 28 ArgusPixelStatusFlags bits.
+  px29:ubyte; // Pixel 29 ArgusPixelStatusFlags bits.
+  px30:ubyte; // Pixel 30 ArgusPixelStatusFlags bits.
+  px31:ubyte; // Pixel 31 ArgusPixelStatusFlags bits.
+}
+
+// Per-pixel time-of-flight point cloud from an AFBR-S50 (argus) ranger. Raw
+// layer: ranges are sensor-native meters before mounting calibration, in the
+// sensor frame; a consumer projects pixels through the sensor optics model
+// and mounting pose. Amplitude is the per-pixel intensity. This topic is
+// bandwidth heavy and meant for opt-in offboard streaming and logging; the
+// fused scalar range rides on OpticalFlow.
+struct ArgusPointCloudData {
+  timestamp_ns:ulong; // Sample timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
+  range_m:ArgusPixelRanges32; // Per-pixel range in meters.
+  amplitude_lsb:ArgusPixelAmplitudes32; // Per-pixel return amplitude in LSB.
+  integration_time_us:uint; // Analog integration time of this frame in microseconds.
+  pixel_enabled_mask:uint; // Device pixel-enable mask active for this frame.
+  channel_enabled_mask:uint; // Device ADC channel-enable mask active for this frame.
+  reference_range_m:float; // Internal reference pixel range in meters; a calibration aid, not scene geometry.
+  reference_amplitude_lsb:float; // Internal reference pixel amplitude in LSB.
+  device_status:short; // Device status for the frame: zero is OK, negative is a device error code.
+  pixel_status:ArgusPixelStatus32; // Per-pixel ArgusPixelStatusFlags bits; zero marks a valid pixel.
+  reference_status:ubyte; // ArgusPixelStatusFlags bits of the reference pixel.
+  signal_quality:ubyte; // Overall signal quality percentage: 0 not available, 1 bad, 100 good.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
+  id:ubyte; // Ranger instance identifier; also the instance segment of the Zenoh key.
+}
+
+// FlatBuffers root wrapper for ArgusPointCloudData.
+table ArgusPointCloud {
+  data:ArgusPointCloudData; // Fixed-layout point-cloud payload.
+}

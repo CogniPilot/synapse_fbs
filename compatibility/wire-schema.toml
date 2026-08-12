@@ -445,6 +445,43 @@ values = [
     128,
 ]
 
+[types."synapse.topic.ArgusPixelAmplitudes32"]
+kind = "struct"
+hash = "c9ab073210c6df3959c5075205e11417"
+
+[types."synapse.topic.ArgusPixelRanges32"]
+kind = "struct"
+hash = "b8c19a674b4d0507817b262f6d1df6ef"
+
+[types."synapse.topic.ArgusPixelStatus32"]
+kind = "struct"
+hash = "e0087a831609463c3061fabf48d72f4b"
+
+[types."synapse.topic.ArgusPixelStatusFlags"]
+kind = "enum"
+hash = "b9c2bf867477d2285a729da669229269"
+underlying = "ubyte"
+bit_flags = true
+values = [
+    1,
+    2,
+    4,
+    8,
+    16,
+    32,
+    64,
+    128,
+]
+
+[types."synapse.topic.ArgusPointCloud"]
+kind = "table"
+hash = "3793fdd2f2c6c9c36ab65786ee2923c7"
+fields = ["0 synapse.topic.ArgusPointCloudData"]
+
+[types."synapse.topic.ArgusPointCloudData"]
+kind = "struct"
+hash = "ecc4ecff2dbcc6d8a570f0ab4a07dbd1"
+
 [types."synapse.topic.AttitudeCommand"]
 kind = "table"
 hash = "5cfbe9ddf21d3a6be65cd443a77670ac"
@@ -1130,7 +1167,7 @@ values = [
 
 [types."synapse.topic.SynapseMessage"]
 kind = "union"
-hash = "be7fb5bb18b168c7d184b983759cf669"
+hash = "436817ff897b42818ffe0991757bdb70"
 members = [
     "1 synapse.topic.VehicleHealth",
     "2 synapse.topic.TimeReference",
@@ -1175,6 +1212,7 @@ members = [
     "41 synapse.topic.OdometryWithCovariance",
     "42 synapse.topic.MocapPoseFrame",
     "43 synapse.topic.MagneticField",
+    "44 synapse.topic.ArgusPointCloud",
 ]
 
 [types."synapse.topic.TextStatus"]
@@ -1198,7 +1236,7 @@ hash = "43409688e97e3afd97bdc64051a98217"
 
 [types."synapse.topic.TopicId"]
 kind = "enum"
-hash = "1647f827759870bb1f8fce2ed8dc3875"
+hash = "5fa50b0b0d8ac1a0c669a89b27bccaac"
 underlying = "ushort"
 bit_flags = false
 values = [
@@ -1246,6 +1284,7 @@ values = [
     41,
     42,
     43,
+    44,
 ]
 
 [types."synapse.topic.TrajectoryDegree"]

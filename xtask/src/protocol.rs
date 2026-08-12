@@ -4,6 +4,7 @@ const SCHEMAS: &[&str] = &[
     "fbs/state.fbs",
     "fbs/control.fbs",
     "fbs/optical_flow.fbs",
+    "fbs/argus.fbs",
     "fbs/mocap.fbs",
     "fbs/telemetry.fbs",
     "fbs/sim.fbs",
@@ -90,6 +91,7 @@ const TOPIC_KEYS: &[(&str, &str)] = &[
     ("OdometryWithCovariance", "odom_cov"),
     ("MocapPoseFrame", "mocap"),
     ("MagneticField", "mag"),
+    ("ArgusPointCloud", "argus"),
 ];
 
 /// Queryable command and transfer services on the cmd key space. Ids mirror
@@ -191,6 +193,7 @@ const VEHICLE_SCOPE_TOPICS: &[&str] = &[
     "AirData",
     "OpticalFlow",
     "OpticalFlowVelocity",
+    "ArgusPointCloud",
     "ExternalOdometry",
     "RawPose",
     "Pose",

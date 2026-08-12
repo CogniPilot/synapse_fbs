@@ -334,4 +334,5 @@ enum TopicId:ushort {
   OdometryWithCovariance = 41, // Odometry with complete 12x12 state covariance.
   MocapPoseFrame = 42, // Raw motion-capture frame with quaternion rigid-body attitudes.
   MagneticField = 43, // Magnetometer sample in the body FLU frame.
+  ArgusPointCloud = 44, // Per-pixel time-of-flight range and intensity field from an AFBR ranger.
 }
