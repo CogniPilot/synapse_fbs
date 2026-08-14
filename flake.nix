@@ -127,6 +127,79 @@
         {
           inherit ci packages test;
         };
+      # The generated bindings as immutable outputs rather than a directory
+      # under target/. Consumers previously read the working tree while the
+      # generator was rewriting it, so a build could lose headers midway
+      # through. A store path cannot be rewritten, so a consumer holding one is
+      # unaffected by any later generation.
+      #
+      # Generation itself stays in the existing xtask; this only runs it from
+      # tracked source and keeps what it produces.
+      bindingsFor =
+        pkgs:
+        let
+          tooling = toolingFor pkgs;
+        in
+        pkgs.stdenv.mkDerivation (
+          {
+          pname = "synapse-fbs";
+          version = tools.package.version;
+
+          # Tracked source only. target/ is mutable build state and must not
+          # enter a derivation.
+          src = pkgs.lib.cleanSourceWith {
+            src = ./.;
+            filter =
+              path: _type:
+              let
+                relative = pkgs.lib.removePrefix (toString ./. + "/") (toString path);
+              in
+              !(pkgs.lib.hasPrefix "target" relative) && !(pkgs.lib.hasPrefix ".git" relative);
+          };
+
+          outputs = [
+            "out"
+            "c"
+            "rust"
+            "python"
+            "js"
+          ];
+
+          nativeBuildInputs = tooling.packages ++ [ pkgs.rustPlatform.cargoSetupHook ];
+          cargoDeps = pkgs.rustPlatform.importCargoLock { lockFile = ./xtask/Cargo.lock; };
+          cargoRoot = "xtask";
+
+          # CMake is a tool the generator invokes, not this derivation's build
+          # system, so its setup hook must not claim the configure phase.
+          dontUseCmakeConfigure = true;
+
+          # The multiple-outputs hook relocates include/ to a development
+          # output by default, which silently emptied the C bindings of every
+          # generated header while leaving the rest of the tree intact. The
+          # headers are the point of this output, so keep them in it.
+          outputInclude = "c";
+
+          buildPhase = ''
+            runHook preBuild
+            cargo run --locked --offline --manifest-path xtask/Cargo.toml -- \
+              build --release-name ${tools.package.version}
+            runHook postBuild
+          '';
+
+          installPhase = ''
+            runHook preInstall
+            cp -r target/xtask/artifacts-work/synapse_fbs-c "$c"
+            cp -r target/xtask/packages/rust "$rust"
+            cp -r target/xtask/packages/python "$python"
+            cp -r target/xtask/packages/js "$js"
+            mkdir -p "$out"
+            printf 'synapse_fbs %s\n' "${tools.package.version}" > "$out/version"
+            runHook postInstall
+          '';
+          }
+          // tooling.environment
+        );
+
       asApp = name: program: {
         type = "app";
         program = "${program}/bin/${name}";
@@ -166,6 +239,24 @@
           build = asApp "synapse-fbs-packages" commands.packages;
           ci = asApp "synapse-fbs-ci" commands.ci;
           default = asApp "synapse-fbs-ci" commands.ci;
+        }
+      );
+
+      packages = forAllSystems (
+        pkgs:
+        let
+          bindings = bindingsFor pkgs;
+        in
+        {
+          synapse-fbs = bindings;
+          # One generation, several consumable roots. Each alias names the
+          # ecosystem a consumer asks for, so nobody has to know which output
+          # of which derivation carries it.
+          synapse-fbs-c = bindings.c;
+          synapse-fbs-rust = bindings.rust;
+          synapse-fbs-python = bindings.python;
+          synapse-fbs-javascript = bindings.js;
+          default = bindings;
         }
       );
 
