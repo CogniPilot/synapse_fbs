@@ -142,60 +142,67 @@
         in
         pkgs.stdenv.mkDerivation (
           {
-          pname = "synapse-fbs";
-          version = tools.package.version;
+            pname = "synapse-fbs";
+            version = tools.package.version;
 
-          # Tracked source only. target/ is mutable build state and must not
-          # enter a derivation.
-          src = pkgs.lib.cleanSourceWith {
-            src = ./.;
-            filter =
-              path: _type:
-              let
-                relative = pkgs.lib.removePrefix (toString ./. + "/") (toString path);
-              in
-              !(pkgs.lib.hasPrefix "target" relative) && !(pkgs.lib.hasPrefix ".git" relative);
-          };
+            # Tracked source only. target/ is mutable build state and must not
+            # enter a derivation.
+            src = pkgs.lib.cleanSourceWith {
+              src = ./.;
+              filter =
+                path: _type:
+                let
+                  relative = pkgs.lib.removePrefix (toString ./. + "/") (toString path);
+                in
+                !(pkgs.lib.hasPrefix "target" relative) && !(pkgs.lib.hasPrefix ".git" relative);
+            };
 
-          outputs = [
-            "out"
-            "c"
-            "rust"
-            "python"
-            "js"
-          ];
+            outputs = [
+              "out"
+              "c"
+              "rust"
+              "python"
+              "js"
+            ];
 
-          nativeBuildInputs = tooling.packages ++ [ pkgs.rustPlatform.cargoSetupHook ];
-          cargoDeps = pkgs.rustPlatform.importCargoLock { lockFile = ./xtask/Cargo.lock; };
-          cargoRoot = "xtask";
+            nativeBuildInputs = tooling.packages ++ [ pkgs.rustPlatform.cargoSetupHook ];
+            cargoDeps = pkgs.rustPlatform.importCargoLock { lockFile = ./xtask/Cargo.lock; };
+            cargoRoot = "xtask";
 
-          # CMake is a tool the generator invokes, not this derivation's build
-          # system, so its setup hook must not claim the configure phase.
-          dontUseCmakeConfigure = true;
+            # CMake is a tool the generator invokes, not this derivation's build
+            # system, so its setup hook must not claim the configure phase.
+            dontUseCmakeConfigure = true;
 
-          # The multiple-outputs hook relocates include/ to a development
-          # output by default, which silently emptied the C bindings of every
-          # generated header while leaving the rest of the tree intact. The
-          # headers are the point of this output, so keep them in it.
-          outputInclude = "c";
+            # The multiple-outputs hook relocates include/ to a development
+            # output by default, which silently emptied the C bindings of every
+            # generated header while leaving the rest of the tree intact. The
+            # headers are the point of this output, so keep them in it.
+            outputInclude = "c";
 
-          buildPhase = ''
-            runHook preBuild
-            cargo run --locked --offline --manifest-path xtask/Cargo.toml -- \
-              build --release-name ${tools.package.version}
-            runHook postBuild
-          '';
+            buildPhase = ''
+              runHook preBuild
+              cargo run --locked --offline --manifest-path xtask/Cargo.toml -- \
+                build --release-name ${tools.package.version}
+              runHook postBuild
+            '';
 
-          installPhase = ''
-            runHook preInstall
-            cp -r target/xtask/artifacts-work/synapse_fbs-c "$c"
-            cp -r target/xtask/packages/rust "$rust"
-            cp -r target/xtask/packages/python "$python"
-            cp -r target/xtask/packages/js "$js"
-            mkdir -p "$out"
-            printf 'synapse_fbs %s\n' "${tools.package.version}" > "$out/version"
-            runHook postInstall
-          '';
+            installPhase = ''
+              runHook preInstall
+              cp -r target/xtask/artifacts-work/synapse_fbs-c "$c"
+              cp -r target/xtask/packages/rust "$rust"
+              cp -r target/xtask/packages/python "$python"
+              cp -r target/xtask/packages/js "$js"
+              # The default output is the coherent set: one link per ecosystem,
+              # all from the same generation. Building the advertised package
+              # otherwise yielded a directory containing only a version string.
+              mkdir -p "$out"
+              ln -s "$c" "$out/c"
+              ln -s "$rust" "$out/rust"
+              ln -s "$python" "$out/python"
+              ln -s "$js" "$out/javascript"
+              printf 'synapse_fbs %s\n' "${tools.package.version}" > "$out/version"
+              runHook postInstall
+            '';
           }
           // tooling.environment
         );
