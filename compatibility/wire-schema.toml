@@ -720,6 +720,19 @@ values = [
     4,
 ]
 
+[types."synapse.topic.InertialBatch"]
+kind = "table"
+hash = "de935308ef8a1245b0e57390731499e3"
+fields = ["0 synapse.topic.InertialBatchData"]
+
+[types."synapse.topic.InertialBatchData"]
+kind = "struct"
+hash = "f0ec576fd0ae112a0e83464f5e7965ba"
+
+[types."synapse.topic.InertialBatchSample"]
+kind = "struct"
+hash = "c2febec2d7e4d0f6e676d68d383f5ede"
+
 [types."synapse.topic.InertialFieldFlags"]
 kind = "enum"
 hash = "c870ae4e61f4d06bc70fb8fb02f1a073"
@@ -1141,6 +1154,15 @@ fields = ["0 synapse.topic.RawPoseData"]
 kind = "struct"
 hash = "cb4981e34e293dd7946adde1471f9d08"
 
+[types."synapse.topic.Rtcm3"]
+kind = "table"
+hash = "b399c53d0d090c3ab18da6e465bd1265"
+fields = ["0 synapse.topic.Rtcm3Data"]
+
+[types."synapse.topic.Rtcm3Data"]
+kind = "struct"
+hash = "8970f39c8d00daaa0665cb02f8dd98e3"
+
 [types."synapse.topic.SensorComponentFlags"]
 kind = "enum"
 hash = "e855ce77b7c4b83d0fcba9c3210452ab"
@@ -1167,7 +1189,7 @@ values = [
 
 [types."synapse.topic.SynapseMessage"]
 kind = "union"
-hash = "436817ff897b42818ffe0991757bdb70"
+hash = "52253b7637a0a7120dfc996ca25b63ec"
 members = [
     "1 synapse.topic.VehicleHealth",
     "2 synapse.topic.TimeReference",
@@ -1213,6 +1235,8 @@ members = [
     "42 synapse.topic.MocapPoseFrame",
     "43 synapse.topic.MagneticField",
     "44 synapse.topic.ArgusPointCloud",
+    "45 synapse.topic.Rtcm3",
+    "46 synapse.topic.InertialBatch",
 ]
 
 [types."synapse.topic.TextStatus"]
@@ -1236,7 +1260,7 @@ hash = "43409688e97e3afd97bdc64051a98217"
 
 [types."synapse.topic.TopicId"]
 kind = "enum"
-hash = "5fa50b0b0d8ac1a0c669a89b27bccaac"
+hash = "b63f562e6a0ad6183b6fab4b511e396f"
 underlying = "ushort"
 bit_flags = false
 values = [
@@ -1285,6 +1309,8 @@ values = [
     42,
     43,
     44,
+    45,
+    46,
 ]
 
 [types."synapse.topic.TrajectoryDegree"]
