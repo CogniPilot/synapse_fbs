@@ -1,6 +1,8 @@
 const SCHEMAS: &[&str] = &[
     "fbs/types.fbs",
     "fbs/sensors.fbs",
+    "fbs/inertial_batch.fbs",
+    "fbs/rtcm3.fbs",
     "fbs/state.fbs",
     "fbs/control.fbs",
     "fbs/optical_flow.fbs",
@@ -92,6 +94,8 @@ const TOPIC_KEYS: &[(&str, &str)] = &[
     ("MocapPoseFrame", "mocap"),
     ("MagneticField", "mag"),
     ("ArgusPointCloud", "argus"),
+    ("Rtcm3", "rtcm3"),
+    ("InertialBatch", "imu_batch"),
 ];
 
 /// Queryable command and transfer services on the cmd key space. Ids mirror
@@ -190,6 +194,7 @@ const COMMANDS: &[(u16, &str, &str, &str, &str)] = &[
 const VEHICLE_SCOPE_TOPICS: &[&str] = &[
     "RadioControl",
     "InertialSample",
+    "InertialBatch",
     "AirData",
     "OpticalFlow",
     "OpticalFlowVelocity",

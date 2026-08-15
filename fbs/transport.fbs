@@ -1,5 +1,7 @@
 include "types.fbs";
 include "sensors.fbs";
+include "inertial_batch.fbs";
+include "rtcm3.fbs";
 include "state.fbs";
 include "control.fbs";
 include "optical_flow.fbs";
@@ -68,6 +70,8 @@ union SynapseMessage {
   MocapPoseFrame, // Raw motion-capture frame with quaternion rigid-body attitudes.
   MagneticField, // Magnetometer sample in the body FLU frame.
   ArgusPointCloud, // Per-pixel time-of-flight range and intensity point cloud.
+  Rtcm3, // Raw RTCM3 correction frame.
+  InertialBatch, // Phase-locked batch of raw inertial samples.
 }
 
 // Fixed-layout header carried by the optional multiplexed Frame transport.

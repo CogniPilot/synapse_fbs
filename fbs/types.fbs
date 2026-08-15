@@ -335,4 +335,6 @@ enum TopicId:ushort {
   MocapPoseFrame = 42, // Raw motion-capture frame with quaternion rigid-body attitudes.
   MagneticField = 43, // Magnetometer sample in the body FLU frame.
   ArgusPointCloud = 44, // Per-pixel time-of-flight range and intensity field from an AFBR ranger.
+  Rtcm3 = 45, // Raw RTCM3 correction frame delivered to the receiver.
+  InertialBatch = 46, // Phase-locked batch of raw inertial samples for high-rate delivery.
 }

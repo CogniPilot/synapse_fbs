@@ -300,7 +300,9 @@ fn reflected_type_name(
     type_: reflection::Type<'_>,
     namespace: &str,
 ) -> Result<String> {
-    let base = if type_.base_type() == BaseType::Vector {
+    let is_vector = type_.base_type() == BaseType::Vector;
+    let is_array = type_.base_type() == BaseType::Array;
+    let base = if is_vector || is_array {
         type_.element()
     } else {
         type_.base_type()
@@ -316,8 +318,10 @@ fn reflected_type_name(
         reflected_scalar_name(base)?.to_string()
     };
 
-    Ok(if type_.base_type() == BaseType::Vector {
+    Ok(if is_vector {
         format!("[{atom}]")
+    } else if is_array {
+        format!("[{atom}:{}]", type_.fixed_length())
     } else {
         atom
     })
@@ -680,6 +684,12 @@ fn collect_field_descs(
     base_offset: usize,
     out: &mut Vec<FieldDescTemplateEntry>,
 ) -> Result<()> {
+    // Fixed-length arrays are opaque to the scalar debug printer: their wire
+    // structure is captured by the wire descriptor hash, and the value printer
+    // has no per-element scalar kind for them, so they are omitted here.
+    if type_name.trim_start().starts_with('[') {
+        return Ok(());
+    }
     let lookup = type_lookup_name(type_name);
     if let Some(kind) = scalar_field_kind(&lookup) {
         out.push(FieldDescTemplateEntry {

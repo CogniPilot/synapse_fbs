@@ -1,0 +1,41 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// One inertial sample within an InertialBatch. Fixed 40-byte layout: values are
+// sensor-native measurements in the body FLU frame after driver axis alignment.
+// The batch shares one discipline state and one sensor instance, so the element
+// carries only its own timestamp, its two vectors, and per-sample validity bits.
+struct InertialBatchSample {
+  timestamp_ns:ulong; // Per-sample timestamp in nanoseconds on the batch time base.
+  accel_flu_m_s2:synapse.types.Vec3f; // Linear acceleration in the body FLU frame.
+  gyro_flu_rad_s:synapse.types.Vec3f; // Angular rate in the body FLU frame.
+  flags:ubyte; // Bitmask of InertialFieldFlags bits updated in this sample.
+}
+
+// Phase-locked batch of raw inertial samples for high-rate, bounded, periodic
+// delivery. Batching amortizes header overhead and keeps the traffic periodic
+// and single-datagram without a variable-length wire type: only the first count
+// samples are valid, and slots from index count onward carry stale bytes that
+// consumers ignore. The eight-slot wire capacity is a fleet-global schema
+// parameter fixed by the release, not a per-node knob; the per-node retunable
+// quantity is the runtime count drained each cycle.
+struct InertialBatchData {
+  base_timestamp_ns:ulong; // Batch anchor in nanoseconds; equals the first valid sample timestamp.
+  count:ubyte; // Number of valid samples in this batch, at most eight.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind every stamp in the batch.
+  id:ubyte; // Sensor instance identifier; also the instance segment of the Zenoh key.
+  sample0:InertialBatchSample; // Sample slot 0; valid when count is greater than 0.
+  sample1:InertialBatchSample; // Sample slot 1; valid when count is greater than 1.
+  sample2:InertialBatchSample; // Sample slot 2; valid when count is greater than 2.
+  sample3:InertialBatchSample; // Sample slot 3; valid when count is greater than 3.
+  sample4:InertialBatchSample; // Sample slot 4; valid when count is greater than 4.
+  sample5:InertialBatchSample; // Sample slot 5; valid when count is greater than 5.
+  sample6:InertialBatchSample; // Sample slot 6; valid when count is greater than 6.
+  sample7:InertialBatchSample; // Sample slot 7; valid when count is greater than 7.
+}
+
+// FlatBuffers root wrapper for InertialBatchData.
+table InertialBatch {
+  data:InertialBatchData; // Fixed-layout inertial batch payload.
+}

@@ -1,0 +1,19 @@
+include "types.fbs";
+
+namespace synapse.topic;
+
+// Raw RTCM3 correction frame carried as a fixed-layout topic. A frame is a
+// 3-byte header, a payload of up to 1023 bytes, and a 3-byte CRC, so 1030 bytes
+// covers the largest legal frame. Only the first len bytes of data are
+// meaningful; the remaining bytes are stale and ignored by consumers. The
+// four-byte length places the byte array on a four-byte boundary, so the fixed
+// wire layout matches the in-process struct on the producing node.
+struct Rtcm3Data {
+  len:uint; // Number of valid bytes in data, at most 1030.
+  data:[ubyte:1030]; // RTCM3 frame bytes; only the first len are valid.
+}
+
+// FlatBuffers root wrapper for Rtcm3Data.
+table Rtcm3 {
+  data:Rtcm3Data; // Fixed-layout RTCM3 correction payload.
+}
