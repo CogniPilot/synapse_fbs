@@ -30,4 +30,8 @@ assert len(tc.command_by_name("param_get").reply_schema_hash) == 32
 assert tc.command_by_name("firmware_prepare").key == "cmd/firmware_prepare"
 assert tc.command_by_name("firmware_prepare").request_type == "synapse.cmd.FirmwarePrepareRequest"
 assert tc.topic_by_key("fw").id == 34
+actuator_outputs = tc.topic_by_name("ActuatorOutputs")
+assert actuator_outputs.id == 47 and actuator_outputs.key == "act_out"
+assert actuator_outputs.fixed_layout
+assert actuator_outputs.payload_size is not None and 0 < actuator_outputs.payload_size <= 1408
 print("catalog python helpers ok")

@@ -69,6 +69,11 @@ int main(void) {
     topic = synapse_topic_by_key("fw");
     assert(topic != NULL && topic->id == 34 && !topic->fixed_layout);
 
+    topic = synapse_topic_by_name("ActuatorOutputs");
+    assert(topic != NULL && topic->id == 47 && topic->fixed_layout);
+    assert(strcmp(topic->key, "act_out") == 0);
+    assert(topic->payload_size > 0 && topic->payload_size <= 1408);
+
     printf("catalog c helpers ok\n");
     return 0;
 }

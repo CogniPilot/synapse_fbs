@@ -23,4 +23,7 @@ if (!/^[0-9a-f]{32}$/.test(commandByName('param_get')?.replySchemaHash)) throw n
 if (commandByName('firmware_prepare')?.key !== 'cmd/firmware_prepare') throw new Error('bad firmware command key');
 if (commandByName('firmware_prepare')?.requestType !== 'synapse.cmd.FirmwarePrepareRequest') throw new Error('bad firmware command type');
 if (topicByKey('fw')?.id !== 34) throw new Error('bad firmware progress topic');
+const actuatorOutputs = topicByName('ActuatorOutputs');
+if (actuatorOutputs?.id !== 47 || actuatorOutputs.key !== 'act_out') throw new Error('bad actuator outputs identity');
+if (!actuatorOutputs.fixedLayout || actuatorOutputs.payloadSize <= 0 || actuatorOutputs.payloadSize > 1408) throw new Error('bad actuator outputs payload');
 console.log('catalog js helpers ok');
