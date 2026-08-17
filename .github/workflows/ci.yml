@@ -18,10 +18,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          use-flakehub: false
-          use-gha-cache: true
+          components: clippy, rustfmt
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential cmake ninja-build python3-build python3-pip python3-venv twine
       - name: Test and build packages
-        run: nix run .#ci
+        run: make ci

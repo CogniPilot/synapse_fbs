@@ -7,7 +7,7 @@ The schema source of truth lives in `fbs/`. CI stages this package under
 PyPI. To build locally from the repository root:
 
 ```sh
-cargo run --locked --manifest-path xtask/Cargo.toml -- ci
+make packages
 ```
 
 Install the staged wheel locally with:

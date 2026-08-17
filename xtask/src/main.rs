@@ -18,6 +18,8 @@ struct Tools {
     package_version: String,
     flatbuffers_version: String,
     flatbuffers_commit: String,
+    flatbuffers_source: PathBuf,
+    flatc_binary: PathBuf,
     flatbuffers_build_version: String,
     flatcc_version: String,
     flatcc_commit: String,
@@ -86,6 +88,8 @@ struct TypescriptTools {
 #[derive(Debug)]
 struct Options {
     release_name: String,
+    release_name_explicit: bool,
+    offline: bool,
     update: bool,
 }
 
@@ -94,20 +98,21 @@ fn main() -> Result<()> {
     let (command, options) = parse_args()?;
 
     match command.as_str() {
+        "bootstrap" => bootstrap_tools(&root, &read_tools(&root)?, options.offline),
         "build" => build(&root, &options),
         "ci" => ci(&root, &options),
         "js" => js(&root),
         "check" => check(&root),
         "wire-check" => wire_check_command(&root, &options),
         _ => fail(format!(
-            "unknown command '{command}'. expected: build, ci, js, check, or wire-check"
+            "unknown command '{command}'. expected: bootstrap, build, ci, js, check, or wire-check"
         )),
     }
 }
 
 fn build(root: &Path, options: &Options) -> Result<()> {
     let tools = read_tools(root)?;
-    check_release_version(&tools, &options.release_name)?;
+    check_release_version(&tools, &options.release_name, options.release_name_explicit)?;
     let templates = Templates::new(root)?;
 
     let packages = stage_packages(root, &templates, &tools)?;
@@ -115,6 +120,7 @@ fn build(root: &Path, options: &Options) -> Result<()> {
     let flatc = build_flatc(&tools)?;
     let flatcc = flatcc_tool(&tools)?;
     generate_bindings(root, &flatc, &flatcc.binary, &templates, &packages)?;
+    check_rust_package(&templates, &packages.rust)?;
     build_js_package(
         root,
         &templates,
@@ -210,7 +216,7 @@ fn check(root: &Path) -> Result<()> {
 
 /// Regenerate the per-type wire descriptors from the pinned schema and either
 /// compare them against the committed baseline (default) or rewrite it
-/// (`--update`). Uses the same Nix-pinned FlatCC as `check` and `ci`.
+/// (`--update`). Uses the same pinned FlatCC as `check` and `ci`.
 fn wire_check_command(root: &Path, options: &Options) -> Result<()> {
     let tools = read_tools(root)?;
     let flatcc = flatcc_tool(&tools)?;
@@ -228,7 +234,7 @@ fn wire_check_command(root: &Path, options: &Options) -> Result<()> {
 
 fn ci(root: &Path, options: &Options) -> Result<()> {
     let tools = read_tools(root)?;
-    check_release_version(&tools, &options.release_name)?;
+    check_release_version(&tools, &options.release_name, options.release_name_explicit)?;
     let templates = Templates::new(root)?;
 
     let packages = stage_packages(root, &templates, &tools)?;
@@ -317,6 +323,8 @@ fn parse_args() -> Result<(String, Options)> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "ci".to_string());
     let mut release_name = env::var("GITHUB_REF_NAME").unwrap_or_else(|_| "local".to_string());
+    let mut release_name_explicit = false;
+    let mut offline = false;
     let mut update = false;
 
     while let Some(arg) = args.next() {
@@ -325,7 +333,9 @@ fn parse_args() -> Result<(String, Options)> {
                 release_name = args
                     .next()
                     .ok_or_else(|| io::Error::other("--release-name requires a value"))?;
+                release_name_explicit = true;
             }
+            "--offline" => offline = true,
             "--update" => update = true,
             other => return fail(format!("unknown argument '{other}'")),
         }
@@ -335,6 +345,8 @@ fn parse_args() -> Result<(String, Options)> {
         command,
         Options {
             release_name,
+            release_name_explicit,
+            offline,
             update,
         },
     ))
@@ -354,13 +366,11 @@ fn find_repo_root(start: &Path) -> Result<PathBuf> {
     }
 }
 
-fn read_tools(_root: &Path) -> Result<Tools> {
-    let Some(path) = env::var_os("SYNAPSE_FBS_TOOLS_TOML").map(PathBuf::from) else {
-        return fail("SYNAPSE_FBS_TOOLS_TOML is not set. Run inside `nix develop`.");
-    };
+fn read_tools(root: &Path) -> Result<Tools> {
+    let path = root.join("tools.toml");
     if !path.is_file() {
         return fail(format!(
-            "could not find Nix-generated tool manifest at {}",
+            "could not find tool manifest at {}",
             path.display()
         ));
     }
@@ -368,15 +378,19 @@ fn read_tools(_root: &Path) -> Result<Tools> {
     let parsed: ToolsFile = toml::from_str(&content)
         .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
 
+    let toolchain = root.join("target/xtask/toolchain");
+
     Ok(Tools {
         package_version: parsed.package.version,
         flatbuffers_version: parsed.flatbuffers.version,
         flatbuffers_commit: parsed.flatbuffers.commit,
+        flatbuffers_source: toolchain.join("flatbuffers/source"),
+        flatc_binary: toolchain.join("flatbuffers/build/flatc"),
         flatbuffers_build_version: parsed.flatbuffers_build.version,
         flatcc_version: parsed.flatcc.version,
         flatcc_commit: parsed.flatcc.commit,
-        flatcc_binary: required_env_path("SYNAPSE_FBS_FLATCC")?,
-        flatcc_source: required_env_path("SYNAPSE_FBS_FLATCC_SOURCE")?,
+        flatcc_binary: toolchain.join("flatcc/source/bin/flatcc"),
+        flatcc_source: toolchain.join("flatcc/source"),
         mcap_rust_version: parsed.mcap.rust,
         mcap_python_version: parsed.mcap.python,
         mcap_javascript_version: parsed.mcap.javascript,
@@ -384,12 +398,6 @@ fn read_tools(_root: &Path) -> Result<Tools> {
         mcap_cpp_commit: parsed.mcap.cpp.commit,
         typescript_version: parsed.typescript.version,
     })
-}
-
-fn required_env_path(name: &str) -> Result<PathBuf> {
-    Ok(env::var_os(name)
-        .map(PathBuf::from)
-        .ok_or_else(|| io::Error::other(format!("{name} is not set. Run through Nix.")))?)
 }
 
 /// Exercise the rendered catalog helpers with whichever toolchains are
@@ -471,25 +479,65 @@ fn smoke_catalog_helpers(templates: &Templates, check_dir: &Path) -> Result<()> 
     Ok(())
 }
 
-fn check_release_version(tools: &Tools, release_name: &str) -> Result<()> {
-    // Only enforce for tag builds: GITHUB_REF_NAME is the branch name on
-    // branch pushes, and branches may legitimately be named v2-wip etc.
-    if env::var("GITHUB_REF_TYPE").as_deref() != Ok("tag") {
+fn check_release_version(
+    tools: &Tools,
+    release_name: &str,
+    release_name_explicit: bool,
+) -> Result<()> {
+    let tag_build = env::var("GITHUB_REF_TYPE").as_deref() == Ok("tag");
+    validate_release_version(
+        &tools.package_version,
+        release_name,
+        tag_build,
+        release_name_explicit,
+    )
+}
+
+fn validate_release_version(
+    package_version: &str,
+    release_name: &str,
+    tag_build: bool,
+    release_name_explicit: bool,
+) -> Result<()> {
+    // Branch names can legitimately start with v. Validate every tag build and
+    // every explicitly requested non-local release name.
+    if !tag_build && !release_name_explicit {
         return Ok(());
     }
-    let Some(version) = release_name.strip_prefix('v') else {
-        return Ok(());
-    };
-    if !version.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+    if !tag_build && release_name == "local" {
         return Ok(());
     }
-    if version != tools.package_version {
+    let expected = format!("v{package_version}");
+    if release_name != expected {
         return fail(format!(
-            "release tag '{release_name}' does not match package.version={} in flake.nix",
-            tools.package_version
+            "release name '{release_name}' does not match package.version={package_version} in tools.toml; expected '{expected}'"
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod release_version_tests {
+    use super::validate_release_version;
+
+    #[test]
+    fn ignores_implicit_branch_names() {
+        assert!(validate_release_version("0.10.0", "v2-wip", false, false).is_ok());
+    }
+
+    #[test]
+    fn accepts_local_and_matching_versions() {
+        assert!(validate_release_version("0.10.0", "local", false, true).is_ok());
+        assert!(validate_release_version("0.10.0", "v0.10.0", false, true).is_ok());
+        assert!(validate_release_version("0.10.0", "v0.10.0", true, false).is_ok());
+    }
+
+    #[test]
+    fn rejects_invalid_explicit_and_tag_versions() {
+        assert!(validate_release_version("0.10.0", "v9.9.9", false, true).is_err());
+        assert!(validate_release_version("0.10.0", "vfoo.bar.baz", true, false).is_err());
+        assert!(validate_release_version("0.10.0", "0.10.0", true, false).is_err());
+    }
 }
 
 fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {

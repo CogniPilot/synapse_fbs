@@ -9,8 +9,9 @@ FlatBuffers schemas and generated language packages for Synapse.
 
 This repository is the schema source of truth for vehicle state, sensor,
 control, transport, and transfer messages. The checked-in source stays small:
-FlatBuffers schemas live in `fbs/`, package inputs live in `templates/`, and a
-pinned Nix toolchain generates and verifies every release artifact.
+FlatBuffers schemas live in `fbs/`, package inputs live in `templates/`, and
+a native toolchain with pinned schema generator and runtime versions generates
+and verifies every release artifact.
 
 ## Design
 
@@ -43,53 +44,66 @@ profile](docs/MCAP.md) for the full contracts.
 
 ## Repository layout
 
-- `fbs/` — authoritative `.fbs` schemas.
-- `templates/` — Rust, Python, JavaScript, C, C++, and xtask MiniJinja inputs.
-- `xtask/` — FlatCC-reflection-driven generation and verification.
-- `docs/` — architecture, package, development, MCAP, and use-case details.
-- `flake.nix` — pinned tool versions and the public build/test commands.
+- `fbs/` - authoritative `.fbs` schemas.
+- `templates/` - Rust, Python, JavaScript, C, C++, and xtask MiniJinja inputs.
+- `xtask/` - FlatCC-reflection-driven generation and verification.
+- `docs/` - architecture, package, development, MCAP, and use-case details.
+- `tools.toml` contains package, generator, and runtime version pins.
+- `Makefile` provides the public native build and test commands.
 
 Generated files are written only beneath `target/xtask/`:
 
-- `target/xtask/packages/{rust,python,js}`
+- `target/xtask/packages/{c,rust,python,js}`
 - `target/xtask/artifacts/synapse_fbs-{c,cpp}.tar.gz`
 - `target/xtask/check` and other temporary verification trees
 
 FlatCC generates C bindings and every BFBS reflection schema consumed by
 `xtask`. The pinned upstream `flatc` is used only for official Rust, Python,
-and C++ binding generation. Nix supplies FlatCC directly—`xtask` does not clone
-or compile it. All generated text owned by `xtask` is rendered from MiniJinja
-templates.
+and C++ binding generation. `make bootstrap` checks out and compiles the exact
+FlatBuffers and FlatCC commits under `target/xtask/toolchain`. All generated
+text owned by `xtask` is rendered from MiniJinja templates.
 
 ## Build and test
 
-Nix is the supported interface on `x86_64-linux` and `aarch64-linux`. The same
-commands are used locally and by GitHub Actions.
+The supported interface is native Rust, CMake, Ninja, GNU Make, Git, Python,
+and Node tooling on Linux. First build the exact generator revisions from
+`tools.toml`:
+
+```sh
+make bootstrap
+```
 
 Run formatting, lint, schema validation, compatibility checks, and catalog
 smoke tests:
 
 ```sh
-nix run .#test
+make test
 ```
 
-Build and verify all Rust, Python, JavaScript, C, and C++ packages:
+Generate and verify local Rust and C packages without creating a tag, release,
+or push:
 
 ```sh
-nix run .#packages
+make local
 ```
 
-Run both exactly as CI does:
+The local outputs are `target/xtask/packages/rust` and
+`target/xtask/packages/c`. See [package usage](docs/packages.md) for Cargo,
+CMake, and Zephyr source-override recipes.
+
+Build and verify all Rust, Python, JavaScript, C, and C++ release packages:
 
 ```sh
-nix run .#ci
+make packages
 ```
 
-`nix run .#build` is an alias for `nix run .#packages`. `nix develop` provides
-the same pinned toolchain plus `synapse-fbs-test`, `synapse-fbs-packages`, and
-`synapse-fbs-ci` commands. The shell prints this list when it starts.
+Run the complete branch CI sequence:
 
-To test a change without publishing, run `nix run .#packages`, then consume the
+```sh
+make ci
+```
+
+To test a change without publishing, run `make packages`, then consume the
 staged output directly:
 
 ```sh
@@ -120,7 +134,7 @@ assets. Installation, CMake targets, and local staged-package examples are in
 Edit only the authoritative files in `fbs/`, then run:
 
 ```sh
-nix run .#test
+make test
 ```
 
 `xtask` asks FlatCC to compile BFBS and uses reflection to validate topic IDs,
@@ -136,11 +150,11 @@ Never hand-edit generated package trees under `target/`.
 
 ## Releases
 
-Version pins and the package version live in `flake.nix`. A semantic version
-tag such as `v0.8.0` must match `package.version`; the release workflow rejects
+Version pins and the package version live in `tools.toml`. A semantic version
+tag such as `v0.10.0` must match `package.version`; the release workflow rejects
 a mismatch before publishing.
 
-Release CI builds the same package set as `nix run .#packages`, then publishes
+Release CI builds the same package set as `make packages`, then publishes
 the Rust crate, Python wheel and source distribution, npm package, and C/C++
 archives. See [development and releases](docs/development.md) for artifact and
 trusted-publishing details.

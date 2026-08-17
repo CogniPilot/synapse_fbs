@@ -4,7 +4,7 @@
   coordinate conventions, Zenoh keys, catalogs, serial framing, and ROS edges.
 - [Package usage](packages.md): Rust, Python, JavaScript, C, C++, and Zephyr
   consumption.
-- [Development and releases](development.md): Nix commands, generation flow,
+- [Development and releases](development.md): native commands, generation flow,
   compatibility policy, artifacts, and publishing.
 - [Normative MCAP profile](MCAP.md): the exact `synapse/1` logging contract.
 - [Design use cases](USE_CASES.md): message and system design scenarios.

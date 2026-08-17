@@ -60,17 +60,14 @@ fn archive_context(
 }
 
 fn build_flatc(tools: &Tools) -> Result<PathBuf> {
-    println!("using Nix-pinned flatc {}", tools.flatbuffers_version);
+    println!("using pinned flatc {}", tools.flatbuffers_version);
 
-    let flatc = env::var_os("SYNAPSE_FBS_FLATC")
-        .map(PathBuf::from)
-        .ok_or_else(|| {
-            io::Error::other("SYNAPSE_FBS_FLATC is not set. Run inside `nix develop`.")
-        })?;
+    verify_git_commit(&tools.flatbuffers_source, &tools.flatbuffers_commit)?;
+    let flatc = tools.flatc_binary.clone();
     if !flatc.is_file() {
         return fail(format!(
-            "SYNAPSE_FBS_FLATC does not point to a file: {}",
-            flatc.display()
+            "flatc is missing at {}. Run `make bootstrap`.",
+            flatc.display(),
         ));
     }
 
@@ -96,6 +93,13 @@ struct FlatccTool {
 fn flatcc_tool(tools: &Tools) -> Result<FlatccTool> {
     let binary = tools.flatcc_binary.clone();
     let source = tools.flatcc_source.clone();
+    if !binary.is_file() {
+        return fail(format!(
+            "flatcc is missing at {}. Run `make bootstrap`.",
+            binary.display(),
+        ));
+    }
+    verify_git_commit(&source, &tools.flatcc_commit)?;
     let version_text = output_combined(Command::new(&binary).arg("--version"))?;
     let version = version_text
         .lines()
@@ -110,12 +114,218 @@ fn flatcc_tool(tools: &Tools) -> Result<FlatccTool> {
 
     if !source.join("src/runtime").is_dir() || !source.join("include/flatcc").is_dir() {
         return fail(format!(
-            "Nix-pinned flatcc source is incomplete at {}",
+            "pinned flatcc source is incomplete at {}",
             source.display()
         ));
     }
 
     Ok(FlatccTool { binary, source })
+}
+
+const FLATBUFFERS_REPOSITORY: &str = "https://github.com/google/flatbuffers.git";
+const FLATCC_REPOSITORY: &str = "https://github.com/dvidelabs/flatcc.git";
+
+fn bootstrap_tools(root: &Path, tools: &Tools, offline: bool) -> Result<()> {
+    println!("bootstrapping pinned native schema tools");
+
+    ensure_git_checkout(
+        &tools.flatbuffers_source,
+        FLATBUFFERS_REPOSITORY,
+        &tools.flatbuffers_commit,
+        offline,
+    )?;
+    let flatbuffers_build = root.join("target/xtask/toolchain/flatbuffers/build");
+    run(Command::new("cmake")
+        .arg("-S")
+        .arg(&tools.flatbuffers_source)
+        .arg("-B")
+        .arg(&flatbuffers_build)
+        .arg("-G")
+        .arg("Ninja")
+        .arg("-DCMAKE_BUILD_TYPE=Release")
+        .arg("-DFLATBUFFERS_BUILD_TESTS=OFF")
+        .arg("-DFLATBUFFERS_BUILD_FLATLIB=OFF")
+        .arg("-DFLATBUFFERS_BUILD_SHAREDLIB=OFF")
+        .arg("-DFLATBUFFERS_INSTALL=OFF"))?;
+    run(Command::new("cmake")
+        .arg("--build")
+        .arg(&flatbuffers_build)
+        .arg("--target")
+        .arg("flatc")
+        .arg("--parallel"))?;
+
+    ensure_git_checkout(
+        &tools.flatcc_source,
+        FLATCC_REPOSITORY,
+        &tools.flatcc_commit,
+        offline,
+    )?;
+    let flatcc_build = root.join("target/xtask/toolchain/flatcc/build");
+    run(Command::new("cmake")
+        .arg("-S")
+        .arg(&tools.flatcc_source)
+        .arg("-B")
+        .arg(&flatcc_build)
+        .arg("-G")
+        .arg("Ninja")
+        .arg("-DCMAKE_BUILD_TYPE=Release")
+        .arg("-DFLATCC_TEST=OFF")
+        .arg("-DFLATCC_ALLOW_WERROR=OFF"))?;
+    run(Command::new("cmake")
+        .arg("--build")
+        .arg(&flatcc_build)
+        .arg("--target")
+        .arg("flatcc_cli")
+        .arg("--parallel"))?;
+
+    build_flatc(tools)?;
+    flatcc_tool(tools)?;
+    println!("native schema tools are ready");
+    Ok(())
+}
+
+fn ensure_git_checkout(path: &Path, url: &str, commit: &str, offline: bool) -> Result<()> {
+    let new_checkout = !path.join(".git").is_dir();
+    if new_checkout {
+        if offline {
+            return fail(format!(
+                "pinned tool source is not cached at {}. Run `make bootstrap` with network access.",
+                path.display()
+            ));
+        }
+        if path.exists() && fs::read_dir(path)?.next().is_some() {
+            return fail(format!(
+                "tool source directory exists but is not a Git checkout: {}",
+                path.display()
+            ));
+        }
+        fs::create_dir_all(path)?;
+        run(Command::new("git").arg("init").arg(path))?;
+        run(Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .arg("remote")
+            .arg("add")
+            .arg("origin")
+            .arg(url))?;
+    } else {
+        let remote = output(
+            Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .arg("remote")
+                .arg("get-url")
+                .arg("origin"),
+        )?;
+        if remote.trim() != url {
+            return fail(format!(
+                "tool source {} has origin {}, expected {url}",
+                path.display(),
+                remote.trim()
+            ));
+        }
+        verify_git_clean(path)?;
+        if command_succeeds(
+            Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .arg("rev-parse")
+                .arg("--verify")
+                .arg("HEAD"),
+        ) {
+            let current = output(
+                Command::new("git")
+                    .arg("-C")
+                    .arg(path)
+                    .arg("rev-parse")
+                    .arg("HEAD"),
+            )?;
+            if current.trim() == commit {
+                return Ok(());
+            }
+        }
+        if command_succeeds(
+            Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .arg("cat-file")
+                .arg("-e")
+                .arg(format!("{commit}^{{commit}}")),
+        ) {
+            run(Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .arg("checkout")
+                .arg("--detach")
+                .arg(commit))?;
+            return verify_git_commit(path, commit);
+        }
+        if offline {
+            return fail(format!(
+                "pinned commit {commit} is not cached at {}. Run `make bootstrap` with network access.",
+                path.display()
+            ));
+        }
+    }
+
+    run(Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("fetch")
+        .arg("--depth")
+        .arg("1")
+        .arg("origin")
+        .arg(commit))?;
+    run(Command::new("git")
+        .arg("-C")
+        .arg(path)
+        .arg("checkout")
+        .arg("--detach")
+        .arg("FETCH_HEAD"))?;
+    verify_git_commit(path, commit)
+}
+
+fn verify_git_commit(path: &Path, commit: &str) -> Result<()> {
+    if !path.join(".git").is_dir() {
+        return fail(format!(
+            "pinned tool source is not a Git checkout: {}",
+            path.display()
+        ));
+    }
+    let actual = output(
+        Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .arg("rev-parse")
+            .arg("HEAD"),
+    )?;
+    if actual.trim() != commit {
+        return fail(format!(
+            "tool source {} is at {}, expected {commit}",
+            path.display(),
+            actual.trim()
+        ));
+    }
+    verify_git_clean(path)?;
+    Ok(())
+}
+
+fn verify_git_clean(path: &Path) -> Result<()> {
+    let status = output(
+        Command::new("git")
+            .arg("-C")
+            .arg(path)
+            .arg("status")
+            .arg("--porcelain")
+            .arg("--untracked-files=all"),
+    )?;
+    if !status.is_empty() {
+        return fail(format!(
+            "tool source has tracked or untracked files not ignored: {}",
+            path.display()
+        ));
+    }
+    Ok(())
 }
 
 fn generate_bindings(
@@ -868,7 +1078,12 @@ fn build_archives(
         )?;
     }
 
-    let c_root = workdir.join("synapse_fbs-c");
+    let c_root = if development_only {
+        root.join("target/xtask/packages/c")
+    } else {
+        workdir.join("synapse_fbs-c")
+    };
+    reset_dir(&c_root)?;
     fs::create_dir_all(c_root.join("include/synapse"))?;
     fs::create_dir_all(c_root.join("include"))?;
     fs::create_dir_all(c_root.join("src/flatcc-runtime"))?;
@@ -944,7 +1159,13 @@ fn build_archives(
             &mcap_bfbs_sources,
         ),
     )?;
-    if !development_only {
+    if development_only {
+        smoke_c_archive(&templates, &c_root)?;
+        smoke_c_to_rust_mcap(root, &c_root)?;
+        smoke_cmake_source_override(&templates, &workdir, &c_root)?;
+        smoke_cmake_find_package_c(&templates, tools, &workdir, &c_root)?;
+        println!("staged local C package at {}", c_root.display());
+    } else {
         write_tar_gz(
             &templates,
             &workdir,

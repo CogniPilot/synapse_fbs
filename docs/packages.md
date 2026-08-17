@@ -1,7 +1,7 @@
 # Package usage
 
 Release artifacts are generated from the same schemas and templates. The
-package version and all generator/runtime pins come from `flake.nix`.
+package version and all generator/runtime pins come from `tools.toml`.
 
 ## Rust
 
@@ -9,7 +9,7 @@ Install the published crate:
 
 ```toml
 [dependencies]
-synapse_fbs = "0.8"
+synapse_fbs = "0.10"
 ```
 
 Enable the `mcap` feature for the `synapse/1` reader and writer. After a local
@@ -18,6 +18,17 @@ package build, point a project at the staged crate:
 ```toml
 synapse_fbs = { path = "../synapse_fbs/target/xtask/packages/rust" }
 ```
+
+To override a registry dependency without editing its declaration, use a Cargo
+source patch:
+
+```toml
+[patch.crates-io]
+synapse_fbs = { path = "../synapse_fbs/target/xtask/packages/rust" }
+```
+
+The consumer's `synapse_fbs` version requirement must accept the generated
+package version.
 
 The crate includes generated bindings, schema sources, BFBS assets, the topic
 catalog, value-contract helpers, and the debug decoder.
@@ -68,7 +79,7 @@ GitHub releases contain self-contained generated archives. Extract one and add
 its root to `CMAKE_PREFIX_PATH`:
 
 ```cmake
-find_package(synapse_fbs 0.8.0 CONFIG REQUIRED)
+find_package(synapse_fbs 0.10.0 CONFIG REQUIRED)
 target_link_libraries(app PRIVATE synapse_fbs::c)
 ```
 
@@ -86,7 +97,7 @@ Projects without a dependency setup can fetch a release directly:
 ```cmake
 include(FetchContent)
 
-set(SYNAPSE_FBS_VERSION 0.8.0)
+set(SYNAPSE_FBS_VERSION 0.10.0)
 FetchContent_Declare(
   synapse_fbs
   URL https://github.com/CogniPilot/synapse_fbs/releases/download/v${SYNAPSE_FBS_VERSION}/synapse_fbs-c.tar.gz
@@ -108,6 +119,44 @@ The C archive includes `zephyr/module.yml`, Kconfig integration, generated C
 headers, and the allocation-free embedded MCAP writer. West projects can add
 the extracted archive as a module. Enable `CONFIG_SYNAPSE_FBS_MCAP` only when
 logging is required so disabled logging has no linked-code cost.
+
+## Local source consumption
+
+Generate verified Rust and C packages directly from a schema checkout:
+
+```sh
+make local
+```
+
+No tag, release, or push is required. A CMake consumer whose FetchContent name
+is `synapse_fbs_c` can use the generated C package with:
+
+```sh
+cmake -S . -B build \
+  -DFETCHCONTENT_SOURCE_DIR_SYNAPSE_FBS_C:PATH=/absolute/path/to/synapse_fbs/target/xtask/packages/c
+cmake --build build
+```
+
+For a non-sysbuild Zephyr application, pass the same cache variable after the
+west argument separator. A sysbuild consumer must import the variable from the
+sysbuild cache before its `FetchContent_Declare` call:
+
+```cmake
+if(SYSBUILD)
+  zephyr_get(FETCHCONTENT_SOURCE_DIR_SYNAPSE_FBS_C SYSBUILD GLOBAL)
+endif()
+```
+
+After that consumer integration, one unprefixed west argument supplies the
+same generated package to the main image and child images:
+
+```sh
+west build -p always --sysbuild -b <board> -d <build-dir> <application> -- \
+  -DFETCHCONTENT_SOURCE_DIR_SYNAPSE_FBS_C:PATH=/absolute/path/to/synapse_fbs/target/xtask/packages/c
+```
+
+Keep the release URL and hash declarations in the consumer. CMake uses them
+when no local source override is present.
 
 ## Catalog assets
 

@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.20)
+project(synapse_fbs_source_override_smoke C)
+
+include(FetchContent)
+
+FetchContent_Declare(
+  synapse_fbs_c
+  URL file:///nonexistent/synapse_fbs-c.tar.gz
+  DOWNLOAD_EXTRACT_TIMESTAMP TRUE
+)
+FetchContent_MakeAvailable(synapse_fbs_c)
+
+file(REAL_PATH "{{ source_dir }}" expected_source_dir)
+file(REAL_PATH "${synapse_fbs_c_SOURCE_DIR}" actual_source_dir)
+if(NOT actual_source_dir STREQUAL expected_source_dir)
+  message(FATAL_ERROR
+    "FetchContent used ${actual_source_dir}, expected ${expected_source_dir}"
+  )
+endif()
+
+add_executable(smoke main.c)
+target_link_libraries(smoke PRIVATE synapse_fbs::c)

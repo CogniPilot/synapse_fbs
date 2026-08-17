@@ -15,20 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          use-flakehub: false
-          use-gha-cache: true
+          components: clippy, rustfmt
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential cmake ninja-build python3-build python3-pip python3-venv twine
       - name: Build and verify
-        run: nix run .#packages -- --release-name "${GITHUB_REF_NAME}"
+        run: make packages RELEASE_NAME="${GITHUB_REF_NAME}"
       - name: Pack npm package
-        run: nix develop --command npm pack
+        run: npm pack
         working-directory: target/xtask/packages/js
       - name: Upload GitHub Release artifacts
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        shell: nix develop --command bash -e {0}
         run: |
           set -euo pipefail
           files=(
@@ -42,9 +47,7 @@ jobs:
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
           else
-            gh release create "${GITHUB_REF_NAME}" "${files[@]}" \
-              --title "${GITHUB_REF_NAME}" \
-              --notes "Release ${GITHUB_REF_NAME}"
+            gh release create "${GITHUB_REF_NAME}" "${files[@]}" --title "${GITHUB_REF_NAME}" --notes "Release ${GITHUB_REF_NAME}"
           fi
       - name: Check published package versions
         id: published
@@ -62,7 +65,7 @@ jobs:
           if curl --fail --silent --show-error --user-agent "${user_agent}" "https://pypi.org/pypi/synapse-fbs/${version}/json" >/dev/null; then
             python=true
           fi
-          if nix develop --command npm view "@cognipilot/synapse-fbs@${version}" version >/dev/null 2>&1; then
+          if npm view "@cognipilot/synapse-fbs@${version}" version >/dev/null 2>&1; then
             javascript=true
           fi
 
@@ -85,7 +88,7 @@ jobs:
         if: steps.published.outputs.rust != 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.crates-io-auth.outputs.token }}
-        run: nix develop --command cargo publish --manifest-path target/xtask/packages/rust/Cargo.toml --allow-dirty
+        run: cargo publish --manifest-path target/xtask/packages/rust/Cargo.toml --allow-dirty
       - name: Publish Python package to PyPI
         if: steps.published.outputs.python != 'true'
         uses: pypa/gh-action-pypi-publish@release/v1
@@ -93,5 +96,5 @@ jobs:
           packages-dir: target/xtask/packages/python/dist/
       - name: Publish JavaScript package to npm
         if: steps.published.outputs.javascript != 'true'
-        run: nix develop --command npm publish --access public
+        run: npm publish --access public
         working-directory: target/xtask/packages/js

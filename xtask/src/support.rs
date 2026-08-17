@@ -379,6 +379,46 @@ fn smoke_cmake_fetch(templates: &Templates, workdir: &Path, archive: &Path) -> R
     Ok(())
 }
 
+fn smoke_cmake_source_override(
+    templates: &Templates,
+    workdir: &Path,
+    source_dir: &Path,
+) -> Result<()> {
+    println!("smoke-testing CMake FetchContent source override");
+
+    let smoke_dir = workdir.join("source-override-smoke");
+    reset_dir(&smoke_dir)?;
+
+    templates.render_to_file(
+        "xtask/cmake_source_override_smoke/CMakeLists.txt.jinja",
+        context! { source_dir => source_dir.display().to_string() },
+        &smoke_dir.join("CMakeLists.txt"),
+    )?;
+    templates.render_to_file(
+        "xtask/smoke.c.jinja",
+        context! {},
+        &smoke_dir.join("main.c"),
+    )?;
+
+    run(Command::new("cmake")
+        .arg("-S")
+        .arg(&smoke_dir)
+        .arg("-B")
+        .arg(smoke_dir.join("build"))
+        .arg(format!(
+            "-DFETCHCONTENT_SOURCE_DIR_SYNAPSE_FBS_C:PATH={}",
+            source_dir.display()
+        )))?;
+    run(Command::new("cmake")
+        .arg("--build")
+        .arg(smoke_dir.join("build"))
+        .arg("--parallel")
+        .arg("2"))?;
+    run(&mut Command::new(smoke_dir.join("build/smoke")))?;
+
+    Ok(())
+}
+
 fn smoke_cmake_find_package_c(
     templates: &Templates,
     tools: &Tools,
