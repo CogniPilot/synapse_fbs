@@ -13,8 +13,9 @@ requires:
 - C11 and C++ compilers
 - `tar`, `gzip`, and `sha256sum`
 
-Full package and release validation additionally requires Python 3.9 or newer
-with `build`, `venv`, `pip`, and `twine`, plus Node 24 and npm.
+Full package and release validation additionally requires Python 3.12 with
+`venv` and `pip`, Python `build` 1.5.0, Python `twine` 7.0.0, plus Node 24
+and npm.
 
 ## Public commands
 
@@ -173,8 +174,9 @@ workflow checks which package versions already exist before publishing.
 
 ## CI action maintenance
 
-CI uses native Ubuntu packages, the Rust toolchain action, and the Node 24
-setup action. Validate workflow edits with a native `actionlint` installation:
+CI uses Ubuntu 24.04, native system packages, Python 3.12, the Rust toolchain
+action, and the Node 24 setup action. Validate workflow edits with a native
+`actionlint` installation:
 
 ```sh
 actionlint

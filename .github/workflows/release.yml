@@ -12,7 +12,7 @@ permissions:
 jobs:
   publish:
     name: Publish Packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
@@ -22,10 +22,14 @@ jobs:
         with:
           node-version: "24"
           registry-url: https://registry.npmjs.org
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
       - name: Install native dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes build-essential cmake ninja-build python3-build python3-pip python3-venv twine
+          sudo apt-get install --yes build-essential cmake ninja-build
+          python -m pip install --disable-pip-version-check build==1.5.0 twine==7.0.0
       - name: Build and verify
         run: make packages RELEASE_NAME="${GITHUB_REF_NAME}"
       - name: Pack npm package
