@@ -23,6 +23,9 @@ mcap = ["dep:mcap"]
 flatbuffers = "={{ flatbuffers_version }}"
 mcap = { version = "={{ mcap_rust_version }}", optional = true, default-features = false }
 
+[dev-dependencies]
+flatbuffers-reflection = "=0.1.0"
+
 [[example]]
 name = "validate_mcap"
 required-features = ["mcap"]

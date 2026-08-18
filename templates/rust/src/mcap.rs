@@ -10,10 +10,12 @@ use ::mcap::records::{MessageHeader, Metadata};
 use crate::{
     schemas::schema_by_name,
     topic_catalog::{
-        MCAP_MESSAGE_ENCODING, MCAP_METADATA_NAME, MCAP_PROFILE, MCAP_SCHEMA_ENCODING,
-        MCAP_SCHEMA_SET_HASH_KEY, MCAP_SESSION_ID_KEY, MCAP_SOURCE_KEY, MCAP_TIME_BASIS_CORRELATED,
-        MCAP_TIME_BASIS_KEY, MCAP_TIME_BASIS_MONOTONIC_BOOT, MCAP_TIME_BASIS_UNIX_EPOCH,
-        MCAP_TOPIC_ID_KEY, SCHEMA_SET_HASH, TopicInfo,
+        LEGACY_SCHEMA_SET_HASH_128, MCAP_MESSAGE_ENCODING, MCAP_METADATA_NAME, MCAP_PROFILE,
+        MCAP_SCHEMA_ENCODING, MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY, MCAP_SCHEMA_SET_HASH_KEY,
+        MCAP_SCHEMA_SET_IDENTITY_KEY, MCAP_SESSION_ID_KEY, MCAP_SOURCE_KEY,
+        MCAP_TIME_BASIS_CORRELATED, MCAP_TIME_BASIS_KEY, MCAP_TIME_BASIS_MONOTONIC_BOOT,
+        MCAP_TIME_BASIS_UNIX_EPOCH, MCAP_TOPIC_ID_KEY, SCHEMA_PACKAGE_CONTRACT_IDENTITY,
+        SCHEMA_SET_IDENTITY, TopicInfo,
     },
 };
 
@@ -151,7 +153,15 @@ impl<W: Write + Seek> Writer<W> {
         let metadata = BTreeMap::from([
             (
                 MCAP_SCHEMA_SET_HASH_KEY.to_owned(),
-                SCHEMA_SET_HASH.to_owned(),
+                LEGACY_SCHEMA_SET_HASH_128.to_owned(),
+            ),
+            (
+                MCAP_SCHEMA_SET_IDENTITY_KEY.to_owned(),
+                SCHEMA_SET_IDENTITY.to_owned(),
+            ),
+            (
+                MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY.to_owned(),
+                SCHEMA_PACKAGE_CONTRACT_IDENTITY.to_owned(),
             ),
             (MCAP_SESSION_ID_KEY.to_owned(), session_id.to_owned()),
             (MCAP_SOURCE_KEY.to_owned(), source.to_owned()),

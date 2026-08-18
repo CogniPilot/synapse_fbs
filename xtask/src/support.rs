@@ -316,10 +316,12 @@ fn smoke_c_archive(templates: &Templates, c_root: &Path) -> Result<()> {
         .arg(c_root.join("include"))
         .arg(c_root.join("tests/mcap_smoke.c"))
         .arg(c_root.join("src/mcap.c"))
-        .arg(c_root.join("src/bfbs/state.c"))
+        .arg(c_root.join("src/bfbs/control.c"))
         .arg("-o")
         .arg(&mcap_smoke))?;
-    run(Command::new(&mcap_smoke).arg(c_root.join("c-writer.mcap")))?;
+    run(Command::new(&mcap_smoke)
+        .arg(c_root.join("test-vectors/actuator_outputs/tropic-positive.bin"))
+        .arg(c_root.join("c-writer.mcap")))?;
     remove_file_if_exists(&mcap_smoke)?;
 
     Ok(())
