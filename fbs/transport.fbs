@@ -49,8 +49,8 @@ union SynapseMessage {
   LocalPositionCommand, // Local position/velocity/acceleration/yaw command.
   TrajectorySegment, // Bezier or polynomial trajectory segment setpoint.
   ActuatorCommand, // Normalized actuator command.
-  ActuatorFeedback, // Normalized actuator feedback.
-  PwmSignalOutputs, // Raw pulse widths from a genuine PWM waveform producer.
+  ActuatorFeedback, // Actual measured or driver-reported physical actuator feedback.
+  PwmSignalOutputs, // Genuine PWM pulse widths or the exact all-zero stub_zero_beacon inhibit payload.
   ControlLoopMetrics, // Control-loop timing and load metrics.
   TextStatus, // Human-readable status text.
   GcsStatus, // Compact status aggregate for low-rate ground-control links.
@@ -72,7 +72,7 @@ union SynapseMessage {
   ArgusPointCloud, // Per-pixel time-of-flight range and intensity point cloud.
   Rtcm3, // Raw RTCM3 correction frame.
   InertialBatch, // Phase-locked batch of raw inertial samples.
-  ActuatorOutputs, // Normalized locally commanded physical-output telemetry.
+  ActuatorOutputs, // Normalized commanded logical actuator-output telemetry.
 }
 
 // Fixed-layout header carried by the optional multiplexed Frame transport.

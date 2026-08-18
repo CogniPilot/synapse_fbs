@@ -799,8 +799,78 @@ fn write_c_topic_print(
     )
 }
 
+/// Check the accepted candidate byte contract consumed by the C and Rust ActuatorOutputs validators.
+/// The final byte is implicit alignment padding, so the 144-byte size and the
+/// last reflected field ending at byte 143 together reserve byte 143 as the
+/// required zero padding byte.
+fn validate_actuator_outputs_layout(schema: &CompiledSchema, problems: &mut Vec<String>) {
+    let Some((_, entity)) = find_schema_entity(schema, "synapse.topic.ActuatorOutputsData") else {
+        problems.push("ActuatorOutputsData not found".to_string());
+        return;
+    };
+    if entity.kind != SchemaEntityKind::Struct {
+        problems.push(format!(
+            "ActuatorOutputsData is a {}, expected struct",
+            entity.kind.as_str()
+        ));
+        return;
+    }
+    if entity.byte_size != Some(144) {
+        problems.push(format!(
+            "ActuatorOutputsData is {:?} bytes, expected exactly 144",
+            entity.byte_size
+        ));
+    }
+
+    let mut expected = vec![
+        ("timestamp_ns".to_string(), "ulong".to_string(), Some(0)),
+        ("active_mask".to_string(), "uint".to_string(), Some(8)),
+    ];
+    for slot in 0..32 {
+        expected.push((
+            format!("output{slot}"),
+            "float".to_string(),
+            Some(12 + slot * 4),
+        ));
+    }
+    expected.extend([
+        (
+            "arm_state".to_string(),
+            "ActuatorArmState".to_string(),
+            Some(140),
+        ),
+        (
+            "command_source".to_string(),
+            "ActuatorOutputSource".to_string(),
+            Some(141),
+        ),
+        (
+            "time_status".to_string(),
+            "synapse.types.TimeStatus".to_string(),
+            Some(142),
+        ),
+    ]);
+    let actual = entity
+        .members
+        .iter()
+        .map(|member| {
+            (
+                member.name.clone(),
+                member.type_name.clone().unwrap_or_default(),
+                member.offset,
+            )
+        })
+        .collect::<Vec<_>>();
+    if actual != expected {
+        problems.push(format!(
+            "ActuatorOutputsData fields do not match the accepted candidate byte layout.\n  expected: {expected:?}\n  actual:   {actual:?}"
+        ));
+    }
+}
+
 /// Protocol-level consistency checks over FlatCC reflection: TopicId
-/// contiguity, TopicId/union agreement, and command type resolution.
+/// contiguity, TopicId/union agreement, command type resolution, and the exact
+/// ActuatorOutputsData validator layout.
 fn validate_protocol(schema: &CompiledSchema) -> Result<()> {
     let mut problems = Vec::new();
 
@@ -892,6 +962,8 @@ fn validate_protocol(schema: &CompiledSchema) -> Result<()> {
         }
         None => problems.push("CmdId enum not found in fbs/transfer.fbs".to_string()),
     }
+
+    validate_actuator_outputs_layout(schema, &mut problems);
 
     if problems.is_empty() {
         Ok(())

@@ -181,50 +181,55 @@ struct ActuatorCommandData {
   time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
-// Normalized actuator feedback for up to thirty-two physical outputs. The
-// command message carries sixteen logical controls while feedback covers
-// thirty-two physical outputs after mixing and allocation.
+// Actual measured or driver-reported feedback for up to thirty-two physical
+// actuator channels. This topic is emitted only when physical feedback exists.
+// A commanded value, including ActuatorOutputsData, must never be echoed as
+// actuator feedback.
 struct ActuatorFeedbackData {
   timestamp_ns:ulong; // Feedback timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
-  active_mask:uint; // Bitmask indicating which output slots are valid, indexed from bit 0.
-  output0:float; // Normalized actuator output slot 0.
-  output1:float; // Normalized actuator output slot 1.
-  output2:float; // Normalized actuator output slot 2.
-  output3:float; // Normalized actuator output slot 3.
-  output4:float; // Normalized actuator output slot 4.
-  output5:float; // Normalized actuator output slot 5.
-  output6:float; // Normalized actuator output slot 6.
-  output7:float; // Normalized actuator output slot 7.
-  output8:float; // Normalized actuator output slot 8.
-  output9:float; // Normalized actuator output slot 9.
-  output10:float; // Normalized actuator output slot 10.
-  output11:float; // Normalized actuator output slot 11.
-  output12:float; // Normalized actuator output slot 12.
-  output13:float; // Normalized actuator output slot 13.
-  output14:float; // Normalized actuator output slot 14.
-  output15:float; // Normalized actuator output slot 15.
-  output16:float; // Normalized actuator output slot 16.
-  output17:float; // Normalized actuator output slot 17.
-  output18:float; // Normalized actuator output slot 18.
-  output19:float; // Normalized actuator output slot 19.
-  output20:float; // Normalized actuator output slot 20.
-  output21:float; // Normalized actuator output slot 21.
-  output22:float; // Normalized actuator output slot 22.
-  output23:float; // Normalized actuator output slot 23.
-  output24:float; // Normalized actuator output slot 24.
-  output25:float; // Normalized actuator output slot 25.
-  output26:float; // Normalized actuator output slot 26.
-  output27:float; // Normalized actuator output slot 27.
-  output28:float; // Normalized actuator output slot 28.
-  output29:float; // Normalized actuator output slot 29.
-  output30:float; // Normalized actuator output slot 30.
-  output31:float; // Normalized actuator output slot 31.
+  active_mask:uint; // Bitmask indicating which physical feedback channels are valid, indexed from bit 0.
+  output0:float; // Normalized measured or reported physical actuator channel 0.
+  output1:float; // Normalized measured or reported physical actuator channel 1.
+  output2:float; // Normalized measured or reported physical actuator channel 2.
+  output3:float; // Normalized measured or reported physical actuator channel 3.
+  output4:float; // Normalized measured or reported physical actuator channel 4.
+  output5:float; // Normalized measured or reported physical actuator channel 5.
+  output6:float; // Normalized measured or reported physical actuator channel 6.
+  output7:float; // Normalized measured or reported physical actuator channel 7.
+  output8:float; // Normalized measured or reported physical actuator channel 8.
+  output9:float; // Normalized measured or reported physical actuator channel 9.
+  output10:float; // Normalized measured or reported physical actuator channel 10.
+  output11:float; // Normalized measured or reported physical actuator channel 11.
+  output12:float; // Normalized measured or reported physical actuator channel 12.
+  output13:float; // Normalized measured or reported physical actuator channel 13.
+  output14:float; // Normalized measured or reported physical actuator channel 14.
+  output15:float; // Normalized measured or reported physical actuator channel 15.
+  output16:float; // Normalized measured or reported physical actuator channel 16.
+  output17:float; // Normalized measured or reported physical actuator channel 17.
+  output18:float; // Normalized measured or reported physical actuator channel 18.
+  output19:float; // Normalized measured or reported physical actuator channel 19.
+  output20:float; // Normalized measured or reported physical actuator channel 20.
+  output21:float; // Normalized measured or reported physical actuator channel 21.
+  output22:float; // Normalized measured or reported physical actuator channel 22.
+  output23:float; // Normalized measured or reported physical actuator channel 23.
+  output24:float; // Normalized measured or reported physical actuator channel 24.
+  output25:float; // Normalized measured or reported physical actuator channel 25.
+  output26:float; // Normalized measured or reported physical actuator channel 26.
+  output27:float; // Normalized measured or reported physical actuator channel 27.
+  output28:float; // Normalized measured or reported physical actuator channel 28.
+  output29:float; // Normalized measured or reported physical actuator channel 29.
+  output30:float; // Normalized measured or reported physical actuator channel 30.
+  output31:float; // Normalized measured or reported physical actuator channel 31.
   time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
 // Raw PWM pulse-width outputs from genuine PWM waveform producers, such as
-// servo output banks. Values are pulse widths in microseconds. This type does
-// not describe DSHOT or another digital actuator signaling protocol.
+// servo output banks. Values are pulse widths in microseconds. The sole
+// non-producer exception is the stub_zero_beacon build mode: every byte of its
+// PwmSignalOutputsData struct, including padding, must be zero. That inhibit
+// beacon does not assert a physical PWM waveform. A target with PWM disabled
+// has no Topic 25 producer or binding. This type does not
+// describe DSHOT or another digital actuator signaling protocol.
 struct PwmSignalOutputsData {
   timestamp_ns:ulong; // Output timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   active_mask:uint; // Bitmask indicating which PWM outputs are valid, indexed from bit 0.
@@ -248,50 +253,69 @@ struct PwmSignalOutputsData {
   time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
-// Hardware-neutral telemetry for the normalized physical-output commands
-// handed to the local actuator driver after allocation, arming or inhibition,
-// clamping, and local test-source selection. Slots follow the hardware
-// profile's physical actuator mapping. Reversible outputs use -1 to 1 and
-// unidirectional outputs use 0 to 1, as declared by that profile. This is
-// observation-only telemetry. It is never accepted as a network actuator
-// command and never carries DSHOT or another signaling protocol. The command
-// source remains the upstream local request source when a safety gate inhibits
-// its values.
+// Hardware-neutral telemetry for the normalized logical actuator commands
+// handed to the local driver after allocation, clamping, safety gating, and
+// local test-source selection. Slot N is logical actuator index N. A hardware
+// profile maps each active logical slot to a physical channel and declares
+// whether it is unidirectional or reversible. No vehicle geometry or physical
+// signaling is encoded here.
+//
+// active_mask must exactly equal the selected hardware profile's logical-slot
+// mapping mask and is not an arming mask. Inactive slots are canonical positive
+// 0.0f. Active values are finite and use inclusive [0, 1] for unidirectional
+// slots or [-1, 1] for reversible slots. Every zero is positive zero.
+//
+// Armed is valid only with ControlAllocation. NoCommand is always Disarmed and
+// carries profile disarmed values. Disarmed with ControlAllocation means a
+// later safety gate inhibited the request and also carries profile disarmed
+// values while preserving ControlAllocation as the source. ActuatorTest is the
+// sole permitted Disarmed case whose values may differ from profile disarmed
+// values and requires local authorization. Network input must never authorize
+// a test.
+//
+// The bare fixed-layout payload is exactly 144 little-endian bytes:
+// timestamp_ns at 0, active_mask at 8, output N at 12 + 4N, arm_state at 140,
+// command_source at 141, time_status at 142, and zero padding at 143. Trailing
+// bytes, nonzero padding, unknown enum values, non-finite floats, negative zero,
+// out-of-range values, and mask bits outside the selected profile are invalid.
+// This observation-only telemetry is never accepted as a network actuator
+// command and never carries DSHOT command words, beeps, direction changes, or
+// another physical signaling protocol.
 struct ActuatorOutputsData {
   timestamp_ns:ulong; // Time the command became current at the local actuator driver. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
-  active_mask:uint; // Bitmask indicating which physical output slots are valid, indexed from bit 0.
-  output0:float; // Normalized physical actuator command slot 0.
-  output1:float; // Normalized physical actuator command slot 1.
-  output2:float; // Normalized physical actuator command slot 2.
-  output3:float; // Normalized physical actuator command slot 3.
-  output4:float; // Normalized physical actuator command slot 4.
-  output5:float; // Normalized physical actuator command slot 5.
-  output6:float; // Normalized physical actuator command slot 6.
-  output7:float; // Normalized physical actuator command slot 7.
-  output8:float; // Normalized physical actuator command slot 8.
-  output9:float; // Normalized physical actuator command slot 9.
-  output10:float; // Normalized physical actuator command slot 10.
-  output11:float; // Normalized physical actuator command slot 11.
-  output12:float; // Normalized physical actuator command slot 12.
-  output13:float; // Normalized physical actuator command slot 13.
-  output14:float; // Normalized physical actuator command slot 14.
-  output15:float; // Normalized physical actuator command slot 15.
-  output16:float; // Normalized physical actuator command slot 16.
-  output17:float; // Normalized physical actuator command slot 17.
-  output18:float; // Normalized physical actuator command slot 18.
-  output19:float; // Normalized physical actuator command slot 19.
-  output20:float; // Normalized physical actuator command slot 20.
-  output21:float; // Normalized physical actuator command slot 21.
-  output22:float; // Normalized physical actuator command slot 22.
-  output23:float; // Normalized physical actuator command slot 23.
-  output24:float; // Normalized physical actuator command slot 24.
-  output25:float; // Normalized physical actuator command slot 25.
-  output26:float; // Normalized physical actuator command slot 26.
-  output27:float; // Normalized physical actuator command slot 27.
-  output28:float; // Normalized physical actuator command slot 28.
-  output29:float; // Normalized physical actuator command slot 29.
-  output30:float; // Normalized physical actuator command slot 30.
-  output31:float; // Normalized physical actuator command slot 31.
+  active_mask:uint; // Exact hardware-profile logical-slot mapping mask, indexed from bit 0.
+  output0:float; // Normalized logical actuator command slot 0.
+  output1:float; // Normalized logical actuator command slot 1.
+  output2:float; // Normalized logical actuator command slot 2.
+  output3:float; // Normalized logical actuator command slot 3.
+  output4:float; // Normalized logical actuator command slot 4.
+  output5:float; // Normalized logical actuator command slot 5.
+  output6:float; // Normalized logical actuator command slot 6.
+  output7:float; // Normalized logical actuator command slot 7.
+  output8:float; // Normalized logical actuator command slot 8.
+  output9:float; // Normalized logical actuator command slot 9.
+  output10:float; // Normalized logical actuator command slot 10.
+  output11:float; // Normalized logical actuator command slot 11.
+  output12:float; // Normalized logical actuator command slot 12.
+  output13:float; // Normalized logical actuator command slot 13.
+  output14:float; // Normalized logical actuator command slot 14.
+  output15:float; // Normalized logical actuator command slot 15.
+  output16:float; // Normalized logical actuator command slot 16.
+  output17:float; // Normalized logical actuator command slot 17.
+  output18:float; // Normalized logical actuator command slot 18.
+  output19:float; // Normalized logical actuator command slot 19.
+  output20:float; // Normalized logical actuator command slot 20.
+  output21:float; // Normalized logical actuator command slot 21.
+  output22:float; // Normalized logical actuator command slot 22.
+  output23:float; // Normalized logical actuator command slot 23.
+  output24:float; // Normalized logical actuator command slot 24.
+  output25:float; // Normalized logical actuator command slot 25.
+  output26:float; // Normalized logical actuator command slot 26.
+  output27:float; // Normalized logical actuator command slot 27.
+  output28:float; // Normalized logical actuator command slot 28.
+  output29:float; // Normalized logical actuator command slot 29.
+  output30:float; // Normalized logical actuator command slot 30.
+  output31:float; // Normalized logical actuator command slot 31.
   arm_state:ActuatorArmState; // Final normal-output enable state after local actuator safety gates.
   command_source:ActuatorOutputSource; // Upstream local source whose request entered output selection.
   time_status:synapse.types.TimeStatus; // Discipline state of the clock behind timestamp_ns.
@@ -339,17 +363,17 @@ table ActuatorCommand {
 
 // FlatBuffers root wrapper for ActuatorFeedbackData.
 table ActuatorFeedback {
-  data:ActuatorFeedbackData; // Fixed-layout actuator-feedback payload.
+  data:ActuatorFeedbackData; // Fixed-layout measured or reported physical actuator feedback.
 }
 
 // FlatBuffers root wrapper for PwmSignalOutputsData.
 table PwmSignalOutputs {
-  data:PwmSignalOutputsData; // Fixed-layout pulse widths from a genuine PWM producer.
+  data:PwmSignalOutputsData; // Genuine PWM pulse widths or the exact all-zero stub_zero_beacon inhibit payload.
 }
 
 // FlatBuffers root wrapper for ActuatorOutputsData.
 table ActuatorOutputs {
-  data:ActuatorOutputsData; // Fixed-layout local actuator-output telemetry payload.
+  data:ActuatorOutputsData; // Fixed-layout commanded logical actuator-output telemetry.
 }
 
 // FlatBuffers root wrapper for ControlLoopMetricsData.

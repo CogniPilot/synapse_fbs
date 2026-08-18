@@ -22,6 +22,7 @@ pub mod cmd {
     pub use crate::generated::synapse::cmd::*;
 }
 
+pub mod actuator_outputs_contract;
 pub mod schemas;
 pub mod topic_catalog;
 pub mod topic_decode;

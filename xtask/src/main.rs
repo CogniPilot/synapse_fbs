@@ -12,7 +12,12 @@ use sha2::{Digest, Sha256};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
+#[allow(dead_code)]
+#[path = "../../templates/rust/src/actuator_outputs_contract.rs"]
+mod actuator_outputs_contract;
+
 include!("protocol.rs");
+include!("actuator_vectors.rs");
 #[derive(Debug)]
 struct Tools {
     package_version: String,
@@ -40,6 +45,7 @@ fn main() -> Result<()> {
     let root = find_repo_root(&env::current_dir()?)?;
     let (command, options) = parse_args()?;
     enforce_binding_language_policy(&root)?;
+    validate_actuator_output_vectors(&root)?;
 
     match command.as_str() {
         "build" => build(&root, &options),

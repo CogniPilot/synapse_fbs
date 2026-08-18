@@ -1,0 +1,134 @@
+{
+  "format": "synapse.actuator-outputs-negative-vectors.v1",
+  "base": {
+    "file": "tropic-positive.bin",
+    "size": 144,
+    "sha256": "cd1833b8e6f160f0f1a61e9a93dbace295489d4ffb542c2d6dd8171540984cc8"
+  },
+  "profile": {
+    "name": "tropic",
+    "logical_slot_mask": "0x0000000f",
+    "reversible_mask": "0x00000000",
+    "disarmed_values": "32xf32-le:00000000"
+  },
+  "payload_cases": [
+    {
+      "name": "short-payload",
+      "operation": {"kind": "resize", "size": 143},
+      "expected": "wrong_length"
+    },
+    {
+      "name": "trailing-byte",
+      "operation": {"kind": "append", "bytes_hex": "00"},
+      "expected": "wrong_length"
+    },
+    {
+      "name": "active-mask-mismatch",
+      "operation": {"kind": "write", "offset": 8, "bytes_hex": "0e000000"},
+      "expected": "active_mask_mismatch"
+    },
+    {
+      "name": "unknown-arm-state",
+      "operation": {"kind": "write", "offset": 140, "bytes_hex": "02"},
+      "expected": "unknown_arm_state"
+    },
+    {
+      "name": "unknown-command-source",
+      "operation": {"kind": "write", "offset": 141, "bytes_hex": "03"},
+      "expected": "unknown_command_source"
+    },
+    {
+      "name": "unknown-time-status",
+      "operation": {"kind": "write", "offset": 142, "bytes_hex": "03"},
+      "expected": "unknown_time_status"
+    },
+    {
+      "name": "nonzero-padding",
+      "operation": {"kind": "write", "offset": 143, "bytes_hex": "01"},
+      "expected": "nonzero_padding"
+    },
+    {
+      "name": "nan-output",
+      "operation": {"kind": "write", "offset": 12, "bytes_hex": "0000c07f"},
+      "expected": "nonfinite_output"
+    },
+    {
+      "name": "infinite-output",
+      "operation": {"kind": "write", "offset": 12, "bytes_hex": "0000807f"},
+      "expected": "nonfinite_output"
+    },
+    {
+      "name": "negative-zero-output",
+      "operation": {"kind": "write", "offset": 12, "bytes_hex": "00000080"},
+      "expected": "negative_zero_output"
+    },
+    {
+      "name": "unidirectional-output-below-range",
+      "operation": {"kind": "write", "offset": 12, "bytes_hex": "000080be"},
+      "expected": "output_out_of_range"
+    },
+    {
+      "name": "unidirectional-output-above-range",
+      "operation": {"kind": "write", "offset": 12, "bytes_hex": "0000a03f"},
+      "expected": "output_out_of_range"
+    },
+    {
+      "name": "inactive-output-nonzero",
+      "operation": {"kind": "write", "offset": 28, "bytes_hex": "0000803e"},
+      "expected": "inactive_output_not_zero"
+    },
+    {
+      "name": "disarmed-control-output-mismatch",
+      "operation": {"kind": "write", "offset": 140, "bytes_hex": "00"},
+      "expected": "disarmed_output_mismatch"
+    },
+    {
+      "name": "armed-no-command",
+      "operation": {"kind": "write", "offset": 141, "bytes_hex": "00"},
+      "expected": "invalid_arm_source"
+    },
+    {
+      "name": "unauthorized-actuator-test",
+      "operation": {
+        "kind": "writes",
+        "writes": [
+          {"offset": 140, "bytes_hex": "00"},
+          {"offset": 141, "bytes_hex": "02"}
+        ]
+      },
+      "expected": "actuator_test_not_authorized"
+    }
+  ],
+  "profile_cases": [
+    {
+      "name": "reversible-mask-outside-logical-mask",
+      "field": "reversible_mask",
+      "value": "0x00000010",
+      "expected": "reversible_mask_outside_logical_mask"
+    },
+    {
+      "name": "active-disarmed-negative-zero",
+      "field": "disarmed_values[0]",
+      "value": "f32-le:00000080",
+      "expected": "negative_zero_profile_disarmed_value"
+    },
+    {
+      "name": "active-disarmed-infinite",
+      "field": "disarmed_values[0]",
+      "value": "f32-le:0000807f",
+      "expected": "nonfinite_profile_disarmed_value"
+    },
+    {
+      "name": "active-unidirectional-disarmed-below-range",
+      "field": "disarmed_values[0]",
+      "value": "f32-le:000080be",
+      "expected": "profile_disarmed_value_out_of_range"
+    },
+    {
+      "name": "inactive-disarmed-nonzero",
+      "field": "disarmed_values[4]",
+      "value": "f32-le:0000803e",
+      "expected": "inactive_profile_disarmed_value_not_zero"
+    }
+  ]
+}

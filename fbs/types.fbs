@@ -314,8 +314,8 @@ enum TopicId:ushort {
   LocalPositionCommand = 21, // Local ENU position/velocity/acceleration/yaw setpoint.
   TrajectorySegment = 22, // Fixed-layout Bezier or polynomial trajectory segment setpoint.
   ActuatorCommand = 23, // Normalized actuator control request.
-  ActuatorFeedback = 24, // Normalized actuator output feedback.
-  PwmSignalOutputs = 25, // Raw pulse widths from a genuine PWM waveform producer.
+  ActuatorFeedback = 24, // Actual measured or driver-reported physical actuator feedback.
+  PwmSignalOutputs = 25, // Genuine PWM pulse widths or the exact all-zero stub_zero_beacon inhibit payload.
   ControlLoopMetrics = 26, // Control-loop timing, overrun, and load telemetry.
   TextStatus = 27, // Human-readable status or diagnostic text.
   GcsStatus = 28, // Compact vehicle status aggregate for low-rate ground-control links.
@@ -337,5 +337,5 @@ enum TopicId:ushort {
   ArgusPointCloud = 44, // Per-pixel time-of-flight range and intensity field from an AFBR ranger.
   Rtcm3 = 45, // Raw RTCM3 correction frame delivered to the receiver.
   InertialBatch = 46, // Phase-locked batch of raw inertial samples for high-rate delivery.
-  ActuatorOutputs = 47, // Normalized locally commanded physical-output telemetry.
+  ActuatorOutputs = 47, // Normalized commanded logical actuator outputs handed to the local driver.
 }

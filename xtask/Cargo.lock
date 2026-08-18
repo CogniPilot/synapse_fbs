@@ -365,6 +365,7 @@ dependencies = [
  "flatbuffers-reflection",
  "minijinja",
  "serde",
+ "serde_json",
  "sha2",
  "toml",
 ]

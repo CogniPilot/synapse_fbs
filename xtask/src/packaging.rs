@@ -150,6 +150,10 @@ fn generate_bindings(
     // binary schemas, and a generated debug decoder, so downstream tools do
     // not vendor schema copies that can drift from the pinned release.
     copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
+    copy_dir_all(
+        &root.join("test-vectors"),
+        &packages.rust.join("test-vectors"),
+    )?;
     fs::copy(root.join(MCAP_PROFILE_PATH), packages.rust.join("MCAP.md"))?;
     write_rust_embedded_schemas(templates, &schema, &packages.rust)?;
     write_rust_topic_decode(templates, &schema, &topics, &packages.rust)?;
@@ -582,6 +586,10 @@ fn copy_common_archive_files(root: &Path, archive_root: &Path) -> Result<()> {
     fs::copy(root.join("LICENSE"), archive_root.join("LICENSE"))?;
     fs::copy(root.join(MCAP_PROFILE_PATH), archive_root.join("MCAP.md"))?;
     copy_dir_all(&root.join("fbs"), &archive_root.join("fbs"))?;
+    copy_dir_all(
+        &root.join("test-vectors"),
+        &archive_root.join("test-vectors"),
+    )?;
     Ok(())
 }
 

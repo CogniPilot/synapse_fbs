@@ -289,6 +289,23 @@ fn smoke_c_archive(templates: &Templates, c_root: &Path) -> Result<()> {
     remove_file_if_exists(&smoke)?;
     remove_file_if_exists(&c_root.join("smoke.o"))?;
 
+    let actuator_contract_smoke = c_root.join("actuator_outputs_contract_smoke");
+    run(Command::new(&cc)
+        .arg("-std=c11")
+        .arg("-Wall")
+        .arg("-Wextra")
+        .arg("-Werror")
+        .arg("-I")
+        .arg(c_root.join("include"))
+        .arg(c_root.join("tests/actuator_outputs_contract.c"))
+        .arg("-o")
+        .arg(&actuator_contract_smoke))?;
+    run(Command::new(&actuator_contract_smoke).arg(
+        c_root.join("test-vectors/actuator_outputs/tropic-positive.bin"),
+    ))?;
+    exercise_c_actuator_output_manifest(c_root, &actuator_contract_smoke)?;
+    remove_file_if_exists(&actuator_contract_smoke)?;
+
     let mcap_smoke = c_root.join("mcap_smoke");
     run(Command::new(&cc)
         .arg("-std=c11")
