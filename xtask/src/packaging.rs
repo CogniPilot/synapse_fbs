@@ -209,7 +209,15 @@ fn write_c_mcap_topics(
 
 fn topic_catalog_context(schema: &CompiledSchema, topics: &[TopicEntry]) -> Result<Value> {
     let commands = command_entries(schema)?;
-    let set_hash = schema_set_hash(topics, &commands);
+    let schema_set_identity = schema_set_identity(topics, &commands);
+    let legacy_schema_set_hash_128 = legacy_schema_set_hash_128(topics, &commands);
+    let schema_package_contract_identity = schema_package_contract_identity(
+        schema,
+        topics,
+        &commands,
+        &schema_set_identity,
+        &legacy_schema_set_hash_128,
+    );
     let mut mcap_schema_files = BTreeSet::new();
     for topic in topics {
         mcap_schema_files.insert(topic.schema_file.clone());
@@ -257,11 +265,13 @@ fn topic_catalog_context(schema: &CompiledSchema, topics: &[TopicEntry]) -> Resu
                 payload_type: topic.payload_type.clone(),
                 payload_size: topic.payload_size,
                 schema_file: topic.schema_file.clone(),
+                schema_artifact_sha256: topic.schema_artifact_sha256.clone(),
                 mcap_schema_name: root_table_qualified.clone(),
                 mcap_schema_file: format!("bfbs/{schema_stem}.bfbs"),
                 mcap_schema_symbol: format!("synapse_bfbs_{schema_stem}"),
                 wire_type: topic.wire_type.clone(),
-                schema_hash: topic.schema_hash.clone(),
+                type_schema_hash: topic.type_schema_hash.clone(),
+                legacy_schema_file_hash_128: topic.legacy_schema_file_hash_128.clone(),
                 fixed_layout: topic.fixed_layout,
                 multi_instance: topic.multi_instance,
                 scope: topic.scope,
@@ -276,13 +286,21 @@ fn topic_catalog_context(schema: &CompiledSchema, topics: &[TopicEntry]) -> Resu
         .collect();
 
     Ok(Value::from_serialize(TopicCatalogContext {
-        version: 2,
-        schema_set_hash: set_hash,
+        version: CATALOG_VERSION,
+        flatbuffer_value_media_type: FLATBUFFER_VALUE_MEDIA_TYPE,
+        struct_value_media_type: STRUCT_VALUE_MEDIA_TYPE,
+        type_schema_hash_algorithm: TYPE_SCHEMA_HASH_ALGORITHM,
+        topic_instance_key_grammar: TOPIC_INSTANCE_KEY_GRAMMAR,
+        schema_set_identity,
+        schema_package_contract_identity,
+        legacy_schema_set_hash_128,
         mcap_profile: MCAP_PROFILE,
         mcap_schema_encoding: MCAP_SCHEMA_ENCODING,
         mcap_message_encoding: MCAP_MESSAGE_ENCODING,
         mcap_metadata_name: MCAP_METADATA_NAME,
         mcap_schema_set_hash_key: MCAP_SCHEMA_SET_HASH_KEY,
+        mcap_schema_set_identity_key: MCAP_SCHEMA_SET_IDENTITY_KEY,
+        mcap_schema_package_contract_identity_key: MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY,
         mcap_session_id_key: MCAP_SESSION_ID_KEY,
         mcap_source_key: MCAP_SOURCE_KEY,
         mcap_time_basis_key: MCAP_TIME_BASIS_KEY,
@@ -304,6 +322,7 @@ struct EmbeddedSchemaEntry {
     file: String,
     fbs_include: String,
     bfbs_include: String,
+    bfbs_sha256: String,
     root_type: Option<String>,
     file_identifier: Option<String>,
 }
@@ -334,6 +353,7 @@ fn embedded_schemas_context(schema: &CompiledSchema) -> Result<Value> {
             file: (*schema_file).to_string(),
             fbs_include: format!("../{schema_file}"),
             bfbs_include: format!("../bfbs/{stem}.bfbs"),
+            bfbs_sha256: file.bfbs_sha256.clone(),
             root_type: file.root_type.clone(),
             file_identifier: file.file_identifier.clone(),
         });

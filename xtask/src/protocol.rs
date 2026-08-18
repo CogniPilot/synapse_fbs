@@ -20,6 +20,13 @@ const SCHEMAS: &[&str] = &[
 const CMD_KEY_PREFIX: &str = "cmd";
 const META_KEY_PREFIX: &str = "meta";
 const LIVELINESS_KEY_PREFIX: &str = "live";
+const CATALOG_VERSION: u8 = 3;
+const FLATBUFFER_VALUE_MEDIA_TYPE: &str = "application/x-flatbuffers";
+const STRUCT_VALUE_MEDIA_TYPE: &str = "application/x-synapse-struct";
+const TYPE_SCHEMA_HASH_ALGORITHM: &str = "sha256";
+const TOPIC_INSTANCE_KEY_GRAMMAR: &str = "ascii-decimal-1-to-9-digits-u32";
+
+
 
 // Frozen literals from the normative MCAP.md `synapse/1` profile. Keep these
 // in one place so every generated language catalog gives writers the exact
@@ -29,6 +36,10 @@ const MCAP_SCHEMA_ENCODING: &str = "flatbuffer";
 const MCAP_MESSAGE_ENCODING: &str = "flatbuffer";
 const MCAP_METADATA_NAME: &str = "synapse";
 const MCAP_SCHEMA_SET_HASH_KEY: &str = "synapse.schema_set_hash";
+const MCAP_SCHEMA_SET_IDENTITY_KEY: &str = "synapse.schema_set_identity";
+const MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY: &str =
+    "synapse.schema_package_contract_identity";
+
 const MCAP_SESSION_ID_KEY: &str = "synapse.session_id";
 const MCAP_SOURCE_KEY: &str = "synapse.source";
 const MCAP_TIME_BASIS_KEY: &str = "synapse.time_basis";

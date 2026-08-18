@@ -17,6 +17,7 @@ type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 mod actuator_outputs_contract;
 
 include!("protocol.rs");
+include!("identity.rs");
 include!("actuator_vectors.rs");
 #[derive(Debug)]
 struct Tools {
@@ -173,61 +174,6 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
 }
 
 const MCAP_PROFILE_PATH: &str = "docs/MCAP.md";
-
-/// Hash the full catalog contract a constrained link relies on after the
-/// one-time handshake: topic id and key routing, payload interpretation
-/// (encoding, wire type, transitive schema hash, instance key grammar), and
-/// command ids with their request/reply contracts. Policy and documentation
-/// fields (scope, descriptions) are deliberately excluded. Endpoints that
-/// agree on this hash agree on how every frame is routed, decoded, and
-/// restored to canonical Zenoh form.
-fn schema_set_hash(topics: &[TopicEntry], commands: &[CommandEntry]) -> String {
-    let mut digest = Sha256::new();
-    digest.update(b"synapse-schema-set-v3\n");
-    let mut sorted_topics: Vec<&TopicEntry> = topics.iter().collect();
-    sorted_topics.sort_by_key(|topic| topic.id);
-    for topic in sorted_topics {
-        digest.update(b"topic\t");
-        digest.update(topic.id.to_string());
-        digest.update(b"\t");
-        digest.update(topic.key.as_bytes());
-        digest.update(if topic.multi_instance {
-            b"\t1\t"
-        } else {
-            b"\t0\t"
-        });
-        digest.update(topic.encoding.as_bytes());
-        digest.update(b"\t");
-        digest.update(topic.wire_type.as_bytes());
-        digest.update(b"\t");
-        digest.update(topic.schema_hash.as_bytes());
-        digest.update(b"\n");
-    }
-    let mut sorted_commands: Vec<&CommandEntry> = commands.iter().collect();
-    sorted_commands.sort_by_key(|command| command.id);
-    for command in sorted_commands {
-        digest.update(b"cmd\t");
-        digest.update(command.id.to_string());
-        for field in [
-            command.name.as_str(),
-            command.request_encoding,
-            command.request_type.as_str(),
-            command.request_schema_hash.as_str(),
-            command.reply_encoding,
-            command.reply_type.as_str(),
-            command.reply_schema_hash.as_str(),
-        ] {
-            digest.update(b"\t");
-            digest.update(field.as_bytes());
-        }
-        digest.update(b"\n");
-    }
-    let digest = digest.finalize();
-    digest[..16]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
-}
 
 fn parse_args() -> Result<(String, Options)> {
     let mut args = env::args().skip(1);

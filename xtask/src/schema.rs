@@ -1,12 +1,14 @@
 #[derive(Clone, Debug)]
 struct CompiledSchema {
     files: Vec<SchemaFile>,
+    strict_type_hashes: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Debug)]
 struct SchemaFile {
     name: String,
-    schema_hash: String,
+    bfbs_sha256: String,
+    legacy_bfbs_hash_128: String,
     entities: Vec<SchemaEntity>,
     root_type: Option<String>,
     file_identifier: Option<String>,
@@ -41,8 +43,10 @@ struct TopicEntry {
     payload_type_namespace: Option<String>,
     payload_size: Option<usize>,
     schema_file: String,
+    schema_artifact_sha256: String,
     wire_type: String,
-    schema_hash: String,
+    type_schema_hash: String,
+    legacy_schema_file_hash_128: String,
     fixed_layout: bool,
     multi_instance: bool,
     scope: &'static str,
@@ -65,11 +69,13 @@ struct CommandEntry {
     name: String,
     key: String,
     request_type: String,
-    request_schema_hash: String,
+    request_type_schema_hash: String,
+    legacy_request_schema_file_hash_128: String,
     request_encoding: &'static str,
     request_size: Option<usize>,
     reply_type: String,
-    reply_schema_hash: String,
+    reply_type_schema_hash: String,
+    legacy_reply_schema_file_hash_128: String,
     reply_encoding: &'static str,
     reply_size: Option<usize>,
     description: String,
@@ -78,12 +84,20 @@ struct CommandEntry {
 #[derive(Clone, Debug, Serialize)]
 struct TopicCatalogContext {
     version: u8,
-    schema_set_hash: String,
+    flatbuffer_value_media_type: &'static str,
+    struct_value_media_type: &'static str,
+    type_schema_hash_algorithm: &'static str,
+    topic_instance_key_grammar: &'static str,
+    schema_set_identity: String,
+    schema_package_contract_identity: String,
+    legacy_schema_set_hash_128: String,
     mcap_profile: &'static str,
     mcap_schema_encoding: &'static str,
     mcap_message_encoding: &'static str,
     mcap_metadata_name: &'static str,
     mcap_schema_set_hash_key: &'static str,
+    mcap_schema_set_identity_key: &'static str,
+    mcap_schema_package_contract_identity_key: &'static str,
     mcap_session_id_key: &'static str,
     mcap_source_key: &'static str,
     mcap_time_basis_key: &'static str,
@@ -114,11 +128,13 @@ struct TopicTemplateEntry {
     payload_type: Option<String>,
     payload_size: Option<usize>,
     schema_file: String,
+    schema_artifact_sha256: String,
     mcap_schema_name: String,
     mcap_schema_file: String,
     mcap_schema_symbol: String,
     wire_type: String,
-    schema_hash: String,
+    type_schema_hash: String,
+    legacy_schema_file_hash_128: String,
     fixed_layout: bool,
     multi_instance: bool,
     scope: &'static str,
@@ -164,7 +180,8 @@ fn load_compiled_schema(bfbs_dir: &Path) -> Result<CompiledSchema> {
             .ok_or_else(|| io::Error::other(format!("schema path has no stem: {schema_file}")))?;
         let path = bfbs_dir.join(format!("{stem}.bfbs"));
         let bytes = fs::read(&path)?;
-        let schema_hash = sha256_hex(&path)?[..32].to_string();
+        let bfbs_sha256 = sha256_hex(&path)?;
+        let legacy_bfbs_hash_128 = bfbs_sha256[..32].to_string();
         let schema = reflection::root_as_schema(&bytes)
             .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
         let mut entities = Vec::new();
@@ -183,7 +200,8 @@ fn load_compiled_schema(bfbs_dir: &Path) -> Result<CompiledSchema> {
 
         files.push(SchemaFile {
             name: (*schema_file).to_string(),
-            schema_hash,
+            bfbs_sha256,
+            legacy_bfbs_hash_128,
             entities,
             root_type: schema.root_table().map(|root| root.name().to_string()),
             file_identifier: schema
@@ -193,7 +211,11 @@ fn load_compiled_schema(bfbs_dir: &Path) -> Result<CompiledSchema> {
         });
     }
 
-    Ok(CompiledSchema { files })
+    let strict_type_hashes = strict_type_hashes(bfbs_dir)?;
+    Ok(CompiledSchema {
+        files,
+        strict_type_hashes,
+    })
 }
 
 fn reflected_object(
@@ -519,7 +541,12 @@ fn topic_entries(schema: &CompiledSchema) -> Result<Vec<TopicEntry>> {
             root_table
         };
         let wire_type = qualified_name(&wire_entity.namespace, &wire_entity.name);
-        let schema_hash = schema_file.schema_hash.clone();
+        let type_schema_hash = schema
+            .strict_type_hashes
+            .get(&wire_type)
+            .cloned()
+            .ok_or_else(|| io::Error::other(format!("no strict type identity for {wire_type}")))?;
+        let legacy_schema_file_hash_128 = schema_file.legacy_bfbs_hash_128.clone();
         topics.push(TopicEntry {
             id,
             name: member.name.clone(),
@@ -530,8 +557,10 @@ fn topic_entries(schema: &CompiledSchema) -> Result<Vec<TopicEntry>> {
             payload_type_namespace,
             payload_size,
             schema_file: schema_file.name.clone(),
+            schema_artifact_sha256: schema_file.bfbs_sha256.clone(),
             wire_type,
-            schema_hash,
+            type_schema_hash,
+            legacy_schema_file_hash_128,
             fixed_layout,
             multi_instance,
             scope,
@@ -577,16 +606,22 @@ fn command_entries(schema: &CompiledSchema) -> Result<Vec<CommandEntry>> {
     for (id, name, request_type, reply_type, description) in COMMANDS {
         let request_meta = command_payload_metadata(schema, request_type)?;
         let reply_meta = command_payload_metadata(schema, reply_type)?;
+        let (request_type_schema_hash, legacy_request_schema_file_hash_128) =
+            command_schema_identities(schema, request_type)?;
+        let (reply_type_schema_hash, legacy_reply_schema_file_hash_128) =
+            command_schema_identities(schema, reply_type)?;
         commands.push(CommandEntry {
             id: *id,
             name: (*name).to_string(),
             key: format!("{CMD_KEY_PREFIX}/{name}"),
             request_type: (*request_type).to_string(),
-            request_schema_hash: command_schema_hash(schema, request_type)?,
+            request_type_schema_hash,
+            legacy_request_schema_file_hash_128,
             request_encoding: request_meta.encoding,
             request_size: request_meta.size,
             reply_type: (*reply_type).to_string(),
-            reply_schema_hash: command_schema_hash(schema, reply_type)?,
+            reply_type_schema_hash,
+            legacy_reply_schema_file_hash_128,
             reply_encoding: reply_meta.encoding,
             reply_size: reply_meta.size,
             description: (*description).to_string(),
@@ -595,7 +630,10 @@ fn command_entries(schema: &CompiledSchema) -> Result<Vec<CommandEntry>> {
     Ok(commands)
 }
 
-fn command_schema_hash(schema: &CompiledSchema, type_name: &str) -> Result<String> {
+fn command_schema_identities(
+    schema: &CompiledSchema,
+    type_name: &str,
+) -> Result<(String, String)> {
     let Some((schema_file, entity)) = find_schema_entity(schema, &type_lookup_name(type_name))
     else {
         return fail(format!(
@@ -608,7 +646,15 @@ fn command_schema_hash(schema: &CompiledSchema, type_name: &str) -> Result<Strin
             "command type {type_name} resolves to {qualified}; declare the fully qualified name"
         ));
     }
-    Ok(schema_file.schema_hash.clone())
+    let type_schema_hash = schema
+        .strict_type_hashes
+        .get(&qualified)
+        .cloned()
+        .ok_or_else(|| io::Error::other(format!("no strict type identity for {qualified}")))?;
+    Ok((
+        type_schema_hash,
+        schema_file.legacy_bfbs_hash_128.clone(),
+    ))
 }
 
 fn is_scalar_type(type_name: &str) -> bool {
