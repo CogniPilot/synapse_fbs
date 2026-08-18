@@ -918,9 +918,9 @@ const WIRE_SCHEMA_HEADER: &str = "\
 # The file is append-only for published types: `wire-check` fails when a
 # recorded type is removed or changed in a wire-incompatible way. To evolve a
 # type, introduce a new wire type and topic instead of mutating an existing
-# one. `--update` refuses to rewrite a recorded hash unless the fully qualified
-# name is listed under [allow].break, which it then consumes (a single-use
-# bless of an intentional break).
+# one. `--update` records append-compatible changes, but refuses a wire break
+# unless the fully qualified name is listed under [allow].break, which it then
+# consumes as a single-use bless.
 ";
 
 type WireDescriptorSet = BTreeMap<String, WireType>;
@@ -1554,10 +1554,60 @@ fn parse_union_members(members: &[String]) -> BTreeMap<i64, String> {
     parsed
 }
 
-/// Rewrite the committed baseline from freshly built descriptors. Refuses to
-/// change any recorded hash unless the name is blessed under `[allow].break`,
-/// which it then consumes so a bless is single-use. New types are added and
-/// removed ones dropped.
+fn validate_wire_baseline_update(
+    existing: &WireBaseline,
+    current: &WireDescriptorSet,
+) -> Result<()> {
+    let blessed = existing
+        .allow
+        .break_
+        .iter()
+        .map(String::as_str)
+        .collect::<BTreeSet<_>>();
+    for (name, old) in &existing.types {
+        let Some(new) = current.get(name) else {
+            return fail(format!(
+                "refusing to remove published {name} from the wire compatibility baseline"
+            ));
+        };
+        if old.hash() == new.hash() {
+            continue;
+        }
+        if let Some(reason) = breaking_reason(old, new)
+            && !blessed.contains(name.as_str())
+        {
+            return fail(format!(
+                "refusing to record a wire-incompatible change to published {name}: {} -> {} ({reason}). Introduce a new wire type and topic, or add it to [allow].break to bless an intentional break",
+                old.hash(),
+                new.hash()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn remaining_wire_break_blesses(
+    existing: &WireBaseline,
+    current: &WireDescriptorSet,
+) -> Vec<String> {
+    existing
+        .allow
+        .break_
+        .iter()
+        .filter(|name| match (existing.types.get(*name), current.get(*name)) {
+            (Some(old), Some(new)) => {
+                old.hash() == new.hash() || breaking_reason(old, new).is_none()
+            }
+            _ => true,
+        })
+        .cloned()
+        .collect()
+}
+
+/// Rewrite the committed baseline from freshly built descriptors. Records
+/// new types and append-compatible changes directly. Published types cannot be
+/// removed. A wire-incompatible change requires a name under `[allow].break`,
+/// which is consumed so a bless is single-use.
 fn update_wire_baseline(root: &Path, current: &WireDescriptorSet) -> Result<()> {
     let path = root.join(WIRE_SCHEMA_PATH);
     let mut allow = WireAllow::default();
@@ -1565,36 +1615,10 @@ fn update_wire_baseline(root: &Path, current: &WireDescriptorSet) -> Result<()> 
         let content = fs::read_to_string(&path)?;
         let existing: WireBaseline = toml::from_str(&content)
             .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
-        let blessed = existing
-            .allow
-            .break_
-            .iter()
-            .map(String::as_str)
-            .collect::<BTreeSet<_>>();
-        for (name, old) in &existing.types {
-            if let Some(new) = current.get(name)
-                && old.hash() != new.hash()
-                && !blessed.contains(name.as_str())
-            {
-                return fail(format!(
-                    "refusing to rewrite published {name}: {} -> {}; introduce a new wire type and topic, or add it to [allow].break to bless an intentional break",
-                    old.hash(),
-                    new.hash()
-                ));
-            }
-        }
+        validate_wire_baseline_update(&existing, current)?;
         // Keep only blesses that were not consumed by this rewrite, so a bless
         // for a genuinely changed type is single-use.
-        allow.break_ = existing
-            .allow
-            .break_
-            .iter()
-            .filter(|name| match (existing.types.get(*name), current.get(*name)) {
-                (Some(old), Some(new)) => old.hash() == new.hash(),
-                _ => true,
-            })
-            .cloned()
-            .collect();
+        allow.break_ = remaining_wire_break_blesses(&existing, current);
     }
 
     let baseline = WireBaseline {
@@ -1702,6 +1726,64 @@ mod wire_tests {
             hash: hash.to_string(),
             members: members.iter().map(|member| member.to_string()).collect(),
         }
+    }
+
+    fn wire_baseline(name: &str, type_: WireType, breaks: &[&str]) -> WireBaseline {
+        WireBaseline {
+            allow: WireAllow {
+                break_: breaks.iter().map(|name| (*name).to_string()).collect(),
+            },
+            types: BTreeMap::from([(name.to_string(), type_)]),
+        }
+    }
+
+    fn wire_set(name: &str, type_: WireType) -> WireDescriptorSet {
+        BTreeMap::from([(name.to_string(), type_)])
+    }
+
+    #[test]
+    fn updater_rejects_removing_published_type() {
+        let existing = wire_baseline("synapse.msg.A", struct_type("a"), &[]);
+        let error = validate_wire_baseline_update(&existing, &BTreeMap::new())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("refusing to remove published synapse.msg.A"));
+    }
+
+    #[test]
+    fn updater_accepts_append_compatible_change() {
+        let existing = wire_baseline(
+            "synapse.msg.Kind",
+            enum_type("a", "ubyte", false, &[0, 1]),
+            &[],
+        );
+        let current = wire_set(
+            "synapse.msg.Kind",
+            enum_type("b", "ubyte", false, &[0, 1, 2]),
+        );
+        validate_wire_baseline_update(&existing, &current).unwrap();
+    }
+
+    #[test]
+    fn updater_rejects_unblessed_break() {
+        let existing = wire_baseline("synapse.msg.A", struct_type("a"), &[]);
+        let current = wire_set("synapse.msg.A", struct_type("b"));
+        let error = validate_wire_baseline_update(&existing, &current)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("wire-incompatible change"));
+    }
+
+    #[test]
+    fn updater_consumes_used_break_bless() {
+        let existing = wire_baseline(
+            "synapse.msg.A",
+            struct_type("a"),
+            &["synapse.msg.A"],
+        );
+        let current = wire_set("synapse.msg.A", struct_type("b"));
+        validate_wire_baseline_update(&existing, &current).unwrap();
+        assert!(remaining_wire_break_blesses(&existing, &current).is_empty());
     }
 
     #[test]

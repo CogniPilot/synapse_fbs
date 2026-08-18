@@ -46,6 +46,15 @@ fn main() {
     let progress = topic_by_key("fw").unwrap();
     assert_eq!(progress.id, 34);
     assert!(!progress.fixed_layout);
+    let actuator_outputs = topic_by_name("ActuatorOutputs").unwrap();
+    assert_eq!(actuator_outputs.id, 47);
+    assert_eq!(actuator_outputs.key, "act_out");
+    assert!(actuator_outputs.fixed_layout);
+    assert!(
+        actuator_outputs
+            .payload_size
+            .is_some_and(|size| size > 0 && size <= 1408)
+    );
 
     println!("catalog rust helpers ok");
 }

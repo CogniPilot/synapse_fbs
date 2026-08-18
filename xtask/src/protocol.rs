@@ -96,6 +96,7 @@ const TOPIC_KEYS: &[(&str, &str)] = &[
     ("ArgusPointCloud", "argus"),
     ("Rtcm3", "rtcm3"),
     ("InertialBatch", "imu_batch"),
+    ("ActuatorOutputs", "act_out"),
 ];
 
 /// Queryable command and transfer services on the cmd key space. Ids mirror
@@ -213,6 +214,7 @@ const VEHICLE_SCOPE_TOPICS: &[&str] = &[
     "ActuatorCommand",
     "ActuatorFeedback",
     "PwmSignalOutputs",
+    "ActuatorOutputs",
     "ControlLoopMetrics",
     "LockstepTick",
     "LockstepStatus",

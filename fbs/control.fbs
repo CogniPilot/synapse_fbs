@@ -57,6 +57,24 @@ enum LocalPositionCommandMask:ushort (bit_flags) {
   IgnoreYawRate, // Ignore the yaw-rate setpoint.
 }
 
+// Final normal-output enable state after the actuator-owning endpoint's local
+// safety gates. This is not the pilot arm-switch request. A locally authorized
+// actuator test can be active while normal outputs remain disarmed.
+enum ActuatorArmState:ubyte {
+  Disarmed = 0, // Local safety gates do not enable normal motion-producing output.
+  Armed = 1, // Local safety gates enable normal motion-producing output.
+}
+
+// Upstream local request source whose values entered actuator safety and output
+// selection. A downstream safety gate can inhibit the final values without
+// changing this source. This identifies an internal path on the
+// actuator-owning endpoint, not a network authority.
+enum ActuatorOutputSource:ubyte {
+  NoCommand = 0, // No eligible local request existed, so the output path selected safe values.
+  ControlAllocation = 1, // Local control allocation selected the outputs.
+  ActuatorTest = 2, // A locally authorized actuator-test path selected the outputs.
+}
+
 // Raw receiver channel sample before pilot-input normalization. This is a
 // raw-layer topic: channel values are the receiver's native pulse widths.
 struct RadioControlData {
@@ -204,11 +222,13 @@ struct ActuatorFeedbackData {
   time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
 }
 
-// Raw PWM pulse-width outputs for servo and ESC drivers.
+// Raw PWM pulse-width outputs from genuine PWM waveform producers, such as
+// servo output banks. Values are pulse widths in microseconds. This type does
+// not describe DSHOT or another digital actuator signaling protocol.
 struct PwmSignalOutputsData {
   timestamp_ns:ulong; // Output timestamp in nanoseconds. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
   active_mask:uint; // Bitmask indicating which PWM outputs are valid, indexed from bit 0.
-  port:ubyte; // Producer-defined output bank or timer port.
+  port:ubyte; // Producer-defined PWM output bank or timer port.
   output0_us:ushort; // PWM output 0 pulse width.
   output1_us:ushort; // PWM output 1 pulse width.
   output2_us:ushort; // PWM output 2 pulse width.
@@ -226,6 +246,55 @@ struct PwmSignalOutputsData {
   output14_us:ushort; // PWM output 14 pulse width.
   output15_us:ushort; // PWM output 15 pulse width.
   time_status:synapse.types.TimeStatus; // Discipline state of the clock behind the timestamps.
+}
+
+// Hardware-neutral telemetry for the normalized physical-output commands
+// handed to the local actuator driver after allocation, arming or inhibition,
+// clamping, and local test-source selection. Slots follow the hardware
+// profile's physical actuator mapping. Reversible outputs use -1 to 1 and
+// unidirectional outputs use 0 to 1, as declared by that profile. This is
+// observation-only telemetry. It is never accepted as a network actuator
+// command and never carries DSHOT or another signaling protocol. The command
+// source remains the upstream local request source when a safety gate inhibits
+// its values.
+struct ActuatorOutputsData {
+  timestamp_ns:ulong; // Time the command became current at the local actuator driver. Shared gPTP domain when time_status is not LocalFreerun, otherwise monotonic boot.
+  active_mask:uint; // Bitmask indicating which physical output slots are valid, indexed from bit 0.
+  output0:float; // Normalized physical actuator command slot 0.
+  output1:float; // Normalized physical actuator command slot 1.
+  output2:float; // Normalized physical actuator command slot 2.
+  output3:float; // Normalized physical actuator command slot 3.
+  output4:float; // Normalized physical actuator command slot 4.
+  output5:float; // Normalized physical actuator command slot 5.
+  output6:float; // Normalized physical actuator command slot 6.
+  output7:float; // Normalized physical actuator command slot 7.
+  output8:float; // Normalized physical actuator command slot 8.
+  output9:float; // Normalized physical actuator command slot 9.
+  output10:float; // Normalized physical actuator command slot 10.
+  output11:float; // Normalized physical actuator command slot 11.
+  output12:float; // Normalized physical actuator command slot 12.
+  output13:float; // Normalized physical actuator command slot 13.
+  output14:float; // Normalized physical actuator command slot 14.
+  output15:float; // Normalized physical actuator command slot 15.
+  output16:float; // Normalized physical actuator command slot 16.
+  output17:float; // Normalized physical actuator command slot 17.
+  output18:float; // Normalized physical actuator command slot 18.
+  output19:float; // Normalized physical actuator command slot 19.
+  output20:float; // Normalized physical actuator command slot 20.
+  output21:float; // Normalized physical actuator command slot 21.
+  output22:float; // Normalized physical actuator command slot 22.
+  output23:float; // Normalized physical actuator command slot 23.
+  output24:float; // Normalized physical actuator command slot 24.
+  output25:float; // Normalized physical actuator command slot 25.
+  output26:float; // Normalized physical actuator command slot 26.
+  output27:float; // Normalized physical actuator command slot 27.
+  output28:float; // Normalized physical actuator command slot 28.
+  output29:float; // Normalized physical actuator command slot 29.
+  output30:float; // Normalized physical actuator command slot 30.
+  output31:float; // Normalized physical actuator command slot 31.
+  arm_state:ActuatorArmState; // Final normal-output enable state after local actuator safety gates.
+  command_source:ActuatorOutputSource; // Upstream local source whose request entered output selection.
+  time_status:synapse.types.TimeStatus; // Discipline state of the clock behind timestamp_ns.
 }
 
 // Runtime metrics for a control loop or scheduler slice.
@@ -275,7 +344,12 @@ table ActuatorFeedback {
 
 // FlatBuffers root wrapper for PwmSignalOutputsData.
 table PwmSignalOutputs {
-  data:PwmSignalOutputsData; // Fixed-layout PWM output payload.
+  data:PwmSignalOutputsData; // Fixed-layout pulse widths from a genuine PWM producer.
+}
+
+// FlatBuffers root wrapper for ActuatorOutputsData.
+table ActuatorOutputs {
+  data:ActuatorOutputsData; // Fixed-layout local actuator-output telemetry payload.
 }
 
 // FlatBuffers root wrapper for ControlLoopMetricsData.

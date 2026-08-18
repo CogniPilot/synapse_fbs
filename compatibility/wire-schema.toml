@@ -5,9 +5,9 @@
 # The file is append-only for published types: `wire-check` fails when a
 # recorded type is removed or changed in a wire-incompatible way. To evolve a
 # type, introduce a new wire type and topic instead of mutating an existing
-# one. `--update` refuses to rewrite a recorded hash unless the fully qualified
-# name is listed under [allow].break, which it then consumes (a single-use
-# bless of an intentional break).
+# one. `--update` records append-compatible changes, but refuses a wire break
+# unless the fully qualified name is listed under [allow].break, which it then
+# consumes as a single-use bless.
 [allow]
 break = []
 
@@ -402,6 +402,16 @@ values = [
     16,
 ]
 
+[types."synapse.topic.ActuatorArmState"]
+kind = "enum"
+hash = "9a39fad08f2cf41ad2ca37b1e6425977"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+]
+
 [types."synapse.topic.ActuatorCommand"]
 kind = "table"
 hash = "70acff02df5dafbaff7fcb31456925ab"
@@ -419,6 +429,26 @@ fields = ["0 synapse.topic.ActuatorFeedbackData"]
 [types."synapse.topic.ActuatorFeedbackData"]
 kind = "struct"
 hash = "ab4d265808cb2e26c6241ffdab763f23"
+
+[types."synapse.topic.ActuatorOutputSource"]
+kind = "enum"
+hash = "13e0fb5f0a01f5bd7913fd11b993e483"
+underlying = "ubyte"
+bit_flags = false
+values = [
+    0,
+    1,
+    2,
+]
+
+[types."synapse.topic.ActuatorOutputs"]
+kind = "table"
+hash = "e4e8c51d65ed952c940f5fe3937ec2bb"
+fields = ["0 synapse.topic.ActuatorOutputsData"]
+
+[types."synapse.topic.ActuatorOutputsData"]
+kind = "struct"
+hash = "7fcb5903d8266845aaa9572e27c83da2"
 
 [types."synapse.topic.AirData"]
 kind = "table"
@@ -1189,7 +1219,7 @@ values = [
 
 [types."synapse.topic.SynapseMessage"]
 kind = "union"
-hash = "52253b7637a0a7120dfc996ca25b63ec"
+hash = "a6f75e529ddb1ca5cddbe8d2883247de"
 members = [
     "1 synapse.topic.VehicleHealth",
     "2 synapse.topic.TimeReference",
@@ -1237,6 +1267,7 @@ members = [
     "44 synapse.topic.ArgusPointCloud",
     "45 synapse.topic.Rtcm3",
     "46 synapse.topic.InertialBatch",
+    "47 synapse.topic.ActuatorOutputs",
 ]
 
 [types."synapse.topic.TextStatus"]
@@ -1260,7 +1291,7 @@ hash = "43409688e97e3afd97bdc64051a98217"
 
 [types."synapse.topic.TopicId"]
 kind = "enum"
-hash = "b63f562e6a0ad6183b6fab4b511e396f"
+hash = "a2d77e5eea5d2c6a4e0a0009db0c013c"
 underlying = "ushort"
 bit_flags = false
 values = [
@@ -1311,6 +1342,7 @@ values = [
     44,
     45,
     46,
+    47,
 ]
 
 [types."synapse.topic.TrajectoryDegree"]
