@@ -1,23 +1,19 @@
 #[derive(Debug)]
 struct PackagePaths {
     rust: PathBuf,
-    python: PathBuf,
-    js: PathBuf,
 }
 
 fn stage_packages(root: &Path, templates: &Templates, tools: &Tools) -> Result<PackagePaths> {
     println!("staging package roots");
 
+    let package_root = root.join("target/xtask/packages");
+    reset_dir(&package_root)?;
     let packages = PackagePaths {
-        rust: root.join("target/xtask/packages/rust"),
-        python: root.join("target/xtask/packages/python"),
-        js: root.join("target/xtask/packages/js"),
+        rust: package_root.join("rust"),
     };
     let context = package_context(tools);
 
-    stage_template_tree(root, "rust", &packages.rust, templates, context.clone())?;
-    stage_template_tree(root, "python", &packages.python, templates, context.clone())?;
-    stage_template_tree(root, "js", &packages.js, templates, context)?;
+    stage_template_tree(root, "rust", &packages.rust, templates, context)?;
 
     Ok(packages)
 }
@@ -27,8 +23,6 @@ fn package_context(tools: &Tools) -> Value {
         package_version => tools.package_version.as_str(),
         flatbuffers_version => tools.flatbuffers_version.as_str(),
         mcap_rust_version => tools.mcap_rust_version.as_str(),
-        mcap_python_version => tools.mcap_python_version.as_str(),
-        mcap_javascript_version => tools.mcap_javascript_version.as_str(),
     }
 }
 
@@ -47,11 +41,8 @@ fn archive_context(
         package_version => tools.package_version.as_str(),
         flatbuffers_version => tools.flatbuffers_version.as_str(),
         flatbuffers_commit => tools.flatbuffers_commit.as_str(),
-        flatbuffers_build_version => tools.flatbuffers_build_version.as_str(),
         flatcc_version => tools.flatcc_version.as_str(),
         flatcc_commit => tools.flatcc_commit.as_str(),
-        mcap_cpp_version => tools.mcap_cpp_version.as_str(),
-        mcap_cpp_commit => tools.mcap_cpp_commit.as_str(),
         schema_sha256 => schema_sha256,
         bfbs_sha256 => bfbs_sha256,
         runtime_sources => runtime_sources,
@@ -60,19 +51,7 @@ fn archive_context(
 }
 
 fn build_flatc(tools: &Tools) -> Result<PathBuf> {
-    println!("using Nix-pinned flatc {}", tools.flatbuffers_version);
-
-    let flatc = env::var_os("SYNAPSE_FBS_FLATC")
-        .map(PathBuf::from)
-        .ok_or_else(|| {
-            io::Error::other("SYNAPSE_FBS_FLATC is not set. Run inside `nix develop`.")
-        })?;
-    if !flatc.is_file() {
-        return fail(format!(
-            "SYNAPSE_FBS_FLATC does not point to a file: {}",
-            flatc.display()
-        ));
-    }
+    let flatc = configured_tool("SYNAPSE_FBS_FLATC", "flatc");
 
     let version = output(Command::new(&flatc).arg("--version"))?;
     let expected = format!("flatc version {}", tools.flatbuffers_version);
@@ -93,9 +72,8 @@ struct FlatccTool {
     source: PathBuf,
 }
 
-fn flatcc_tool(tools: &Tools) -> Result<FlatccTool> {
-    let binary = tools.flatcc_binary.clone();
-    let source = tools.flatcc_source.clone();
+fn flatcc_binary(tools: &Tools) -> Result<PathBuf> {
+    let binary = configured_tool("SYNAPSE_FBS_FLATCC", "flatcc");
     let version_text = output_combined(Command::new(&binary).arg("--version"))?;
     let version = version_text
         .lines()
@@ -108,14 +86,31 @@ fn flatcc_tool(tools: &Tools) -> Result<FlatccTool> {
         ));
     }
 
+    Ok(binary)
+}
+
+fn flatcc_tool(tools: &Tools) -> Result<FlatccTool> {
+    let binary = flatcc_binary(tools)?;
+    let source = env::var_os("SYNAPSE_FBS_FLATCC_SOURCE")
+        .map(PathBuf::from)
+        .ok_or_else(|| {
+            io::Error::other(
+                "SYNAPSE_FBS_FLATCC_SOURCE must name a FlatCC source tree when building C archives",
+            )
+        })?;
     if !source.join("src/runtime").is_dir() || !source.join("include/flatcc").is_dir() {
         return fail(format!(
-            "Nix-pinned flatcc source is incomplete at {}",
+            "FlatCC source is incomplete at {}",
             source.display()
         ));
     }
-
     Ok(FlatccTool { binary, source })
+}
+
+fn configured_tool(env_name: &str, command: &str) -> PathBuf {
+    env::var_os(env_name)
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(command))
 }
 
 fn generate_bindings(
@@ -125,10 +120,9 @@ fn generate_bindings(
     templates: &Templates,
     packages: &PackagePaths,
 ) -> Result<()> {
-    println!("generating Rust and Python bindings");
+    println!("generating Rust bindings");
 
     reset_dir(&packages.rust.join("src/generated"))?;
-    remove_dir_if_exists(&packages.python.join("synapse"))?;
 
     let mut rust_cmd = Command::new(flatc);
     rust_cmd
@@ -142,27 +136,7 @@ fn generate_bindings(
         .args(SCHEMAS);
     run(&mut rust_cmd)?;
 
-    let mut python_cmd = Command::new(flatc);
-    python_cmd
-        .current_dir(root)
-        .arg("--python")
-        .arg("-I")
-        .arg("fbs")
-        .arg("-o")
-        .arg(&packages.python)
-        .args(SCHEMAS);
-    run(&mut python_cmd)?;
-
-    fs::copy(
-        root.join("templates/python/mcap.py"),
-        packages.python.join("synapse/mcap.py"),
-    )?;
-    write_file(&packages.python.join("synapse/py.typed"), "")?;
-    fs::copy(
-        root.join(MCAP_PROFILE_PATH),
-        packages.python.join("synapse/MCAP.md"),
-    )?;
-    let bfbs_dir = packages.python.join("synapse/bfbs");
+    let bfbs_dir = packages.rust.join("bfbs");
     generate_reflection_schemas(root, flatcc, &bfbs_dir)?;
 
     let schema = load_compiled_schema(&bfbs_dir)?;
@@ -170,55 +144,18 @@ fn generate_bindings(
     let topics = topic_entries(&schema)?;
     let wire = build_wire_descriptors(&bfbs_dir)?;
     wire_check(root, &wire)?;
-    write_package_topic_catalogs(templates, packages, &schema, &topics)?;
+    write_rust_topic_catalog(templates, &packages.rust, &schema, &topics)?;
 
     // The Rust crate ships the wire contract itself: schema sources, compiled
     // binary schemas, and a generated debug decoder, so downstream tools do
     // not vendor schema copies that can drift from the pinned release.
     copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
     fs::copy(root.join(MCAP_PROFILE_PATH), packages.rust.join("MCAP.md"))?;
-    generate_reflection_schemas(root, flatcc, &packages.rust.join("bfbs"))?;
     write_rust_embedded_schemas(templates, &schema, &packages.rust)?;
     write_rust_topic_decode(templates, &schema, &topics, &packages.rust)?;
     write_rust_mcap_fixed(templates, &schema, &topics, &packages.rust)?;
 
     Ok(())
-}
-
-fn write_package_topic_catalogs(
-    templates: &Templates,
-    packages: &PackagePaths,
-    schema: &CompiledSchema,
-    topics: &[TopicEntry],
-) -> Result<()> {
-    write_js_topic_catalogs(templates, &packages.js, schema, topics)?;
-    write_rust_topic_catalog(templates, &packages.rust, schema, topics)?;
-    write_python_topic_catalog(templates, &packages.python, schema, topics)?;
-    Ok(())
-}
-
-fn write_js_topic_catalogs(
-    templates: &Templates,
-    package_root: &Path,
-    schema: &CompiledSchema,
-    topics: &[TopicEntry],
-) -> Result<()> {
-    let context = topic_catalog_context(schema, topics)?;
-    templates.render_to_file(
-        "xtask/topic_catalog/topics.json.jinja",
-        context.clone(),
-        &package_root.join("topics.json"),
-    )?;
-    templates.render_to_file(
-        "xtask/topic_catalog/topic_catalog.js.jinja",
-        context.clone(),
-        &package_root.join("topic_catalog.js"),
-    )?;
-    templates.render_to_file(
-        "xtask/topic_catalog/topic_catalog.d.ts.jinja",
-        context,
-        &package_root.join("topic_catalog.d.ts"),
-    )
 }
 
 fn write_rust_topic_catalog(
@@ -231,19 +168,6 @@ fn write_rust_topic_catalog(
         "xtask/topic_catalog/topic_catalog.rs.jinja",
         topic_catalog_context(schema, topics)?,
         &package_root.join("src/topic_catalog.rs"),
-    )
-}
-
-fn write_python_topic_catalog(
-    templates: &Templates,
-    package_root: &Path,
-    schema: &CompiledSchema,
-    topics: &[TopicEntry],
-) -> Result<()> {
-    templates.render_to_file(
-        "xtask/topic_catalog/topic_catalog.py.jinja",
-        topic_catalog_context(schema, topics)?,
-        &package_root.join("synapse/topic_catalog.py"),
     )
 }
 
@@ -276,19 +200,6 @@ fn write_c_mcap_topics(
         "xtask/topic_catalog/mcap_topics.h.jinja",
         topic_catalog_context(schema, topics)?,
         &package_root.join("include/synapse/mcap_topics.h"),
-    )
-}
-
-fn write_cpp_mcap_topics(
-    templates: &Templates,
-    package_root: &Path,
-    schema: &CompiledSchema,
-    topics: &[TopicEntry],
-) -> Result<()> {
-    templates.render_to_file(
-        "xtask/topic_catalog/mcap_topics.hpp.jinja",
-        topic_catalog_context(schema, topics)?,
-        &package_root.join("include/synapse/mcap_topics.hpp"),
     )
 }
 
@@ -514,257 +425,14 @@ fn check_rust_package(templates: &Templates, package_root: &Path) -> Result<()> 
     Ok(())
 }
 
-fn build_python_package(
-    root: &Path,
-    templates: &Templates,
-    package_root: &Path,
-    tools: &Tools,
-) -> Result<()> {
-    println!("building Python package");
-
-    let python = python_bin()?;
-    remove_dir_if_exists(&package_root.join("build"))?;
-    remove_dir_if_exists(&package_root.join("dist"))?;
-    remove_dir_if_exists(&package_root.join("synapse_fbs.egg-info"))?;
-
-    run(Command::new(&python)
-        .arg("-m")
-        .arg("build")
-        .arg(package_root))?;
-
-    let dist_files = python_dist_files(package_root)?;
-    if dist_files.is_empty() {
-        return fail("python build did not produce any dist files");
-    }
-
-    if command_succeeds(
-        Command::new(&python)
-            .arg("-m")
-            .arg("twine")
-            .arg("--version"),
-    ) {
-        let mut twine = Command::new(&python);
-        twine.arg("-m").arg("twine").arg("check").args(&dist_files);
-        run(&mut twine)?;
-    } else {
-        let mut twine = Command::new("twine");
-        twine.arg("check").args(&dist_files);
-        run(&mut twine)?;
-    }
-
-    smoke_python_package(root, templates, package_root, &python, tools)?;
-
-    Ok(())
-}
-
-fn python_bin() -> Result<PathBuf> {
-    if let Ok(value) = env::var("PYTHON") {
-        let python = PathBuf::from(value);
-        if command_succeeds(Command::new(&python).arg("-c").arg("import sys")) {
-            return Ok(python);
-        }
-    }
-
-    for candidate in ["python", "python3"] {
-        if command_succeeds(Command::new(candidate).arg("-c").arg("import sys")) {
-            return Ok(PathBuf::from(candidate));
-        }
-    }
-
-    fail("could not find python or python3")
-}
-
-fn python_dist_files(package_root: &Path) -> Result<Vec<PathBuf>> {
-    let mut files = Vec::new();
-    let dist = package_root.join("dist");
-    if dist.is_dir() {
-        for entry in fs::read_dir(dist)? {
-            let path = entry?.path();
-            let name = path
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or_default();
-            if name.ends_with(".whl") || name.ends_with(".tar.gz") {
-                files.push(path);
-            }
-        }
-    }
-    files.sort();
-    Ok(files)
-}
-
-fn smoke_python_package(
-    root: &Path,
-    templates: &Templates,
-    package_root: &Path,
-    python: &Path,
-    tools: &Tools,
-) -> Result<()> {
-    println!("smoke-testing Python wheel");
-
-    let wheel = python_dist_files(package_root)?
-        .into_iter()
-        .find(|path| {
-            path.file_name()
-                .and_then(|value| value.to_str())
-                .is_some_and(|name| name.ends_with(".whl"))
-        })
-        .ok_or_else(|| io::Error::other("python build did not produce a wheel"))?;
-
-    let venv = root.join("target/xtask/python-smoke");
-    reset_dir(&venv)?;
-    run(Command::new(python).arg("-m").arg("venv").arg(&venv))?;
-
-    let venv_python = if cfg!(windows) {
-        venv.join("Scripts/python.exe")
-    } else {
-        venv.join("bin/python")
-    };
-
-    run(Command::new(&venv_python)
-        .arg("-m")
-        .arg("pip")
-        .arg("install")
-        .arg(format!("{}[mcap]", wheel.display())))?;
-
-    let mcap_path = venv.join("python-writer.mcap");
-
-    let code = templates.render(
-        "xtask/smoke/python_package.py.jinja",
-        context! {
-            flatbuffers_version => tools.flatbuffers_version.as_str(),
-            mcap_version => tools.mcap_python_version.as_str(),
-            mcap_path => mcap_path.display().to_string(),
-        },
-    )?;
-    run(Command::new(&venv_python).arg("-c").arg(code))?;
-    validate_mcap_with_rust(root, &mcap_path)?;
-    remove_file_if_exists(&mcap_path)?;
-
-    Ok(())
-}
-
-fn build_js_package(
-    root: &Path,
-    templates: &Templates,
-    package_root: &Path,
-    flatcc: &Path,
-    tools: &Tools,
-    validate: bool,
-) -> Result<()> {
-    println!("building JavaScript schema-assets package");
-
-    remove_dir_if_exists(&package_root.join("fbs"))?;
-    remove_dir_if_exists(&package_root.join("bfbs"))?;
-    copy_common_archive_files(root, package_root)?;
-    let bfbs_dir = package_root.join("bfbs");
-    generate_reflection_schemas(root, flatcc, &bfbs_dir)?;
-    let schema = load_compiled_schema(&bfbs_dir)?;
-    validate_protocol(&schema)?;
-    let topics = topic_entries(&schema)?;
-    write_js_topic_catalogs(templates, package_root, &schema, &topics)?;
-    write_schema_hashes(templates, root, &package_root.join("schema.sha256"))?;
-    write_bfbs_hashes(templates, package_root, &package_root.join("bfbs.sha256"))?;
-
-    if validate {
-        smoke_js_package(root, templates, package_root, tools, true)?;
-    }
-
-    Ok(())
-}
-
-fn smoke_js_package(
-    root: &Path,
-    templates: &Templates,
-    package_root: &Path,
-    tools: &Tools,
-    validate_cross_language: bool,
-) -> Result<()> {
-    println!("smoke-testing JavaScript package");
-
-    let node = node_bin()?;
-    if command_succeeds(Command::new("npm").arg("--version")) {
-        run(Command::new("npm")
-            .current_dir(package_root)
-            .arg("install")
-            .arg("--ignore-scripts")
-            .arg("--no-package-lock")
-            .arg("--no-save")
-            .arg(format!("@mcap/core@{}", tools.mcap_javascript_version))
-            .arg(format!("typescript@{}", tools.typescript_version)))?;
-    } else {
-        return fail("npm is required to test the optional JavaScript MCAP API");
-    }
-
-    let mcap_path = package_root.join("javascript-writer.mcap");
-    let script = templates.render(
-        "xtask/smoke/javascript_package.js.jinja",
-        context! { mcap_path => mcap_path.display().to_string() },
-    )?;
-    run(Command::new(&node)
-        .current_dir(package_root)
-        .arg("--input-type=module")
-        .arg("-e")
-        .arg(script))?;
-
-    let type_smoke = package_root.join("mcap-type-smoke.ts");
-    templates.render_to_file(
-        "xtask/smoke/mcap-type-smoke.ts.jinja",
-        context! {},
-        &type_smoke,
-    )?;
-    run(Command::new(package_root.join("node_modules/.bin/tsc"))
-        .current_dir(package_root)
-        .arg("--noEmit")
-        .arg("--strict")
-        .arg("--target")
-        .arg("ES2022")
-        .arg("--module")
-        .arg("NodeNext")
-        .arg("--moduleResolution")
-        .arg("NodeNext")
-        .arg("--skipLibCheck")
-        .arg(&type_smoke))?;
-    remove_file_if_exists(&type_smoke)?;
-
-    if validate_cross_language {
-        validate_mcap_with_rust(root, &mcap_path)?;
-    }
-    remove_file_if_exists(&mcap_path)?;
-
-    // Validate the published file set when npm is available.
-    run(Command::new("npm")
-        .current_dir(package_root)
-        .arg("pack")
-        .arg("--dry-run"))?;
-
-    Ok(())
-}
-
-fn node_bin() -> Result<PathBuf> {
-    if let Ok(value) = env::var("NODE") {
-        let node = PathBuf::from(value);
-        if command_succeeds(Command::new(&node).arg("--version")) {
-            return Ok(node);
-        }
-    }
-
-    if command_succeeds(Command::new("node").arg("--version")) {
-        return Ok(PathBuf::from("node"));
-    }
-
-    fail("could not find node")
-}
-
 fn build_archives(
     root: &Path,
     tools: &Tools,
-    flatc: &Path,
     flatcc: &FlatccTool,
     release_name: &str,
     development_only: bool,
 ) -> Result<()> {
-    println!("building generated C and C++ archives");
+    println!("building generated C archive");
 
     let artifacts = root.join("target/xtask/artifacts");
     let workdir = root.join("target/xtask/artifacts-work");
@@ -776,97 +444,6 @@ fn build_archives(
     let schema = load_compiled_schema(&model_bfbs)?;
     validate_protocol(&schema)?;
     let topics = topic_entries(&schema)?;
-
-    if !development_only {
-        let flatbuffers_source = workdir.join("flatbuffers");
-        fetch_git_commit(
-            "https://github.com/google/flatbuffers.git",
-            &tools.flatbuffers_commit,
-            &flatbuffers_source,
-        )?;
-        let mcap_source = workdir.join("mcap");
-        fetch_git_commit(
-            "https://github.com/foxglove/mcap.git",
-            &tools.mcap_cpp_commit,
-            &mcap_source,
-        )?;
-
-        let cpp_root = workdir.join("synapse_fbs-cpp");
-        fs::create_dir_all(cpp_root.join("include/synapse"))?;
-        fs::create_dir_all(cpp_root.join("include"))?;
-        fs::create_dir_all(cpp_root.join("third_party/flatbuffers"))?;
-        fs::create_dir_all(cpp_root.join("third_party/mcap"))?;
-        fs::create_dir_all(cpp_root.join("src/bfbs"))?;
-        fs::create_dir_all(cpp_root.join("fbs"))?;
-        fs::create_dir_all(cpp_root.join("bfbs"))?;
-
-        let mut cpp_gen = Command::new(flatc);
-        cpp_gen
-            .current_dir(root)
-            .arg("--cpp")
-            .arg("-I")
-            .arg("fbs")
-            .arg("-o")
-            .arg(cpp_root.join("include/synapse"))
-            .args(SCHEMAS);
-        run(&mut cpp_gen)?;
-        generate_reflection_schemas(root, &flatcc.binary, &cpp_root.join("bfbs"))?;
-
-        copy_dir_all(
-            &flatbuffers_source.join("include/flatbuffers"),
-            &cpp_root.join("include/flatbuffers"),
-        )?;
-        fs::copy(
-            flatbuffers_source.join("LICENSE"),
-            cpp_root.join("third_party/flatbuffers/LICENSE"),
-        )?;
-        copy_dir_all(
-            &mcap_source.join("cpp/mcap/include/mcap"),
-            &cpp_root.join("include/mcap"),
-        )?;
-        fs::copy(
-            mcap_source.join("LICENSE"),
-            cpp_root.join("third_party/mcap/LICENSE"),
-        )?;
-        copy_common_archive_files(root, &cpp_root)?;
-        write_c_topic_catalogs(&templates, &cpp_root, &schema, &topics)?;
-        write_cpp_mcap_topics(&templates, &cpp_root, &schema, &topics)?;
-        write_cpp_bfbs_assets(&templates, &cpp_root, &topics)?;
-        write_schema_hashes(&templates, root, &cpp_root.join("schema.sha256"))?;
-        write_bfbs_hashes(&templates, &cpp_root, &cpp_root.join("bfbs.sha256"))?;
-        let cpp_mcap_bfbs_sources = files_with_extension(&cpp_root.join("src/bfbs"), "cpp")?
-            .into_iter()
-            .map(|source| {
-                source
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .expect("generated BFBS source must have a UTF-8 name")
-                    .to_string()
-            })
-            .collect::<Vec<_>>();
-        copy_render_template_tree(
-            "cpp",
-            &root.join("templates/cpp"),
-            &cpp_root,
-            &templates,
-            archive_context(
-                "cpp",
-                release_name,
-                tools,
-                &sha256_hex(&cpp_root.join("schema.sha256"))?,
-                &sha256_hex(&cpp_root.join("bfbs.sha256"))?,
-                &[],
-                &cpp_mcap_bfbs_sources,
-            ),
-        )?;
-        write_tar_gz(
-            &templates,
-            &workdir,
-            &artifacts,
-            "synapse_fbs-cpp",
-            "synapse_fbs-cpp.tar.gz",
-        )?;
-    }
 
     let c_root = workdir.join("synapse_fbs-c");
     fs::create_dir_all(c_root.join("include/synapse"))?;
@@ -953,8 +530,6 @@ fn build_archives(
             "synapse_fbs-c.tar.gz",
         )?;
 
-        let cpp_root = workdir.join("synapse_fbs-cpp");
-        smoke_cpp_archive(root, &templates, &cpp_root)?;
         smoke_c_archive(&templates, &c_root)?;
         smoke_c_to_rust_mcap(root, &c_root)?;
         smoke_cmake_fetch(
@@ -963,8 +538,8 @@ fn build_archives(
             &artifacts.join("synapse_fbs-c.tar.gz"),
         )?;
         smoke_cmake_find_package_c(&templates, tools, &workdir, &c_root)?;
-        smoke_cmake_find_package_cpp(&templates, tools, &workdir, &cpp_root)?;
         print_artifacts(&artifacts)?;
+        remove_dir_if_exists(&workdir)?;
     }
 
     Ok(())
@@ -1031,32 +606,6 @@ fn write_c_bfbs_assets(
             "xtask/bfbs/asset.c.jinja",
             context! { stem, bytes },
             &output_dir.join(format!("{stem}.c")),
-        )?;
-    }
-    Ok(())
-}
-
-fn write_cpp_bfbs_assets(
-    templates: &Templates,
-    package_root: &Path,
-    topics: &[TopicEntry],
-) -> Result<()> {
-    let output_dir = package_root.join("src/bfbs");
-    reset_dir(&output_dir)?;
-    let mut schema_files = BTreeSet::new();
-    for topic in topics {
-        schema_files.insert(topic.schema_file.clone());
-    }
-    for schema_file in schema_files {
-        let stem = Path::new(&schema_file)
-            .file_stem()
-            .and_then(|value| value.to_str())
-            .ok_or_else(|| io::Error::other("schema file has no UTF-8 stem"))?;
-        let bytes = fs::read(package_root.join(format!("bfbs/{stem}.bfbs")))?;
-        templates.render_to_file(
-            "xtask/bfbs/asset.cpp.jinja",
-            context! { stem, bytes },
-            &output_dir.join(format!("{stem}.cpp")),
         )?;
     }
     Ok(())

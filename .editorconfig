@@ -7,10 +7,10 @@ insert_final_newline = true
 trim_trailing_whitespace = true
 indent_style = space
 
-[*.{rs,py}]
+[*.rs]
 indent_size = 4
 
-[*.{fbs,js,ts,json,jinja,yml,yaml,toml,md,h,c,cpp}]
+[*.{fbs,json,jinja,yml,yaml,toml,md,h,c}]
 indent_size = 2
 
 [*.md]

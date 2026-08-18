@@ -316,8 +316,7 @@ Success criteria:
 
 - A bridge can dispatch every stable topic and command using generated
   metadata alone.
-- Invalid keys are rejected consistently across Rust, Python, JavaScript, and C
-  helpers.
+- Invalid keys are rejected consistently across the Rust and C helpers.
 
 ## UC-011: Maintenance-Gated Firmware Update
 

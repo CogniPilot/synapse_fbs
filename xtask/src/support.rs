@@ -1,3 +1,51 @@
+const SUPPORTED_BINDING_LANGUAGES: &[&str] = &["c", "rust"];
+const TEMPLATE_INFRASTRUCTURE_DIRS: &[&str] = &["xtask"];
+
+fn enforce_binding_language_policy(root: &Path) -> Result<()> {
+    let template_root = root.join("templates");
+    let allowed = SUPPORTED_BINDING_LANGUAGES
+        .iter()
+        .chain(TEMPLATE_INFRASTRUCTURE_DIRS)
+        .copied()
+        .collect::<BTreeSet<_>>();
+    let mut actual = BTreeSet::new();
+
+    for entry in fs::read_dir(&template_root)? {
+        let entry = entry?;
+        if !entry.file_type()?.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().into_string().map_err(|value| {
+            io::Error::other(format!(
+                "template directory name is not valid UTF-8: {}",
+                value.to_string_lossy()
+            ))
+        })?;
+        actual.insert(name);
+    }
+
+    let unexpected = actual
+        .iter()
+        .filter(|name| !allowed.contains(name.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    let missing = allowed
+        .iter()
+        .filter(|name| !actual.contains(**name))
+        .copied()
+        .collect::<Vec<_>>();
+
+    if !unexpected.is_empty() || !missing.is_empty() {
+        return fail(format!(
+            "binding language policy requires templates/c, templates/rust, and templates/xtask only; unexpected: [{}], missing: [{}]",
+            unexpected.join(", "),
+            missing.join(", ")
+        ));
+    }
+
+    Ok(())
+}
+
 struct Templates {
     env: Environment<'static>,
 }
@@ -5,15 +53,12 @@ struct Templates {
 impl Templates {
     fn new(root: &Path) -> Result<Self> {
         let mut env = Environment::new();
-        // Templates render config files (package.json, Cargo.toml, ...) with raw
-        // substitution; disable auto-escaping so values are not JSON/HTML encoded.
+        // Templates render config files with raw substitution; disable
+        // auto-escaping so values are not JSON/HTML encoded.
         env.set_auto_escape_callback(|_| AutoEscape::None);
         let template_root = root.join("templates");
         add_templates(&mut env, &template_root.join("rust"), "rust")?;
-        add_templates(&mut env, &template_root.join("python"), "python")?;
-        add_templates(&mut env, &template_root.join("js"), "js")?;
         add_templates(&mut env, &template_root.join("c"), "c")?;
-        add_templates(&mut env, &template_root.join("cpp"), "cpp")?;
         add_templates(&mut env, &template_root.join("xtask"), "xtask")?;
         Ok(Self { env })
     }
@@ -133,30 +178,15 @@ fn should_skip_staged_path(package: &str, rel: &Path) -> bool {
         .and_then(|value| value.to_str())
         .unwrap_or_default();
 
-    if matches!(
-        first,
-        "target" | "build" | "dist" | "node_modules" | "__pycache__" | ".pytest_cache"
-    ) || first.ends_with(".egg-info")
-    {
+    if matches!(first, "target" | "build" | "dist") {
         return true;
     }
 
-    if matches!(file_name, "Cargo.lock" | "Cargo.toml" | "pyproject.toml")
-        || file_name.ends_with(".pyc")
-    {
+    if matches!(file_name, "Cargo.lock" | "Cargo.toml") {
         return true;
     }
 
-    match package {
-        "rust" => rel.starts_with("src/generated"),
-        "python" => rel.starts_with("synapse") || rel == Path::new("mcap.py"),
-        "js" => {
-            rel.starts_with("fbs")
-                || rel.starts_with("bfbs")
-                || matches!(file_name, "schema.sha256" | "bfbs.sha256")
-        }
-        _ => false,
-    }
+    package == "rust" && rel.starts_with("src/generated")
 }
 
 fn runtime_source_names(runtime_dir: &Path) -> Result<Vec<String>> {
@@ -217,47 +247,6 @@ fn write_tar_gz(
         },
         &artifacts.join(format!("{archive_name}.sha256")),
     )?;
-
-    Ok(())
-}
-
-fn smoke_cpp_archive(root: &Path, templates: &Templates, cpp_root: &Path) -> Result<()> {
-    println!("smoke-testing C++ archive");
-
-    let smoke = cpp_root.join("smoke.cpp");
-    templates.render_to_file("xtask/smoke.cpp.jinja", context! {}, &smoke)?;
-
-    let cxx = env::var("CXX").unwrap_or_else(|_| "c++".to_string());
-    run(Command::new(&cxx)
-        .arg("-std=c++17")
-        .arg("-I")
-        .arg(cpp_root.join("include"))
-        .arg("-c")
-        .arg(&smoke)
-        .arg("-o")
-        .arg(cpp_root.join("smoke.o")))?;
-
-    remove_file_if_exists(&smoke)?;
-    remove_file_if_exists(&cpp_root.join("smoke.o"))?;
-
-    let mcap_smoke = cpp_root.join("mcap_smoke");
-    run(Command::new(&cxx)
-        .arg("-std=c++17")
-        .arg("-Wall")
-        .arg("-Wextra")
-        .arg("-Werror")
-        .arg("-I")
-        .arg(cpp_root.join("include"))
-        .arg(cpp_root.join("tests/mcap_smoke.cpp"))
-        .arg(cpp_root.join("src/mcap.cpp"))
-        .arg(cpp_root.join("src/bfbs/state.cpp"))
-        .arg("-o")
-        .arg(&mcap_smoke))?;
-    let mcap_path = cpp_root.join("cpp-writer.mcap");
-    run(Command::new(&mcap_smoke).arg(&mcap_path))?;
-    validate_mcap_with_rust(root, &mcap_path)?;
-    remove_file_if_exists(&mcap_smoke)?;
-    remove_file_if_exists(&mcap_path)?;
 
     Ok(())
 }
@@ -420,47 +409,6 @@ fn smoke_cmake_find_package_c(
     Ok(())
 }
 
-fn smoke_cmake_find_package_cpp(
-    templates: &Templates,
-    tools: &Tools,
-    workdir: &Path,
-    package_root: &Path,
-) -> Result<()> {
-    println!("smoke-testing CMake find_package C++ archive usage");
-
-    let smoke_dir = workdir.join("find-package-cpp-smoke");
-    reset_dir(&smoke_dir)?;
-    templates.render_to_file(
-        "xtask/cmake_find_package_cpp_smoke/CMakeLists.txt.jinja",
-        context! {
-            package_version => tools.package_version.as_str(),
-        },
-        &smoke_dir.join("CMakeLists.txt"),
-    )?;
-    templates.render_to_file(
-        "xtask/smoke.cpp.jinja",
-        context! {},
-        &smoke_dir.join("main.cpp"),
-    )?;
-
-    run(Command::new("cmake")
-        .arg("-S")
-        .arg(&smoke_dir)
-        .arg("-B")
-        .arg(smoke_dir.join("build"))
-        .arg(format!(
-            "-DCMAKE_PREFIX_PATH={}",
-            package_root.to_string_lossy()
-        )))?;
-    run(Command::new("cmake")
-        .arg("--build")
-        .arg(smoke_dir.join("build"))
-        .arg("--parallel")
-        .arg("2"))?;
-
-    Ok(())
-}
-
 fn print_artifacts(artifacts: &Path) -> Result<()> {
     println!("release artifacts:");
     let mut entries = Vec::new();
@@ -478,50 +426,6 @@ fn print_artifacts(artifacts: &Path) -> Result<()> {
             metadata.len()
         );
     }
-    Ok(())
-}
-
-fn fetch_git_commit(url: &str, commit: &str, dest: &Path) -> Result<()> {
-    remove_dir_if_exists(dest)?;
-    fs::create_dir_all(dest)?;
-
-    run(Command::new("git").arg("init").arg(dest))?;
-    run(Command::new("git")
-        .arg("-C")
-        .arg(dest)
-        .arg("remote")
-        .arg("add")
-        .arg("origin")
-        .arg(url))?;
-    run(Command::new("git")
-        .arg("-C")
-        .arg(dest)
-        .arg("fetch")
-        .arg("--depth")
-        .arg("1")
-        .arg("origin")
-        .arg(commit))?;
-    run(Command::new("git")
-        .arg("-C")
-        .arg(dest)
-        .arg("checkout")
-        .arg("--detach")
-        .arg("FETCH_HEAD"))?;
-
-    let actual = output(
-        Command::new("git")
-            .arg("-C")
-            .arg(dest)
-            .arg("rev-parse")
-            .arg("HEAD"),
-    )?;
-    if actual.trim() != commit {
-        return fail(format!(
-            "git checkout of {url} produced {}, expected {commit}",
-            actual.trim()
-        ));
-    }
-
     Ok(())
 }
 

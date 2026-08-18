@@ -151,8 +151,7 @@ static inline const synapse_topic_info_t *synapse_topic_by_key_segment(
  * substring (start pointer into `key` and length, empty when absent) and the
  * instance segment (-1 when absent). Out parameters may be NULL. Instance
  * segments are 1 to 9 ASCII digits, and topic keys never consist solely of
- * digits; this grammar is identical in the Rust, Python, JavaScript, and C
- * catalog helpers.
+ * digits; this grammar is identical in the Rust and C catalog helpers.
  */
 static inline const synapse_topic_info_t *synapse_topic_parse_key(
     const char *key, const char **namespace_start, size_t *namespace_len,

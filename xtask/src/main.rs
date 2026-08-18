@@ -18,70 +18,17 @@ struct Tools {
     package_version: String,
     flatbuffers_version: String,
     flatbuffers_commit: String,
-    flatbuffers_build_version: String,
     flatcc_version: String,
     flatcc_commit: String,
-    flatcc_binary: PathBuf,
-    flatcc_source: PathBuf,
     mcap_rust_version: String,
-    mcap_python_version: String,
-    mcap_javascript_version: String,
-    mcap_cpp_version: String,
-    mcap_cpp_commit: String,
-    typescript_version: String,
 }
 
-#[derive(Debug, serde::Deserialize)]
-struct ToolsFile {
-    package: PackageTools,
-    flatbuffers: FlatbuffersTools,
-    #[serde(rename = "flatbuffers-build")]
-    flatbuffers_build: FlatbuffersBuildTools,
-    flatcc: FlatccTools,
-    mcap: McapTools,
-    typescript: TypescriptTools,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct PackageTools {
-    version: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct FlatbuffersTools {
-    version: String,
-    commit: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct FlatbuffersBuildTools {
-    version: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct FlatccTools {
-    version: String,
-    commit: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct McapTools {
-    rust: String,
-    python: String,
-    javascript: String,
-    cpp: McapCppTools,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct McapCppTools {
-    version: String,
-    commit: String,
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct TypescriptTools {
-    version: String,
-}
+const LOCAL_PACKAGE_VERSION: &str = "0.0.0";
+const FLATBUFFERS_VERSION: &str = "25.12.19";
+const FLATBUFFERS_COMMIT: &str = "7e163021e59cca4f8e1e35a7c828b5c6b7915953";
+const FLATCC_VERSION: &str = "0.6.1";
+const FLATCC_COMMIT: &str = "d17e324e7e595272da486c5b9b20e848b78ba9ba";
+const MCAP_RUST_VERSION: &str = "0.25.0";
 
 #[derive(Debug)]
 struct Options {
@@ -92,22 +39,21 @@ struct Options {
 fn main() -> Result<()> {
     let root = find_repo_root(&env::current_dir()?)?;
     let (command, options) = parse_args()?;
+    enforce_binding_language_policy(&root)?;
 
     match command.as_str() {
         "build" => build(&root, &options),
         "ci" => ci(&root, &options),
-        "js" => js(&root),
         "check" => check(&root),
         "wire-check" => wire_check_command(&root, &options),
         _ => fail(format!(
-            "unknown command '{command}'. expected: build, ci, js, check, or wire-check"
+            "unknown command '{command}'. expected: build, ci, check, or wire-check"
         )),
     }
 }
 
 fn build(root: &Path, options: &Options) -> Result<()> {
-    let tools = read_tools(root)?;
-    check_release_version(&tools, &options.release_name)?;
+    let tools = tools(package_version(&options.release_name)?);
     let templates = Templates::new(root)?;
 
     let packages = stage_packages(root, &templates, &tools)?;
@@ -115,26 +61,18 @@ fn build(root: &Path, options: &Options) -> Result<()> {
     let flatc = build_flatc(&tools)?;
     let flatcc = flatcc_tool(&tools)?;
     generate_bindings(root, &flatc, &flatcc.binary, &templates, &packages)?;
-    build_js_package(
-        root,
-        &templates,
-        &packages.js,
-        &flatcc.binary,
-        &tools,
-        false,
-    )?;
-    build_archives(root, &tools, &flatc, &flatcc, &options.release_name, true)?;
+    build_archives(root, &tools, &flatcc, &options.release_name, true)?;
 
     Ok(())
 }
 
 fn check(root: &Path) -> Result<()> {
-    let tools = read_tools(root)?;
-    let flatcc = flatcc_tool(&tools)?;
+    let tools = tools(LOCAL_PACKAGE_VERSION);
+    let flatcc = flatcc_binary(&tools)?;
     let check_dir = root.join("target/xtask/check");
     reset_dir(&check_dir)?;
     let bfbs_dir = check_dir.join("bfbs");
-    generate_reflection_schemas(root, &flatcc.binary, &bfbs_dir)?;
+    generate_reflection_schemas(root, &flatcc, &bfbs_dir)?;
     let schema = load_compiled_schema(&bfbs_dir)?;
     validate_protocol(&schema)?;
     let topics = topic_entries(&schema)?;
@@ -145,18 +83,6 @@ fn check(root: &Path) -> Result<()> {
     let context = topic_catalog_context(&schema, &topics)?;
     for (template, output) in [
         ("xtask/topic_catalog/topics.json.jinja", "topics.json"),
-        (
-            "xtask/topic_catalog/topic_catalog.js.jinja",
-            "topic_catalog.js",
-        ),
-        (
-            "xtask/topic_catalog/topic_catalog.d.ts.jinja",
-            "topic_catalog.d.ts",
-        ),
-        (
-            "xtask/topic_catalog/topic_catalog.py.jinja",
-            "topic_catalog.py",
-        ),
         (
             "xtask/topic_catalog/topic_catalog.rs.jinja",
             "topic_catalog.rs",
@@ -210,14 +136,14 @@ fn check(root: &Path) -> Result<()> {
 
 /// Regenerate the per-type wire descriptors from the pinned schema and either
 /// compare them against the committed baseline (default) or rewrite it
-/// (`--update`). Uses the same Nix-pinned FlatCC as `check` and `ci`.
+/// (`--update`). Uses the same version-checked FlatCC as `check` and `ci`.
 fn wire_check_command(root: &Path, options: &Options) -> Result<()> {
-    let tools = read_tools(root)?;
-    let flatcc = flatcc_tool(&tools)?;
+    let tools = tools(LOCAL_PACKAGE_VERSION);
+    let flatcc = flatcc_binary(&tools)?;
     let dir = root.join("target/xtask/wire-check");
     reset_dir(&dir)?;
     let bfbs_dir = dir.join("bfbs");
-    generate_reflection_schemas(root, &flatcc.binary, &bfbs_dir)?;
+    generate_reflection_schemas(root, &flatcc, &bfbs_dir)?;
     let current = build_wire_descriptors(&bfbs_dir)?;
     if options.update {
         update_wire_baseline(root, &current)
@@ -227,8 +153,7 @@ fn wire_check_command(root: &Path, options: &Options) -> Result<()> {
 }
 
 fn ci(root: &Path, options: &Options) -> Result<()> {
-    let tools = read_tools(root)?;
-    check_release_version(&tools, &options.release_name)?;
+    let tools = tools(package_version(&options.release_name)?);
     let templates = Templates::new(root)?;
 
     let packages = stage_packages(root, &templates, &tools)?;
@@ -237,9 +162,7 @@ fn ci(root: &Path, options: &Options) -> Result<()> {
     let flatcc = flatcc_tool(&tools)?;
     generate_bindings(root, &flatc, &flatcc.binary, &templates, &packages)?;
     check_rust_package(&templates, &packages.rust)?;
-    build_python_package(root, &templates, &packages.python, &tools)?;
-    build_js_package(root, &templates, &packages.js, &flatcc.binary, &tools, true)?;
-    build_archives(root, &tools, &flatc, &flatcc, &options.release_name, false)?;
+    build_archives(root, &tools, &flatcc, &options.release_name, false)?;
     Ok(())
 }
 
@@ -300,23 +223,10 @@ fn schema_set_hash(topics: &[TopicEntry], commands: &[CommandEntry]) -> String {
         .collect()
 }
 
-fn js(root: &Path) -> Result<()> {
-    let tools = read_tools(root)?;
-    let templates = Templates::new(root)?;
-
-    let package = root.join("target/xtask/packages/js");
-    stage_template_tree(root, "js", &package, &templates, package_context(&tools))?;
-    let flatcc = flatcc_tool(&tools)?;
-    build_js_package(root, &templates, &package, &flatcc.binary, &tools, false)?;
-
-    println!("staged npm package at {}", package.display());
-    Ok(())
-}
-
 fn parse_args() -> Result<(String, Options)> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "ci".to_string());
-    let mut release_name = env::var("GITHUB_REF_NAME").unwrap_or_else(|_| "local".to_string());
+    let mut release_name = "local".to_string();
     let mut update = false;
 
     while let Some(arg) = args.next() {
@@ -354,64 +264,20 @@ fn find_repo_root(start: &Path) -> Result<PathBuf> {
     }
 }
 
-fn read_tools(_root: &Path) -> Result<Tools> {
-    let Some(path) = env::var_os("SYNAPSE_FBS_TOOLS_TOML").map(PathBuf::from) else {
-        return fail("SYNAPSE_FBS_TOOLS_TOML is not set. Run inside `nix develop`.");
-    };
-    if !path.is_file() {
-        return fail(format!(
-            "could not find Nix-generated tool manifest at {}",
-            path.display()
-        ));
+fn tools(package_version: impl Into<String>) -> Tools {
+    Tools {
+        package_version: package_version.into(),
+        flatbuffers_version: FLATBUFFERS_VERSION.to_string(),
+        flatbuffers_commit: FLATBUFFERS_COMMIT.to_string(),
+        flatcc_version: FLATCC_VERSION.to_string(),
+        flatcc_commit: FLATCC_COMMIT.to_string(),
+        mcap_rust_version: MCAP_RUST_VERSION.to_string(),
     }
-    let content = fs::read_to_string(&path)?;
-    let parsed: ToolsFile = toml::from_str(&content)
-        .map_err(|err| io::Error::other(format!("invalid {}: {err}", path.display())))?;
-
-    Ok(Tools {
-        package_version: parsed.package.version,
-        flatbuffers_version: parsed.flatbuffers.version,
-        flatbuffers_commit: parsed.flatbuffers.commit,
-        flatbuffers_build_version: parsed.flatbuffers_build.version,
-        flatcc_version: parsed.flatcc.version,
-        flatcc_commit: parsed.flatcc.commit,
-        flatcc_binary: required_env_path("SYNAPSE_FBS_FLATCC")?,
-        flatcc_source: required_env_path("SYNAPSE_FBS_FLATCC_SOURCE")?,
-        mcap_rust_version: parsed.mcap.rust,
-        mcap_python_version: parsed.mcap.python,
-        mcap_javascript_version: parsed.mcap.javascript,
-        mcap_cpp_version: parsed.mcap.cpp.version,
-        mcap_cpp_commit: parsed.mcap.cpp.commit,
-        typescript_version: parsed.typescript.version,
-    })
 }
 
-fn required_env_path(name: &str) -> Result<PathBuf> {
-    Ok(env::var_os(name)
-        .map(PathBuf::from)
-        .ok_or_else(|| io::Error::other(format!("{name} is not set. Run through Nix.")))?)
-}
-
-/// Exercise the rendered catalog helpers with whichever toolchains are
+/// Exercise the rendered native catalog helpers with whichever toolchains are
 /// available locally; each check is skipped when its tool is missing.
 fn smoke_catalog_helpers(templates: &Templates, check_dir: &Path) -> Result<()> {
-    if command_succeeds(Command::new("node").arg("--version")) {
-        let script = templates.render("xtask/smoke/catalog.js.jinja", context! {})?;
-        run(Command::new("node")
-            .current_dir(check_dir)
-            .arg("--input-type=module")
-            .arg("-e")
-            .arg(script))?;
-    }
-
-    if let Ok(python) = python_bin() {
-        let code = templates.render("xtask/smoke/catalog.py.jinja", context! {})?;
-        run(Command::new(&python)
-            .current_dir(check_dir)
-            .arg("-c")
-            .arg(code))?;
-    }
-
     if command_succeeds(Command::new("cc").arg("--version")) {
         templates.render_to_file(
             "xtask/smoke/catalog.c.jinja",
@@ -471,25 +337,60 @@ fn smoke_catalog_helpers(templates: &Templates, check_dir: &Path) -> Result<()> 
     Ok(())
 }
 
-fn check_release_version(tools: &Tools, release_name: &str) -> Result<()> {
-    // Only enforce for tag builds: GITHUB_REF_NAME is the branch name on
-    // branch pushes, and branches may legitimately be named v2-wip etc.
-    if env::var("GITHUB_REF_TYPE").as_deref() != Ok("tag") {
-        return Ok(());
+fn package_version(release_name: &str) -> Result<String> {
+    if release_name == "local" {
+        return Ok(LOCAL_PACKAGE_VERSION.to_string());
     }
+
     let Some(version) = release_name.strip_prefix('v') else {
-        return Ok(());
-    };
-    if !version.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
-        return Ok(());
-    }
-    if version != tools.package_version {
         return fail(format!(
-            "release tag '{release_name}' does not match package.version={} in flake.nix",
-            tools.package_version
+            "invalid release name '{release_name}'; expected 'local' or a tag like 'v1.2.3'"
+        ));
+    };
+    let mut components = version.split('.');
+    let valid = matches!(
+        (components.next(), components.next(), components.next(), components.next()),
+        (Some(major), Some(minor), Some(patch), None)
+            if [major, minor, patch].into_iter().all(valid_version_component)
+    );
+    if !valid {
+        return fail(format!(
+            "invalid release tag '{release_name}'; expected a stable semantic version like 'v1.2.3'"
         ));
     }
-    Ok(())
+
+    Ok(version.to_string())
+}
+
+fn valid_version_component(component: &str) -> bool {
+    !component.is_empty()
+        && component.bytes().all(|byte| byte.is_ascii_digit())
+        && (component == "0" || !component.starts_with('0'))
+}
+
+#[cfg(test)]
+mod version_tests {
+    use super::*;
+
+    #[test]
+    fn local_builds_use_development_version() {
+        assert_eq!(package_version("local").unwrap(), "0.0.0");
+    }
+
+    #[test]
+    fn release_version_comes_from_tag() {
+        assert_eq!(package_version("v12.3.45").unwrap(), "12.3.45");
+    }
+
+    #[test]
+    fn malformed_release_tags_are_rejected() {
+        for tag in ["1.2.3", "v1.2", "v1.2.3.4", "v01.2.3", "v1.2.3-rc.1"] {
+            assert!(
+                package_version(tag).is_err(),
+                "tag should be rejected: {tag}"
+            );
+        }
+    }
 }
 
 fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {
@@ -497,7 +398,6 @@ fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {
 
     require_git_sha("FLATBUFFERS_COMMIT", &tools.flatbuffers_commit)?;
     require_git_sha("FLATCC_COMMIT", &tools.flatcc_commit)?;
-    require_git_sha("MCAP_CPP_COMMIT", &tools.mcap_cpp_commit)?;
 
     let rust_cargo = fs::read_to_string(packages.rust.join("Cargo.toml"))?;
     let rust_pin = format!("flatbuffers = \"={}\"", tools.flatbuffers_version);
@@ -509,26 +409,6 @@ fn check_pins(packages: &PackagePaths, tools: &Tools) -> Result<()> {
         return fail(format!(
             "staged rust/Cargo.toml must contain {rust_mcap_pin}"
         ));
-    }
-
-    let pyproject = fs::read_to_string(packages.python.join("pyproject.toml"))?;
-    let python_pin = format!("flatbuffers=={}", tools.flatbuffers_version);
-    if !pyproject.contains(&python_pin) {
-        return fail(format!(
-            "staged python/pyproject.toml must contain {python_pin}"
-        ));
-    }
-    let python_mcap_pin = format!("mcap=={}", tools.mcap_python_version);
-    if !pyproject.contains(&python_mcap_pin) {
-        return fail(format!(
-            "staged python/pyproject.toml must contain {python_mcap_pin}"
-        ));
-    }
-
-    let js_package = fs::read_to_string(packages.js.join("package.json"))?;
-    let js_mcap_pin = format!("\"@mcap/core\": \"{}\"", tools.mcap_javascript_version);
-    if !js_package.contains(&js_mcap_pin) {
-        return fail(format!("staged js/package.json must contain {js_mcap_pin}"));
     }
 
     Ok(())

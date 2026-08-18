@@ -2,15 +2,13 @@
 
 [![CI](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml/badge.svg)](https://github.com/CogniPilot/synapse_fbs/actions/workflows/ci.yml)
 [![crates.io](https://img.shields.io/crates/v/synapse_fbs)](https://crates.io/crates/synapse_fbs)
-[![PyPI](https://img.shields.io/pypi/v/synapse-fbs)](https://pypi.org/project/synapse-fbs/)
-[![npm](https://img.shields.io/npm/v/@cognipilot/synapse-fbs)](https://www.npmjs.com/package/@cognipilot/synapse-fbs)
 
-FlatBuffers schemas and generated language packages for Synapse.
+FlatBuffers schemas and generated C and Rust packages for Synapse.
 
 This repository is the schema source of truth for vehicle state, sensor,
 control, transport, and transfer messages. The checked-in source stays small:
 FlatBuffers schemas live in `fbs/`, package inputs live in `templates/`, and a
-pinned Nix toolchain generates and verifies every release artifact.
+Rust `xtask` generates and verifies every release artifact.
 
 ## Design
 
@@ -43,107 +41,100 @@ profile](docs/MCAP.md) for the full contracts.
 
 ## Repository layout
 
-- `fbs/` — authoritative `.fbs` schemas.
-- `templates/` — Rust, Python, JavaScript, C, C++, and xtask MiniJinja inputs.
-- `xtask/` — FlatCC-reflection-driven generation and verification.
-- `docs/` — architecture, package, development, MCAP, and use-case details.
-- `flake.nix` — pinned tool versions and the public build/test commands.
+- `fbs/`: authoritative `.fbs` schemas.
+- `templates/`: Rust, C, and xtask MiniJinja inputs.
+- `xtask/`: FlatCC-reflection-driven generation and verification.
+- `docs/`: architecture, package, development, MCAP, and use-case details.
 
 Generated files are written only beneath `target/xtask/`:
 
-- `target/xtask/packages/{rust,python,js}`
-- `target/xtask/artifacts/synapse_fbs-{c,cpp}.tar.gz`
+- `target/xtask/packages/rust`
+- `target/xtask/artifacts/synapse_fbs-c.tar.gz`
 - `target/xtask/check` and other temporary verification trees
 
 FlatCC generates C bindings and every BFBS reflection schema consumed by
-`xtask`. The pinned upstream `flatc` is used only for official Rust, Python,
-and C++ binding generation. Nix supplies FlatCC directly—`xtask` does not clone
-or compile it. All generated text owned by `xtask` is rendered from MiniJinja
-templates.
+`xtask`. Upstream `flatc` generates the Rust bindings. All generated
+text owned by `xtask` is rendered from MiniJinja templates.
 
 ## Build and test
 
-Nix is the supported interface on `x86_64-linux` and `aarch64-linux`. The same
-commands are used locally and by GitHub Actions.
-
-Run formatting, lint, schema validation, compatibility checks, and catalog
-smoke tests:
-
-```sh
-nix run .#test
-```
-
-Build and verify all Rust, Python, JavaScript, C, and C++ packages:
+CI uses Ubuntu 24.04 as its reproducible baseline. Local builds are not tied
+to a particular Ubuntu release, but require Rust and Cargo with edition 2024
+support, CMake, C and C++ compilers, Git, gzip, GNU tar, and `sha256sum`. On
+Ubuntu and Debian systems, install the native build tools with:
 
 ```sh
-nix run .#packages
+sudo apt-get update
+sudo apt-get install --yes build-essential cargo cmake git gzip tar
 ```
 
-Run both exactly as CI does:
+Build FlatBuffers 25.12.19 and FlatCC from their pinned upstream source
+revisions. Set `SYNAPSE_FBS_FLATC` and `SYNAPSE_FBS_FLATCC` to the resulting
+executables, and set `SYNAPSE_FBS_FLATCC_SOURCE` to the FlatCC checkout. The
+complete source-build commands are in [development and
+releases](docs/development.md).
+
+Run formatting, linting, schema validation, compatibility checks, and package
+verification directly:
 
 ```sh
-nix run .#ci
+cargo fmt --check --manifest-path xtask/Cargo.toml
+cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
+cargo run --locked --manifest-path xtask/Cargo.toml -- check
+cargo run --locked --manifest-path xtask/Cargo.toml -- wire-check
+cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 ```
 
-`nix run .#build` is an alias for `nix run .#packages`. `nix develop` provides
-the same pinned toolchain plus `synapse-fbs-test`, `synapse-fbs-packages`, and
-`synapse-fbs-ci` commands. The shell prints this list when it starts.
-
-To test a change without publishing, run `nix run .#packages`, then consume the
-staged output directly:
+To build release artifacts without the complete verification pass, run:
 
 ```sh
-pip install target/xtask/packages/python/dist/*.whl
-npm install ./target/xtask/packages/js
+cargo run --locked --manifest-path xtask/Cargo.toml -- build
 ```
 
-Rust projects can set a path dependency to `target/xtask/packages/rust`. C and
-C++ projects can extract an archive from `target/xtask/artifacts/` and add its
-root to `CMAKE_PREFIX_PATH`. More examples are in [package
-usage](docs/packages.md).
+Rust projects can set a path dependency to `target/xtask/packages/rust`. C
+projects can extract the archive from `target/xtask/artifacts/` and add its root
+to `CMAKE_PREFIX_PATH`. More examples are in [package usage](docs/packages.md).
 
 ## Published packages
 
 - Rust: [`synapse_fbs`](https://crates.io/crates/synapse_fbs)
-- Python: [`synapse-fbs`](https://pypi.org/project/synapse-fbs/)
-- JavaScript: [`@cognipilot/synapse-fbs`](https://www.npmjs.com/package/@cognipilot/synapse-fbs)
-- C and C++: generated archives attached to [GitHub
+- C: a generated archive attached to [GitHub
   releases](https://github.com/CogniPilot/synapse_fbs/releases)
 
-Each package includes the generated topic catalog. Packages that support MCAP
-also include the `synapse/1` reader/writer surface and the matching BFBS schema
-assets. Installation, CMake targets, and local staged-package examples are in
-[package usage](docs/packages.md).
+Each package includes the generated topic catalog and matching schema assets.
+Packages that support MCAP also include the `synapse/1` reader/writer surface.
+Installation, CMake targets, and local staged-package examples are in [package
+usage](docs/packages.md).
 
 ## Schema changes
 
 Edit only the authoritative files in `fbs/`, then run:
 
 ```sh
-nix run .#test
+cargo run --locked --manifest-path xtask/Cargo.toml -- check
+cargo run --locked --manifest-path xtask/Cargo.toml -- wire-check
 ```
 
 `xtask` asks FlatCC to compile BFBS and uses reflection to validate topic IDs,
 the `SynapseMessage` union, command request/reply types, fixed payload sizes,
-field offsets, and generated wire hashes. It does not contain a second
-`.fbs` parser or documentation compiler.
+field offsets, and generated wire hashes. It does not contain a second `.fbs`
+parser or documentation compiler.
 
-Wire hashes are computed from FlatCC reflection on every build and are not
-committed. Consumers compare them at runtime. If a published payload changes
-incompatibly, introduce a new wire type and topic.
+Wire hashes are computed from FlatCC reflection on every build. Consumers
+compare them at runtime. If a published payload changes incompatibly,
+introduce a new wire type and topic.
 
 Never hand-edit generated package trees under `target/`.
 
 ## Releases
 
-Version pins and the package version live in `flake.nix`. A semantic version
-tag such as `v0.8.0` must match `package.version`; the release workflow rejects
-a mismatch before publishing.
+A stable semantic version tag such as `v0.10.0` is the release version. The
+workflow derives `0.10.0` from the tag for the Rust crate and C archive,
+so there is no checked-in package version to bump before tagging.
 
-Release CI builds the same package set as `nix run .#packages`, then publishes
-the Rust crate, Python wheel and source distribution, npm package, and C/C++
-archives. See [development and releases](docs/development.md) for artifact and
-trusted-publishing details.
+Release CI verifies the same package set as the local `ci` command, then
+publishes the Rust crate and attaches the C archive to the GitHub
+release. See [development and releases](docs/development.md) for details.
 
 ## Documentation
 

@@ -10,18 +10,69 @@ on:
 
 permissions:
   contents: read
-  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+  FLATBUFFERS_COMMIT: 7e163021e59cca4f8e1e35a7c828b5c6b7915953
+  FLATCC_COMMIT: d17e324e7e595272da486c5b9b20e848b78ba9ba
 
 jobs:
   packages:
     name: Packages
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
-      - uses: DeterminateSystems/nix-installer-action@v22
-      - uses: DeterminateSystems/magic-nix-cache-action@v14
-        with:
-          use-flakehub: false
-          use-gha-cache: true
-      - name: Test and build packages
-        run: nix run .#ci
+      - name: Build native schema compilers
+        run: |
+          set -euo pipefail
+          mkdir -p target/native-tools
+
+          git init target/native-tools/flatbuffers
+          git -C target/native-tools/flatbuffers remote add origin https://github.com/google/flatbuffers.git
+          git -C target/native-tools/flatbuffers fetch --depth 1 origin "${FLATBUFFERS_COMMIT}"
+          git -C target/native-tools/flatbuffers checkout --detach FETCH_HEAD
+          cmake \
+            -S target/native-tools/flatbuffers \
+            -B target/native-tools/flatbuffers-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DFLATBUFFERS_BUILD_TESTS=OFF \
+            -DFLATBUFFERS_BUILD_FLATLIB=OFF \
+            -DFLATBUFFERS_INSTALL=OFF
+          cmake \
+            --build target/native-tools/flatbuffers-build \
+            --config Release \
+            --target flatc \
+            --parallel
+
+          git init target/native-tools/flatcc
+          git -C target/native-tools/flatcc remote add origin https://github.com/dvidelabs/flatcc.git
+          git -C target/native-tools/flatcc fetch --depth 1 origin "${FLATCC_COMMIT}"
+          git -C target/native-tools/flatcc checkout --detach FETCH_HEAD
+          cmake \
+            -S target/native-tools/flatcc \
+            -B target/native-tools/flatcc-build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DFLATCC_TEST=OFF \
+            -DFLATCC_INSTALL=OFF
+          cmake \
+            --build target/native-tools/flatcc-build \
+            --config Release \
+            --target flatcc_cli \
+            --parallel
+
+          {
+            echo "SYNAPSE_FBS_FLATC=${PWD}/target/native-tools/flatbuffers-build/flatc"
+            echo "SYNAPSE_FBS_FLATCC=${PWD}/target/native-tools/flatcc/bin/flatcc"
+            echo "SYNAPSE_FBS_FLATCC_SOURCE=${PWD}/target/native-tools/flatcc"
+          } >> "${GITHUB_ENV}"
+      - name: Check Rust task runner
+        run: |
+          cargo fmt --check --manifest-path xtask/Cargo.toml
+          cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
+      - name: Check schemas and packages
+        run: |
+          set -euo pipefail
+          cargo run --locked --manifest-path xtask/Cargo.toml -- check
+          cargo run --locked --manifest-path xtask/Cargo.toml -- wire-check --update
+          git diff --exit-code compatibility/wire-schema.toml
+          cargo run --locked --manifest-path xtask/Cargo.toml -- ci

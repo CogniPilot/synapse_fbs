@@ -9,10 +9,3 @@ rust/src/generated/
 build/
 install/
 /log/
-python/synapse/
-python/build/
-python/dist/
-python/pyproject.toml
-python/*.egg-info/
-__pycache__/
-*.py[cod]

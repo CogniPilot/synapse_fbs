@@ -1,82 +1,119 @@
 # Development and releases
 
-## Supported environment
+## Tool requirements
 
-The Nix flake is the supported toolchain on `x86_64-linux` and
-`aarch64-linux`. On other hosts, use a Linux VM, container, or WSL environment.
+CI uses Ubuntu 24.04 as its reproducible baseline. Development and packaging
+are not tied to a particular Ubuntu release. A local environment needs Rust
+and Cargo with edition 2024 support, CMake, C and C++ compilers, Git, gzip, GNU
+tar, and `sha256sum`.
 
-Enter an interactive shell with:
+On Ubuntu and Debian systems, install the required native packages directly:
 
 ```sh
-nix develop
+sudo apt-get update
+sudo apt-get install --yes build-essential cargo cmake git gzip tar
 ```
 
-The shell and Nix apps share the same compiler, runtime, and package-tool pins.
-GitHub Actions invokes those apps directly, so local and hosted commands cannot
-drift.
+Build the pinned upstream FlatBuffers 25.12.19 compiler:
+
+```sh
+git init /path/to/flatbuffers
+git -C /path/to/flatbuffers remote add origin https://github.com/google/flatbuffers.git
+git -C /path/to/flatbuffers fetch --depth 1 origin 7e163021e59cca4f8e1e35a7c828b5c6b7915953
+git -C /path/to/flatbuffers checkout --detach FETCH_HEAD
+cmake -S /path/to/flatbuffers -B /path/to/flatbuffers/out \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DFLATBUFFERS_BUILD_TESTS=OFF
+cmake --build /path/to/flatbuffers/out --target flatc --parallel
+export SYNAPSE_FBS_FLATC=/path/to/flatbuffers/out/flatc
+```
+
+FlatCC is also built from a pinned source checkout. The C archive embeds its
+runtime sources, so retain the checkout after building:
+
+```sh
+git init /path/to/flatcc
+git -C /path/to/flatcc remote add origin https://github.com/dvidelabs/flatcc.git
+git -C /path/to/flatcc fetch --depth 1 origin d17e324e7e595272da486c5b9b20e848b78ba9ba
+git -C /path/to/flatcc checkout --detach FETCH_HEAD
+cmake -S /path/to/flatcc -B /path/to/flatcc/out \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DFLATCC_TEST=OFF \
+  -DFLATCC_INSTALL=OFF
+cmake --build /path/to/flatcc/out --target flatcc_cli --parallel
+export SYNAPSE_FBS_FLATCC=/path/to/flatcc/bin/flatcc
+export SYNAPSE_FBS_FLATCC_SOURCE=/path/to/flatcc
+```
+
+`xtask` resolves `flatc` and `flatcc` from PATH. The
+`SYNAPSE_FBS_FLATC` and `SYNAPSE_FBS_FLATCC` environment variables can select
+specific executables. `SYNAPSE_FBS_FLATCC_SOURCE` must identify the FlatCC
+source tree.
 
 ## Public commands
 
-Run all fast verification:
+Format and lint the Rust tooling:
 
 ```sh
-nix run .#test
+cargo fmt --check --manifest-path xtask/Cargo.toml
+cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
 ```
 
-This performs `cargo fmt --check`, Clippy with warnings denied, FlatCC schema
-compilation, BFBS reflection checks, and the catalog smoke tests.
-
-Build and verify release packages:
+Validate schemas and generated catalogs:
 
 ```sh
-nix run .#packages
+cargo run --locked --manifest-path xtask/Cargo.toml -- check
 ```
 
-`nix run .#build` is an alias. Arguments after `--` are passed to `xtask ci`,
-which lets the release workflow use:
+Check the compatibility baseline:
 
 ```sh
-nix run .#packages -- --release-name v0.8.0
+cargo run --locked --manifest-path xtask/Cargo.toml -- wire-check
 ```
 
-Inside `nix develop`, the equivalent commands are `synapse-fbs-test`,
-`synapse-fbs-packages`, and `synapse-fbs-ci`. These are the same generated
-scripts used by the flake apps and CI, not separate shell aliases.
-
-Run the complete branch CI sequence:
+Build and verify all release packages:
 
 ```sh
-nix run .#ci
+cargo run --locked --manifest-path xtask/Cargo.toml -- ci
 ```
+
+Build artifacts without the complete verification pass:
+
+```sh
+cargo run --locked --manifest-path xtask/Cargo.toml -- build
+```
+
+Pass `--release-name v0.10.0` after the command to reproduce a tagged release
+locally. The task runner derives package version `0.10.0` from that tag. Builds
+without a release name use development version `0.0.0`.
 
 ## Generation flow
 
 The source inputs are deliberately separated:
 
 - `fbs/` contains only the authoritative FlatBuffers schemas.
-- `templates/{rust,python,js,c,cpp}` contains package skeletons.
+- `templates/{rust,c}` contains package skeletons.
 - `templates/xtask` contains MiniJinja templates for generated catalogs,
   checksums, BFBS source assets, and smoke programs.
 
+The task runner enforces this template-directory allowlist for every command.
+Adding another generated binding language requires an explicit policy change.
+
 `xtask` asks FlatCC to compile BFBS reflection schemas, then reads reflection
 data to validate and generate metadata. It does not parse `.fbs` syntax itself.
-The pinned upstream `flatc` remains only for official Rust, Python, and C++
-binding generation; FlatCC generates C bindings and BFBS.
+Upstream `flatc` generates Rust bindings; FlatCC generates C bindings and BFBS.
 
-Nix supplies both the pinned FlatCC executable and its source tree. `xtask`
-does not clone or compile a second FlatCC; the source tree is used only when
-the portable C archive needs FlatCC runtime source files.
+The FlatCC source tree is used only when the portable C archive needs FlatCC
+runtime source files.
 
 The Rust orchestration is split by responsibility: `main.rs` contains the CLI
 flow, `protocol.rs` contains declarative routing policy, `schema.rs` adapts BFBS
 reflection, `packaging.rs` builds packages, and `support.rs` contains shared
-I/O/process helpers.
+I/O and process helpers.
 
 Generated outputs live below `target/xtask/` and are safe to remove:
 
 - `packages/rust`
-- `packages/python`
-- `packages/js`
 - `artifacts`
 - build, check, smoke, and downloaded-source work directories
 
@@ -84,58 +121,51 @@ Generated outputs live below `target/xtask/` and are safe to remove:
 
 Schema hashes are the first 128 bits of SHA-256 over the BFBS bytes emitted by
 FlatCC on every build. The schema-set hash is derived from those hashes and the
-routing catalog. No checksum baseline is committed. Normal Zenoh consumers
-compare the schema hash; constrained endpoints compare the schema-set hash
-before exchanging compact frames.
+routing catalog. Normal Zenoh consumers compare the schema hash; constrained
+endpoints compare the schema-set hash before exchanging compact frames.
 
 Published wire-type names should remain immutable. An incompatible payload
 change gets a new wire type and topic so old and new consumers fail clearly
-rather than silently decoding different layouts.
+instead of silently decoding different layouts.
+
+Use `wire-check --update` only when intentionally accepting a compatible
+schema addition or a reviewed compatibility-policy exception. Commit the
+resulting `compatibility/wire-schema.toml` change with the schema change.
 
 ## Package verification
 
-The package command:
+The `ci` command:
 
-1. stages Rust, Python, and JavaScript skeletons;
-2. renders every generated text file through MiniJinja;
-3. generates official language bindings and BFBS assets;
+1. stages the Rust and C package inputs;
+2. renders generated text through MiniJinja;
+3. generates language bindings and BFBS assets;
 4. builds and tests the Rust crate;
-5. builds, checks, installs, and imports the Python wheel;
-6. type-checks, packs, installs, and imports the npm package;
-7. assembles C and C++ archives with pinned runtimes;
-8. builds CMake `FetchContent` and `find_package` consumers;
-9. writes and reads real MCAP logs across languages;
-10. emits schema and BFBS checksum manifests.
-
-## Version pins
-
-`flake.nix` is the single version manifest for the package version, FlatBuffers,
-FlatCC, MCAP implementations, and TypeScript. Nix supplies FlatCC directly;
-Git commits are pinned where another upstream source tree is packaged.
-Generated bindings and their runtimes remain in lockstep.
+5. assembles the C archive with its required runtime;
+6. builds CMake `FetchContent` and `find_package` consumers;
+7. exercises the MCAP implementations;
+8. emits schema and BFBS checksum manifests.
 
 ## Release workflow
 
-Pushes and pull requests run `nix run .#ci`. A tag matching `v*.*.*` runs the
-release workflow. The tag must match `package.version` in `flake.nix`.
+Pushes and pull requests run the direct Cargo verification commands. A stable
+semantic version tag matching `v*.*.*` runs the release workflow and supplies
+the version for every generated package. No separate version file or source
+constant needs to be changed before tagging.
 
 The release publishes:
 
 - the staged Rust crate through crates.io trusted publishing;
-- the Python wheel and source distribution through PyPI trusted publishing;
-- the npm tarball through npm trusted publishing;
-- C and C++ tarballs plus checksum files on the GitHub Release.
+- a C tarball plus its checksum file on the GitHub release.
 
-The repository and workflow identities must be registered with each package
-registry before tagging. A failed publication can be retried safely: the
-workflow checks which package versions already exist before publishing.
+The repository and workflow identity must be registered with crates.io before
+tagging. A failed publication can be retried safely because the workflow checks
+whether the crate version already exists before publishing.
 
 ## CI action maintenance
 
-CI uses Node-24-compatible GitHub Actions. The Nix cache is explicitly backed
-by GitHub Actions cache and does not attempt unauthenticated FlakeHub access.
-Validate workflow edits locally with:
+GitHub Actions invokes Cargo, the FlatBuffers tools, CMake, and the native
+compilers directly. Validate workflow edits with an installed `actionlint`:
 
 ```sh
-nix shell nixpkgs#actionlint --command actionlint
+actionlint
 ```
