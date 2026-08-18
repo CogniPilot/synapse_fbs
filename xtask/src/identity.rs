@@ -318,9 +318,98 @@ mod identity_tests {
         right.field("bc");
         assert_ne!(left.finish(), right.finish());
     }
+
+    #[test]
+    fn schema_set_identity_includes_global_literals() {
+        let empty_topics = [];
+        let empty_commands = [];
+        let left = schema_set_identity_with_globals(
+            &empty_topics,
+            &empty_commands,
+            &["grammar-a".to_string()],
+        );
+        let right = schema_set_identity_with_globals(
+            &empty_topics,
+            &empty_commands,
+            &["grammar-b".to_string()],
+        );
+        assert_ne!(left, right);
+    }
+
+    #[test]
+    fn schema_set_identity_includes_topic_scope() {
+        let vehicle = TopicEntry {
+            id: 1,
+            name: "Example".to_string(),
+            key: "example".to_string(),
+            root_table: "Example".to_string(),
+            root_table_namespace: "synapse.topic".to_string(),
+            payload_type: Some("ExampleData".to_string()),
+            payload_type_namespace: Some("synapse.topic".to_string()),
+            payload_size: Some(4),
+            schema_file: "fbs/example.fbs".to_string(),
+            schema_artifact_sha256: "artifact".to_string(),
+            wire_type: "synapse.topic.ExampleData".to_string(),
+            type_schema_hash: "type".to_string(),
+            legacy_schema_file_hash_128: "legacy".to_string(),
+            fixed_layout: true,
+            multi_instance: false,
+            scope: "vehicle",
+            encoding: "struct",
+            description: "Example topic".to_string(),
+        };
+        let mut any = vehicle.clone();
+        any.scope = "any";
+        let globals = [];
+        let commands = [];
+
+        assert_ne!(
+            schema_set_identity_with_globals(&[vehicle], &commands, &globals),
+            schema_set_identity_with_globals(&[any], &commands, &globals)
+        );
+    }
+
+    #[test]
+    fn package_contract_identity_keys_each_appear_once() {
+        let literals = schema_package_contract_literals();
+
+        for key in [
+            MCAP_SCHEMA_SET_HASH_KEY,
+            MCAP_SCHEMA_SET_IDENTITY_KEY,
+            MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY,
+        ] {
+            assert_eq!(
+                literals.iter().filter(|literal| **literal == key).count(),
+                1,
+                "{key} must occur exactly once in the package transcript"
+            );
+        }
+    }
 }
 fn schema_set_identity(topics: &[TopicEntry], commands: &[CommandEntry]) -> String {
+    let global_literals = [
+        CATALOG_VERSION.to_string(),
+        CMD_KEY_PREFIX.to_string(),
+        META_KEY_PREFIX.to_string(),
+        LIVELINESS_KEY_PREFIX.to_string(),
+        FLATBUFFER_VALUE_MEDIA_TYPE.to_string(),
+        STRUCT_VALUE_MEDIA_TYPE.to_string(),
+        TYPE_SCHEMA_HASH_ALGORITHM.to_string(),
+        TOPIC_INSTANCE_KEY_GRAMMAR.to_string(),
+    ];
+    schema_set_identity_with_globals(topics, commands, &global_literals)
+}
+
+fn schema_set_identity_with_globals(
+    topics: &[TopicEntry],
+    commands: &[CommandEntry],
+    global_literals: &[String],
+) -> String {
     let mut transcript = IdentityTranscript::new("synapse-schema-set-v4");
+    transcript.field(global_literals.len().to_string());
+    for literal in global_literals {
+        transcript.field(literal);
+    }
     let mut topics = topics.iter().collect::<Vec<_>>();
     topics.sort_by_key(|topic| topic.id);
     transcript.field(topics.len().to_string());
@@ -329,6 +418,7 @@ fn schema_set_identity(topics: &[TopicEntry], commands: &[CommandEntry]) -> Stri
             topic.id.to_string(),
             topic.key.clone(),
             bool_token(topic.multi_instance).to_string(),
+            topic.scope.to_string(),
             topic.encoding.to_string(),
             topic.wire_type.clone(),
             topic.type_schema_hash.clone(),
@@ -417,21 +507,8 @@ fn legacy_schema_set_hash_128(topics: &[TopicEntry], commands: &[CommandEntry]) 
         .collect()
 }
 
-/// Identity of the complete schema package contract authored in this
-/// repository. External CDR/RIHS01 projections, HCDF mappings, and deployment
-/// manifests are intentionally excluded.
-fn schema_package_contract_identity(
-    schema: &CompiledSchema,
-    topics: &[TopicEntry],
-    commands: &[CommandEntry],
-    schema_set_identity: &str,
-    legacy_schema_set_hash_128: &str,
-) -> String {
-    let mut transcript = IdentityTranscript::new("synapse-schema-package-contract-v1");
-    transcript.field(CATALOG_VERSION.to_string());
-    transcript.field(schema_set_identity);
-    transcript.field(legacy_schema_set_hash_128);
-    for field in [
+fn schema_package_contract_literals() -> [&'static str; 21] {
+    [
         CMD_KEY_PREFIX,
         META_KEY_PREFIX,
         LIVELINESS_KEY_PREFIX,
@@ -453,7 +530,24 @@ fn schema_package_contract_identity(
         MCAP_TIME_BASIS_UNIX_EPOCH,
         MCAP_TIME_BASIS_CORRELATED,
         MCAP_TOPIC_ID_KEY,
-    ] {
+    ]
+}
+
+/// Identity of the complete schema package contract authored in this
+/// repository. External CDR/RIHS01 projections, HCDF mappings, and deployment
+/// manifests are intentionally excluded.
+fn schema_package_contract_identity(
+    schema: &CompiledSchema,
+    topics: &[TopicEntry],
+    commands: &[CommandEntry],
+    schema_set_identity: &str,
+    legacy_schema_set_hash_128: &str,
+) -> String {
+    let mut transcript = IdentityTranscript::new("synapse-schema-package-contract-v1");
+    transcript.field(CATALOG_VERSION.to_string());
+    transcript.field(schema_set_identity);
+    transcript.field(legacy_schema_set_hash_128);
+    for field in schema_package_contract_literals() {
         transcript.field(field);
     }
 

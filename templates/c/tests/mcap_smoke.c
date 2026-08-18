@@ -206,12 +206,12 @@ static parsed_message_t validate_recording(const memory_sink_t *sink,
     record = cursor_record(&file, 0x0cU);
     cursor_string(&record, SYNAPSE_MCAP_METADATA_NAME);
     map = cursor_take(&record, cursor_u32(&record));
+    cursor_string(&map, SYNAPSE_MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY);
+    cursor_string(&map, SYNAPSE_SCHEMA_PACKAGE_CONTRACT_IDENTITY);
     cursor_string(&map, SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY);
     cursor_string(&map, SYNAPSE_LEGACY_SCHEMA_SET_HASH_128);
     cursor_string(&map, SYNAPSE_MCAP_SCHEMA_SET_IDENTITY_KEY);
     cursor_string(&map, SYNAPSE_SCHEMA_SET_IDENTITY);
-    cursor_string(&map, SYNAPSE_MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY);
-    cursor_string(&map, SYNAPSE_SCHEMA_PACKAGE_CONTRACT_IDENTITY);
     cursor_string(&map, SYNAPSE_MCAP_SESSION_ID_KEY);
     cursor_string(&map, "0123456789abcdef0123456789abcdef");
     cursor_string(&map, SYNAPSE_MCAP_SOURCE_KEY);

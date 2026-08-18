@@ -4,7 +4,7 @@ use std::io::Cursor;
 
 use flatbuffers_reflection::reflection::{self, BaseType};
 use synapse_fbs::{
-    mcap::{self, TimeBasis, Writer},
+    mcap::{self, TimeBasis, Writer, schema_metadata_matches_installed_contract},
     schemas::schema_by_name,
     topic::{ActuatorOutputs, ActuatorOutputsData},
     topic_catalog::{
@@ -143,11 +143,34 @@ fn actuator_outputs_root_wrap_record_decode_and_replay() {
         &records[1],
         mcap::container::records::Record::Metadata(metadata)
             if metadata.name == "synapse"
-                && metadata.metadata[MCAP_SCHEMA_SET_HASH_KEY] == LEGACY_SCHEMA_SET_HASH_128
-                && metadata.metadata[MCAP_SCHEMA_SET_IDENTITY_KEY] == SCHEMA_SET_IDENTITY
-                && metadata.metadata[MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY]
-                    == SCHEMA_PACKAGE_CONTRACT_IDENTITY
+                && schema_metadata_matches_installed_contract(&metadata.metadata)
     ));
+    let mut historical_metadata = match &records[1] {
+        mcap::container::records::Record::Metadata(metadata) => metadata.metadata.clone(),
+        record => panic!("expected Metadata record, received {record:?}"),
+    };
+    historical_metadata.remove(MCAP_SCHEMA_SET_IDENTITY_KEY);
+    historical_metadata.remove(MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY);
+    assert!(schema_metadata_matches_installed_contract(&historical_metadata));
+
+    historical_metadata.insert(
+        MCAP_SCHEMA_SET_IDENTITY_KEY.to_owned(),
+        "0".repeat(SCHEMA_SET_IDENTITY.len()),
+    );
+    assert!(!schema_metadata_matches_installed_contract(&historical_metadata));
+    historical_metadata.insert(
+        MCAP_SCHEMA_SET_IDENTITY_KEY.to_owned(),
+        SCHEMA_SET_IDENTITY.to_owned(),
+    );
+    historical_metadata.insert(
+        MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY.to_owned(),
+        "0".repeat(SCHEMA_PACKAGE_CONTRACT_IDENTITY.len()),
+    );
+    assert!(!schema_metadata_matches_installed_contract(&historical_metadata));
+    historical_metadata.remove(MCAP_SCHEMA_SET_HASH_KEY);
+    historical_metadata.remove(MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY);
+    assert!(!schema_metadata_matches_installed_contract(&historical_metadata));
+
 
     let schema_data = match &records[2] {
         mcap::container::records::Record::Schema { header, data } => {

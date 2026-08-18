@@ -37,6 +37,38 @@ impl TimeBasis {
     }
 }
 
+fn optional_identity_matches(
+    metadata: &BTreeMap<String, String>,
+    key: &str,
+    expected: &str,
+) -> bool {
+    match metadata.get(key) {
+        Some(value) => value == expected,
+        None => true,
+    }
+}
+
+/// Check whether a `synapse/1` Metadata map matches this installed package.
+///
+/// A historical file from this same package contract may carry only the legacy
+/// 128-bit key. Each full-width identity is optional, but must match this
+/// installed package when present. Generic historical decoding instead uses the
+/// BFBS embedded in the file and does not call this compatibility gate.
+pub fn schema_metadata_matches_installed_contract(metadata: &BTreeMap<String, String>) -> bool {
+    matches!(
+        metadata.get(MCAP_SCHEMA_SET_HASH_KEY),
+        Some(value) if value == LEGACY_SCHEMA_SET_HASH_128
+    ) && optional_identity_matches(
+        metadata,
+        MCAP_SCHEMA_SET_IDENTITY_KEY,
+        SCHEMA_SET_IDENTITY,
+    ) && optional_identity_matches(
+        metadata,
+        MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY,
+        SCHEMA_PACKAGE_CONTRACT_IDENTITY,
+    )
+}
+
 /// A registered channel and its caller-owned sequence state.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct TopicChannel {

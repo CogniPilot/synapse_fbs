@@ -14,6 +14,11 @@ extern "C" {
 #define SYNAPSE_CMD_KEY_PREFIX {{ cmd_key_prefix|tojson }}
 #define SYNAPSE_META_KEY_PREFIX {{ meta_key_prefix|tojson }}
 #define SYNAPSE_LIVELINESS_KEY_PREFIX {{ liveliness_key_prefix|tojson }}
+#define SYNAPSE_TOPIC_CATALOG_VERSION {{ version }}
+#define SYNAPSE_FLATBUFFER_VALUE_MEDIA_TYPE {{ flatbuffer_value_media_type|tojson }}
+#define SYNAPSE_STRUCT_VALUE_MEDIA_TYPE {{ struct_value_media_type|tojson }}
+#define SYNAPSE_TYPE_SCHEMA_HASH_ALGORITHM {{ type_schema_hash_algorithm|tojson }}
+#define SYNAPSE_TOPIC_INSTANCE_KEY_GRAMMAR {{ topic_instance_key_grammar|tojson }}
 #define SYNAPSE_SCHEMA_SET_IDENTITY {{ schema_set_identity|tojson }}
 #define SYNAPSE_SCHEMA_PACKAGE_CONTRACT_IDENTITY {{ schema_package_contract_identity|tojson }}
 #define SYNAPSE_LEGACY_SCHEMA_SET_HASH_128 {{ legacy_schema_set_hash_128|tojson }}

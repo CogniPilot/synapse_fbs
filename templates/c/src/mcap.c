@@ -237,14 +237,14 @@ static int write_metadata(synapse_mcap_writer_t *writer,
         emit_string(writer, SYNAPSE_MCAP_METADATA_NAME, name_size) !=
             SYNAPSE_MCAP_OK ||
         emit_u32(writer, map_size) != SYNAPSE_MCAP_OK ||
-        emit_map_pair(writer, SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY,
-                      SYNAPSE_LEGACY_SCHEMA_SET_HASH_128) != SYNAPSE_MCAP_OK ||
-        emit_map_pair(writer, SYNAPSE_MCAP_SCHEMA_SET_IDENTITY_KEY,
-                      SYNAPSE_SCHEMA_SET_IDENTITY) != SYNAPSE_MCAP_OK ||
         emit_map_pair(writer,
                       SYNAPSE_MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY,
                       SYNAPSE_SCHEMA_PACKAGE_CONTRACT_IDENTITY) !=
             SYNAPSE_MCAP_OK ||
+        emit_map_pair(writer, SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY,
+                      SYNAPSE_LEGACY_SCHEMA_SET_HASH_128) != SYNAPSE_MCAP_OK ||
+        emit_map_pair(writer, SYNAPSE_MCAP_SCHEMA_SET_IDENTITY_KEY,
+                      SYNAPSE_SCHEMA_SET_IDENTITY) != SYNAPSE_MCAP_OK ||
         emit_map_pair(writer, SYNAPSE_MCAP_SESSION_ID_KEY, session_id) !=
             SYNAPSE_MCAP_OK ||
         emit_map_pair(writer, SYNAPSE_MCAP_SOURCE_KEY, source) !=

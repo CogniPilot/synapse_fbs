@@ -5,14 +5,14 @@ use std::{env, fs};
 
 use flatbuffers_reflection::reflection::{self, BaseType};
 use synapse_fbs::{
-    mcap::container::{read::LinearReader, records::Record},
+    mcap::{
+        container::{read::LinearReader, records::Record},
+        schema_metadata_matches_installed_contract,
+    },
     schemas::schema_by_name,
     topic::ActuatorOutputs,
     topic_catalog::{
-        LEGACY_SCHEMA_SET_HASH_128, MCAP_MESSAGE_ENCODING, MCAP_PROFILE, MCAP_SCHEMA_ENCODING,
-        MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY, MCAP_SCHEMA_SET_HASH_KEY,
-        MCAP_SCHEMA_SET_IDENTITY_KEY, MCAP_TOPIC_ID_KEY, SCHEMA_PACKAGE_CONTRACT_IDENTITY,
-        SCHEMA_SET_IDENTITY, topic_by_id,
+        MCAP_MESSAGE_ENCODING, MCAP_PROFILE, MCAP_SCHEMA_ENCODING, MCAP_TOPIC_ID_KEY, topic_by_id,
     },
 };
 
@@ -80,10 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &records[1],
         Record::Metadata(metadata)
             if metadata.name == "synapse"
-                && metadata.metadata[MCAP_SCHEMA_SET_HASH_KEY] == LEGACY_SCHEMA_SET_HASH_128
-                && metadata.metadata[MCAP_SCHEMA_SET_IDENTITY_KEY] == SCHEMA_SET_IDENTITY
-                && metadata.metadata[MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY]
-                    == SCHEMA_PACKAGE_CONTRACT_IDENTITY
+                && schema_metadata_matches_installed_contract(&metadata.metadata)
     ));
     let schema = schema_by_name("control").unwrap();
     let schema_id = records

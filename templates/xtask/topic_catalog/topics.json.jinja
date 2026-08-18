@@ -1,5 +1,11 @@
 {
   "version": {{ version }},
+  "value_contract": {
+    "flatbuffer_media_type": {{ flatbuffer_value_media_type|tojson }},
+    "struct_media_type": {{ struct_value_media_type|tojson }},
+    "type_schema_hash_algorithm": {{ type_schema_hash_algorithm|tojson }},
+    "topic_instance_key_grammar": {{ topic_instance_key_grammar|tojson }}
+  },
   "schema_set_identity": {{ schema_set_identity|tojson }},
   "schema_package_contract_identity": {{ schema_package_contract_identity|tojson }},
   "legacy_schema_set_hash_128": {{ legacy_schema_set_hash_128|tojson }},

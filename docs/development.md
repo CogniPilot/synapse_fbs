@@ -125,10 +125,11 @@ a normalized, length-framed transcript derived from the include-expanded BFBS,
 so unrelated type additions do not change an existing wire-type identity.
 
 The separate `schema_artifact_sha256` and embedded `bfbs_sha256` values identify
-the exact compiled BFBS bytes. `SCHEMA_SET_IDENTITY` covers routing and all topic
-and command wire contracts. `SCHEMA_PACKAGE_CONTRACT_IDENTITY` additionally
-covers the complete generated schema package contract, including BFBS artifacts
-and frozen catalog literals.
+the exact compiled BFBS bytes. `SCHEMA_SET_IDENTITY` covers catalog version,
+routing, key and instance grammar, value-encoding literals, and all topic and
+command wire contracts. `SCHEMA_PACKAGE_CONTRACT_IDENTITY` additionally covers
+the complete generated schema package contract, including BFBS artifacts,
+rooted catalog presentation, descriptions, and logging-profile literals.
 
 The 32-character `LEGACY_SCHEMA_SET_HASH_128` and per-file legacy fields retain
 the previous BFBS-prefix behavior for historical compatibility only. New Zenoh

@@ -6,6 +6,16 @@ pub const CMD_KEY_PREFIX: &str = {{ cmd_key_prefix|tojson }};
 pub const META_KEY_PREFIX: &str = {{ meta_key_prefix|tojson }};
 /// Reserved key segment for liveliness tokens.
 pub const LIVELINESS_KEY_PREFIX: &str = {{ liveliness_key_prefix|tojson }};
+/// Generated catalog format version.
+pub const TOPIC_CATALOG_VERSION: u8 = {{ version }};
+/// Media type used by variable-size FlatBuffers table payloads.
+pub const FLATBUFFER_VALUE_MEDIA_TYPE: &str = {{ flatbuffer_value_media_type|tojson }};
+/// Media type used by fixed-layout Synapse struct payloads.
+pub const STRUCT_VALUE_MEDIA_TYPE: &str = {{ struct_value_media_type|tojson }};
+/// Digest algorithm and width used by per-type schema identities.
+pub const TYPE_SCHEMA_HASH_ALGORITHM: &str = {{ type_schema_hash_algorithm|tojson }};
+/// Canonical grammar for a topic instance key segment.
+pub const TOPIC_INSTANCE_KEY_GRAMMAR: &str = {{ topic_instance_key_grammar|tojson }};
 /// Full SHA-256 identity of the routing and wire-type contract.
 pub const SCHEMA_SET_IDENTITY: &str = {{ schema_set_identity|tojson }};
 /// Full SHA-256 identity of the generated schema package contract.

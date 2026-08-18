@@ -6,10 +6,11 @@
 
 use std::fmt;
 
-use crate::topic_catalog::{self, TopicInfo};
+pub use crate::topic_catalog::{FLATBUFFER_VALUE_MEDIA_TYPE, STRUCT_VALUE_MEDIA_TYPE};
+use crate::topic_catalog::{self, TYPE_SCHEMA_HASH_ALGORITHM, TopicInfo};
 
-pub const FLATBUFFER_MEDIA_TYPE: &str = "application/x-flatbuffers";
-pub const STRUCT_MEDIA_TYPE: &str = "application/x-synapse-struct";
+pub const FLATBUFFER_MEDIA_TYPE: &str = FLATBUFFER_VALUE_MEDIA_TYPE;
+pub const STRUCT_MEDIA_TYPE: &str = STRUCT_VALUE_MEDIA_TYPE;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ValueContract {
@@ -23,8 +24,8 @@ impl ValueContract {
     /// contract so every producer emits one unambiguous representation.
     pub fn encoding(&self) -> String {
         format!(
-            "{};type={};schema=sha256:{}",
-            self.media_type, self.wire_type, self.schema_hash
+            "{};type={};schema={}:{}",
+            self.media_type, self.wire_type, TYPE_SCHEMA_HASH_ALGORITHM, self.schema_hash
         )
     }
 }

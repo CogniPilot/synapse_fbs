@@ -105,14 +105,15 @@ wire name should not be reused for a different contract.
 
 Explicitly configured low-bandwidth endpoints may omit repeated Zenoh metadata
 after comparing the generated `SCHEMA_SET_IDENTITY`. That full SHA-256 identity
-covers topic IDs, keys, instance rules, encodings, wire identities, payload
+covers the catalog version, key-space prefixes, topic IDs, keys, instance
+grammar, value-media and hash-algorithm literals, wire identities, payload
 sizes, command IDs, and request/reply contracts. A mismatch prevents the link
 from opening.
 
 `SCHEMA_PACKAGE_CONTRACT_IDENTITY` additionally covers the exact BFBS artifacts,
-catalog version, key-space literals, and logging-profile literals authored by
-this package. `SCHEMA_SET_HASH` remains an alias for the historical 128-bit
-value only, for compatibility with existing integrations.
+root-wrapper and catalog presentation, descriptions, and logging-profile
+literals authored by this package. `SCHEMA_SET_HASH` remains an alias for the
+historical 128-bit value only, for compatibility with existing integrations.
 
 A minimal byte-stream frame is:
 

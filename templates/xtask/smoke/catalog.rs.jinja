@@ -5,6 +5,11 @@ fn main() {
     assert_eq!(SCHEMA_PACKAGE_CONTRACT_IDENTITY.len(), 64);
     assert_eq!(LEGACY_SCHEMA_SET_HASH_128.len(), 32);
     assert_eq!(SCHEMA_SET_HASH, LEGACY_SCHEMA_SET_HASH_128);
+    assert_eq!(TOPIC_CATALOG_VERSION, 3);
+    assert_eq!(FLATBUFFER_VALUE_MEDIA_TYPE, "application/x-flatbuffers");
+    assert_eq!(STRUCT_VALUE_MEDIA_TYPE, "application/x-synapse-struct");
+    assert_eq!(TYPE_SCHEMA_HASH_ALGORITHM, "sha256");
+    assert_eq!(TOPIC_INSTANCE_KEY_GRAMMAR, "ascii-decimal-1-to-9-digits-u32");
     assert_eq!(MCAP_PROFILE, "synapse/1");
     assert_eq!(MCAP_SCHEMA_ENCODING, "flatbuffer");
     assert_eq!(MCAP_MESSAGE_ENCODING, "flatbuffer");

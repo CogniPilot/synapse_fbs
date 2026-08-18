@@ -12,7 +12,12 @@ incompatible change requires a new profile name such as `synapse/2`.
 - One MCAP Metadata record named `synapse` must precede the first Message.
 - The Metadata map must contain:
   - `synapse.schema_set_hash`: the producer release's 32-character lowercase
-    schema-set hash;
+    legacy schema-set hash. This key retains the historical 128-bit value and
+    must never be rebound to a full-width identity;
+  - `synapse.schema_set_identity`: the producer release's 64-character
+    lowercase full schema-set identity;
+  - `synapse.schema_package_contract_identity`: the producer release's
+    64-character lowercase schema-package contract identity;
   - `synapse.session_id`: exactly 32 lowercase hexadecimal characters
     representing a recording-unique 128-bit identifier;
   - `synapse.source`: a non-empty UTF-8 vehicle, simulator, or device identity;
@@ -27,6 +32,13 @@ incompatible change requires a new profile name such as `synapse/2`.
   expressed in the selected basis. A topic payload's `timestamp_ns` becomes
   `Message.publish_time = timestamp_ns` without conversion. When the
   sample has no publication timestamp, `publish_time` equals `log_time`.
+
+Historical `synapse/1` files may predate the two full-width identity keys.
+Generic historical readers preserve any identity values as provenance and
+decode messages with the BFBS embedded in that file. New writers must emit all
+three values. A reader enforcing compatibility with its installed package must
+require each present full-width identity to match that package. For a
+legacy-only file, it compares the legacy key.
 
 ## Topic schemas and channels
 
