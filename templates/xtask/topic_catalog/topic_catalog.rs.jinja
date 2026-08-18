@@ -6,17 +6,22 @@ pub const CMD_KEY_PREFIX: &str = {{ cmd_key_prefix|tojson }};
 pub const META_KEY_PREFIX: &str = {{ meta_key_prefix|tojson }};
 /// Reserved key segment for liveliness tokens.
 pub const LIVELINESS_KEY_PREFIX: &str = {{ liveliness_key_prefix|tojson }};
-/// SHA-256 truncated to 128 bits over the full catalog contract: topic ids,
-/// key suffixes, encodings, wire types with their transitive schema hashes,
-/// and command ids with their request/reply contracts. Constrained links
-/// compare it once at link establishment and refuse a mismatch.
-pub const SCHEMA_SET_HASH: &str = {{ schema_set_hash|tojson }};
+/// Full SHA-256 identity of the routing and wire-type contract.
+pub const SCHEMA_SET_IDENTITY: &str = {{ schema_set_identity|tojson }};
+/// Full SHA-256 identity of the generated schema package contract.
+pub const SCHEMA_PACKAGE_CONTRACT_IDENTITY: &str = {{ schema_package_contract_identity|tojson }};
+/// Legacy 128-bit schema-set hash retained for historical compatibility.
+pub const LEGACY_SCHEMA_SET_HASH_128: &str = {{ legacy_schema_set_hash_128|tojson }};
+/// Compatibility alias for the historical 128-bit schema-set hash.
+pub const SCHEMA_SET_HASH: &str = LEGACY_SCHEMA_SET_HASH_128;
 /// Frozen MCAP logging contract. See MCAP.md in the source distribution.
 pub const MCAP_PROFILE: &str = {{ mcap_profile|tojson }};
 pub const MCAP_SCHEMA_ENCODING: &str = {{ mcap_schema_encoding|tojson }};
 pub const MCAP_MESSAGE_ENCODING: &str = {{ mcap_message_encoding|tojson }};
 pub const MCAP_METADATA_NAME: &str = {{ mcap_metadata_name|tojson }};
 pub const MCAP_SCHEMA_SET_HASH_KEY: &str = {{ mcap_schema_set_hash_key|tojson }};
+pub const MCAP_SCHEMA_SET_IDENTITY_KEY: &str = {{ mcap_schema_set_identity_key|tojson }};
+pub const MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY: &str = {{ mcap_schema_package_contract_identity_key|tojson }};
 pub const MCAP_SESSION_ID_KEY: &str = {{ mcap_session_id_key|tojson }};
 pub const MCAP_SOURCE_KEY: &str = {{ mcap_source_key|tojson }};
 pub const MCAP_TIME_BASIS_KEY: &str = {{ mcap_time_basis_key|tojson }};
@@ -41,8 +46,12 @@ pub struct TopicInfo {
     pub mcap_schema_file: &'static str,
     /// Fully qualified FlatBuffers type carried in the value bytes.
     pub wire_type: &'static str,
-    /// SHA-256 of this wire type's transitive schema contract.
+    /// Full SHA-256 identity of this wire type's transitive schema contract.
     pub schema_hash: &'static str,
+    /// Full SHA-256 digest of the exact compiled BFBS artifact.
+    pub schema_artifact_sha256: &'static str,
+    /// Historical 128-bit prefix of the compiled BFBS digest.
+    pub legacy_schema_file_hash_128: &'static str,
     pub fixed_layout: bool,
     pub multi_instance: bool,
     pub scope: &'static str,
@@ -58,12 +67,16 @@ pub struct CommandInfo {
     pub key: &'static str,
     /// Fully qualified FlatBuffers request type.
     pub request_type: &'static str,
-    /// SHA-256 of the request type's transitive schema contract.
+    /// Full SHA-256 identity of the request type's transitive schema contract.
     pub request_schema_hash: &'static str,
+    /// Historical 128-bit prefix of the request schema file's BFBS digest.
+    pub legacy_request_schema_file_hash_128: &'static str,
     /// Fully qualified FlatBuffers reply type.
     pub reply_type: &'static str,
-    /// SHA-256 of the reply type's transitive schema contract.
+    /// Full SHA-256 identity of the reply type's transitive schema contract.
     pub reply_schema_hash: &'static str,
+    /// Historical 128-bit prefix of the reply schema file's BFBS digest.
+    pub legacy_reply_schema_file_hash_128: &'static str,
     /// Canonical request payload encoding: "struct" or "table".
     pub request_encoding: &'static str,
     /// Fixed request payload size in bytes when request_encoding is "struct".
@@ -99,7 +112,9 @@ pub const TOPICS: &[TopicInfo] = &[
         mcap_schema_name: {{ topic.mcap_schema_name|tojson }},
         mcap_schema_file: {{ topic.mcap_schema_file|tojson }},
         wire_type: {{ topic.wire_type|tojson }},
-        schema_hash: {{ topic.schema_hash|tojson }},
+        schema_hash: {{ topic.type_schema_hash|tojson }},
+        schema_artifact_sha256: {{ topic.schema_artifact_sha256|tojson }},
+        legacy_schema_file_hash_128: {{ topic.legacy_schema_file_hash_128|tojson }},
         fixed_layout: {{ topic.fixed_layout }},
         multi_instance: {{ topic.multi_instance }},
         scope: {{ topic.scope|tojson }},
@@ -116,9 +131,11 @@ pub const COMMANDS: &[CommandInfo] = &[
         name: {{ command.name|tojson }},
         key: {{ command.key|tojson }},
         request_type: {{ command.request_type|tojson }},
-        request_schema_hash: {{ command.request_schema_hash|tojson }},
+        request_schema_hash: {{ command.request_type_schema_hash|tojson }},
+        legacy_request_schema_file_hash_128: {{ command.legacy_request_schema_file_hash_128|tojson }},
         reply_type: {{ command.reply_type|tojson }},
-        reply_schema_hash: {{ command.reply_schema_hash|tojson }},
+        reply_schema_hash: {{ command.reply_type_schema_hash|tojson }},
+        legacy_reply_schema_file_hash_128: {{ command.legacy_reply_schema_file_hash_128|tojson }},
         request_encoding: {{ command.request_encoding|tojson }},
         request_size: {% if command.request_size is not none %}Some({{ command.request_size }}){% else %}None{% endif %},
         reply_encoding: {{ command.reply_encoding|tojson }},

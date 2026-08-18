@@ -23,7 +23,7 @@ impl ValueContract {
     /// contract so every producer emits one unambiguous representation.
     pub fn encoding(&self) -> String {
         format!(
-            "{};type={};schema=sha256-128:{}",
+            "{};type={};schema=sha256:{}",
             self.media_type, self.wire_type, self.schema_hash
         )
     }
@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(
             health_encoding,
             format!(
-                "application/x-synapse-struct;type={};schema=sha256-128:{}",
+                "application/x-synapse-struct;type={};schema=sha256:{}",
                 health.wire_type, health.schema_hash
             )
         );
@@ -108,7 +108,7 @@ mod tests {
         assert!(topic_for_encoding("zenoh/bytes").is_err());
         assert!(
             topic_for_encoding(
-                "application/x-synapse-struct;type=synapse.topic.UnknownData;schema=sha256-128:00000000000000000000000000000000"
+                "application/x-synapse-struct;type=synapse.topic.UnknownData;schema=sha256:0000000000000000000000000000000000000000000000000000000000000000"
             )
             .unwrap_err()
             .to_string()
@@ -118,7 +118,7 @@ mod tests {
         let topic = topic_catalog::topic_by_name("VehicleHealth").unwrap();
         let encoding = encoding_for_topic(topic);
         assert!(
-            topic_for_encoding(&encoding.replace("schema=sha256-128:", "schema=sha256-128:deadbeef"))
+            topic_for_encoding(&encoding.replace("schema=sha256:", "schema=sha256:deadbeef"))
                 .is_err()
         );
         assert!(topic_for_encoding(&format!("{encoding};extra=not-allowed")).is_err());

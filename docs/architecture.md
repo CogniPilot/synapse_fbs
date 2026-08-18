@@ -81,17 +81,21 @@ infer a wire type from a key.
 Every normal Synapse Zenoh value carries an encoding and schema string:
 
 ```text
-<media-type>;type=<wire-type>;schema=sha256-128:<schema-hash>
+<media-type>;type=<wire-type>;schema=sha256:<schema-hash>
 ```
 
 Fixed structs use `application/x-synapse-struct`; root tables use
-`application/x-flatbuffers`. The schema hash is the first 128 bits of SHA-256
-over the named wire type and every transitively referenced type. Unrelated
-schema edits do not change it.
+`application/x-flatbuffers`. The schema hash is the full 64-character lowercase
+SHA-256 identity of the named wire type and every transitively referenced type.
+It is computed from a normalized, length-framed reflection transcript, so an
+unrelated schema edit does not change it.
 
-Generated catalogs expose the encoding, wire type, schema hash, fixed payload
-size, scope, canonical key, instance grammar, and command request/reply
-contracts. Consumers require an exact match before decoding.
+Generated catalogs expose the encoding, wire type, schema hash, exact BFBS
+artifact SHA-256, fixed payload size, scope, canonical key, instance grammar,
+and command request/reply contracts. Consumers require an exact type identity
+match before decoding. The artifact digest identifies the compiled BFBS bytes
+used by reflection and logging; it is distinct from the transitive type
+identity.
 
 Hashes are derived from the committed schemas through FlatCC reflection on
 every build. They are generated data rather than committed source. A published
@@ -100,9 +104,15 @@ wire name should not be reused for a different contract.
 ## Constrained links
 
 Explicitly configured low-bandwidth endpoints may omit repeated Zenoh metadata
-after comparing the generated `SCHEMA_SET_HASH`. That hash covers topic IDs,
-keys, instance rules, encodings, wire hashes, command IDs, and request/reply
-contracts. A mismatch prevents the link from opening.
+after comparing the generated `SCHEMA_SET_IDENTITY`. That full SHA-256 identity
+covers topic IDs, keys, instance rules, encodings, wire identities, payload
+sizes, command IDs, and request/reply contracts. A mismatch prevents the link
+from opening.
+
+`SCHEMA_PACKAGE_CONTRACT_IDENTITY` additionally covers the exact BFBS artifacts,
+catalog version, key-space literals, and logging-profile literals authored by
+this package. `SCHEMA_SET_HASH` remains an alias for the historical 128-bit
+value only, for compatibility with existing integrations.
 
 A minimal byte-stream frame is:
 

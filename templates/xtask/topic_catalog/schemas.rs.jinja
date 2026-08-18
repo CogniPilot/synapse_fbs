@@ -15,6 +15,8 @@ pub struct EmbeddedSchema {
     /// Compiled binary schema (`flatc --schema -b`), a reflection.fbs root.
     /// Includes are flattened, so each entry is self-contained.
     pub bfbs: &'static [u8],
+    /// Full SHA-256 digest of the exact compiled BFBS bytes.
+    pub bfbs_sha256: &'static str,
     /// Fully qualified declared root type, when the file declares one.
     pub root_type: Option<&'static str>,
     /// Declared file identifier, when the file declares one.
@@ -28,6 +30,7 @@ pub const SCHEMAS: &[EmbeddedSchema] = &[
         file: {{ schema.file|tojson }},
         fbs: include_str!({{ schema.fbs_include|tojson }}),
         bfbs: include_bytes!({{ schema.bfbs_include|tojson }}),
+        bfbs_sha256: {{ schema.bfbs_sha256|tojson }},
         root_type: {% if schema.root_type %}Some({{ schema.root_type|tojson }}){% else %}None{% endif %},
         file_identifier: {% if schema.file_identifier %}Some({{ schema.file_identifier|tojson }}){% else %}None{% endif %},
     },

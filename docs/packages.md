@@ -68,7 +68,9 @@ logging is required so disabled logging has no linked-code cost.
 
 The generated packages expose the topic and command catalog. It includes IDs,
 canonical keys, scopes, encodings, payload sizes, instance behavior, wire
-types, and schema hashes. The C archive also ships `topics.json`.
+types, full transitive type identities, exact BFBS artifact SHA-256 values,
+full schema-set and package-contract identities, and explicit legacy 128-bit
+compatibility fields. The C archive also ships `topics.json`.
 
 The C release archive contains `fbs/`, `bfbs/`, `schema.sha256`, and
 `bfbs.sha256` so downstream builds and log readers can verify the exact schema

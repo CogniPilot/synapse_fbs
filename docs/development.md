@@ -117,12 +117,23 @@ Generated outputs live below `target/xtask/` and are safe to remove:
 - `artifacts`
 - build, check, smoke, and downloaded-source work directories
 
-## Wire hashes
+## Wire identities
 
-Schema hashes are the first 128 bits of SHA-256 over the BFBS bytes emitted by
-FlatCC on every build. The schema-set hash is derived from those hashes and the
-routing catalog. Normal Zenoh consumers compare the schema hash; constrained
-endpoints compare the schema-set hash before exchanging compact frames.
+Each public `schema_hash` is a full 64-character SHA-256 identity over the named
+wire type and its complete transitive dependency closure. The identity input is
+a normalized, length-framed transcript derived from the include-expanded BFBS,
+so unrelated type additions do not change an existing wire-type identity.
+
+The separate `schema_artifact_sha256` and embedded `bfbs_sha256` values identify
+the exact compiled BFBS bytes. `SCHEMA_SET_IDENTITY` covers routing and all topic
+and command wire contracts. `SCHEMA_PACKAGE_CONTRACT_IDENTITY` additionally
+covers the complete generated schema package contract, including BFBS artifacts
+and frozen catalog literals.
+
+The 32-character `LEGACY_SCHEMA_SET_HASH_128` and per-file legacy fields retain
+the previous BFBS-prefix behavior for historical compatibility only. New Zenoh
+consumers compare the full type identity, and constrained endpoints compare the
+full schema-set identity before exchanging compact frames.
 
 Published wire-type names should remain immutable. An incompatible payload
 change gets a new wire type and topic so old and new consumers fail clearly

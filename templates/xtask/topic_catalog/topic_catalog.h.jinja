@@ -14,12 +14,17 @@ extern "C" {
 #define SYNAPSE_CMD_KEY_PREFIX {{ cmd_key_prefix|tojson }}
 #define SYNAPSE_META_KEY_PREFIX {{ meta_key_prefix|tojson }}
 #define SYNAPSE_LIVELINESS_KEY_PREFIX {{ liveliness_key_prefix|tojson }}
-#define SYNAPSE_SCHEMA_SET_HASH {{ schema_set_hash|tojson }}
+#define SYNAPSE_SCHEMA_SET_IDENTITY {{ schema_set_identity|tojson }}
+#define SYNAPSE_SCHEMA_PACKAGE_CONTRACT_IDENTITY {{ schema_package_contract_identity|tojson }}
+#define SYNAPSE_LEGACY_SCHEMA_SET_HASH_128 {{ legacy_schema_set_hash_128|tojson }}
+#define SYNAPSE_SCHEMA_SET_HASH SYNAPSE_LEGACY_SCHEMA_SET_HASH_128
 #define SYNAPSE_MCAP_PROFILE {{ mcap_profile|tojson }}
 #define SYNAPSE_MCAP_SCHEMA_ENCODING {{ mcap_schema_encoding|tojson }}
 #define SYNAPSE_MCAP_MESSAGE_ENCODING {{ mcap_message_encoding|tojson }}
 #define SYNAPSE_MCAP_METADATA_NAME {{ mcap_metadata_name|tojson }}
 #define SYNAPSE_MCAP_SCHEMA_SET_HASH_KEY {{ mcap_schema_set_hash_key|tojson }}
+#define SYNAPSE_MCAP_SCHEMA_SET_IDENTITY_KEY {{ mcap_schema_set_identity_key|tojson }}
+#define SYNAPSE_MCAP_SCHEMA_PACKAGE_CONTRACT_IDENTITY_KEY {{ mcap_schema_package_contract_identity_key|tojson }}
 #define SYNAPSE_MCAP_SESSION_ID_KEY {{ mcap_session_id_key|tojson }}
 #define SYNAPSE_MCAP_SOURCE_KEY {{ mcap_source_key|tojson }}
 #define SYNAPSE_MCAP_TIME_BASIS_KEY {{ mcap_time_basis_key|tojson }}
@@ -39,7 +44,9 @@ typedef struct synapse_topic_info {
     const char *mcap_schema_name; /* fully qualified MCAP Schema.name */
     const char *mcap_schema_file; /* package-relative BFBS */
     const char *wire_type; /* fully qualified FlatBuffers value type */
-    const char *schema_hash; /* SHA-256 of the transitive wire schema */
+    const char *schema_hash; /* full SHA-256 transitive type identity */
+    const char *schema_artifact_sha256; /* full SHA-256 of the BFBS bytes */
+    const char *legacy_schema_file_hash_128; /* historical BFBS digest prefix */
     bool fixed_layout;
     bool multi_instance;
     const char *scope;
@@ -52,9 +59,11 @@ typedef struct synapse_command_info {
     const char *name;
     const char *key;
     const char *request_type; /* fully qualified FlatBuffers type */
-    const char *request_schema_hash; /* SHA-256 of the transitive request schema */
+    const char *request_schema_hash; /* full transitive request type identity */
+    const char *legacy_request_schema_file_hash_128;
     const char *reply_type;   /* fully qualified FlatBuffers type */
-    const char *reply_schema_hash; /* SHA-256 of the transitive reply schema */
+    const char *reply_schema_hash; /* full transitive reply type identity */
+    const char *legacy_reply_schema_file_hash_128;
     const char *request_encoding;
     size_t request_size; /* zero when request_encoding is table */
     const char *reply_encoding;
@@ -75,7 +84,9 @@ static const synapse_topic_info_t synapse_topics[] = {
         {{ topic.mcap_schema_name|tojson }},
         {{ topic.mcap_schema_file|tojson }},
         {{ topic.wire_type|tojson }},
-        {{ topic.schema_hash|tojson }},
+        {{ topic.type_schema_hash|tojson }},
+        {{ topic.schema_artifact_sha256|tojson }},
+        {{ topic.legacy_schema_file_hash_128|tojson }},
         {{ topic.fixed_layout }},
         {{ topic.multi_instance }},
         {{ topic.scope|tojson }},
@@ -95,9 +106,11 @@ static const synapse_command_info_t synapse_commands[] = {
         {{ command.name|tojson }},
         {{ command.key|tojson }},
         {{ command.request_type|tojson }},
-        {{ command.request_schema_hash|tojson }},
+        {{ command.request_type_schema_hash|tojson }},
+        {{ command.legacy_request_schema_file_hash_128|tojson }},
         {{ command.reply_type|tojson }},
-        {{ command.reply_schema_hash|tojson }},
+        {{ command.reply_type_schema_hash|tojson }},
+        {{ command.legacy_reply_schema_file_hash_128|tojson }},
         {{ command.request_encoding|tojson }},
         {% if command.request_size is not none %}{{ command.request_size }}{% else %}0{% endif %},
         {{ command.reply_encoding|tojson }},

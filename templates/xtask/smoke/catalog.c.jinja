@@ -3,7 +3,11 @@
 #include <stdio.h>
 
 int main(void) {
-    assert(strlen(SYNAPSE_SCHEMA_SET_HASH) == 32);
+    assert(strlen(SYNAPSE_SCHEMA_SET_IDENTITY) == 64);
+    assert(strlen(SYNAPSE_SCHEMA_PACKAGE_CONTRACT_IDENTITY) == 64);
+    assert(strlen(SYNAPSE_LEGACY_SCHEMA_SET_HASH_128) == 32);
+    assert(strcmp(SYNAPSE_SCHEMA_SET_HASH,
+                  SYNAPSE_LEGACY_SCHEMA_SET_HASH_128) == 0);
     assert(strcmp(SYNAPSE_MCAP_PROFILE, "synapse/1") == 0);
     assert(strcmp(SYNAPSE_MCAP_SCHEMA_ENCODING, "flatbuffer") == 0);
     assert(strcmp(SYNAPSE_MCAP_MESSAGE_ENCODING, "flatbuffer") == 0);
@@ -51,14 +55,19 @@ int main(void) {
     assert(odom != NULL &&
            strcmp(odom->mcap_schema_name, "synapse.topic.Odometry") == 0 &&
            strcmp(odom->mcap_schema_file, "bfbs/state.bfbs") == 0);
+    assert(strlen(odom->schema_hash) == 64 &&
+           strlen(odom->schema_artifact_sha256) == 64 &&
+           strlen(odom->legacy_schema_file_hash_128) == 32);
 
     const synapse_command_info_t *command = synapse_command_by_name("param_get");
     assert(command != NULL && command->id == 1 &&
            strcmp(command->request_type, "synapse.cmd.ParamGetRequest") == 0);
     assert(strcmp(command->request_encoding, "table") == 0 &&
            command->request_size == 0);
-    assert(strlen(command->request_schema_hash) == 32 &&
-           strlen(command->reply_schema_hash) == 32);
+    assert(strlen(command->request_schema_hash) == 64 &&
+           strlen(command->reply_schema_hash) == 64);
+    assert(strlen(command->legacy_request_schema_file_hash_128) == 32 &&
+           strlen(command->legacy_reply_schema_file_hash_128) == 32);
 
     command = synapse_command_by_name("firmware_prepare");
     assert(command != NULL && command->id == 9 &&
