@@ -37,6 +37,14 @@ add_library(synapse_fbs::cdr ALIAS synapse_fbs_cdr)
 
 target_link_libraries(synapse_fbs_cdr PUBLIC synapse_fbs_c)
 
+add_library(synapse_fbs_wire STATIC EXCLUDE_FROM_ALL
+  "${_SYNAPSE_FBS_ROOT}/src/wire.c"
+)
+add_library(synapse_fbs::wire ALIAS synapse_fbs_wire)
+
+target_link_libraries(synapse_fbs_wire PUBLIC synapse_fbs_c)
+target_compile_features(synapse_fbs_wire PUBLIC c_std_11)
+
 add_library(synapse_fbs_mcap STATIC EXCLUDE_FROM_ALL
   "${_SYNAPSE_FBS_ROOT}/src/mcap.c"
 {% for source in mcap_bfbs_sources -%}
