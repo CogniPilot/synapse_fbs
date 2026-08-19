@@ -42,6 +42,11 @@ target_link_libraries(app PRIVATE synapse_fbs::c)
 Link `synapse_fbs::flatcc_runtime` when using generated builders, verifiers, or
 JSON helpers.
 
+Link `synapse_fbs::cdr`, or enable `CONFIG_SYNAPSE_FBS_CDR` when the archive is
+loaded as a Zephyr module, for the allocation-free little-endian CDRv1 codecs
+and generated projection catalog. The application selects publishers, ROS
+topics, Zenoh routes, QoS, and traffic policy.
+
 ```c
 #include <synapse/topic_catalog.h>
 

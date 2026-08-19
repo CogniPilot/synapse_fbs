@@ -1,0 +1,28 @@
+module synapse_msgs {
+  module msg {
+    struct GnssFix {
+      uint64 timestamp_ns;
+      uint64 time_unix_ns;
+      int32 latitude_deg_e7;
+      int32 longitude_deg_e7;
+      int32 altitude_msl_mm;
+      int32 altitude_ellipsoid_mm;
+      uint16 horizontal_accuracy_mm;
+      uint16 vertical_accuracy_mm;
+      uint16 velocity_accuracy_mm_s;
+      uint16 yaw_accuracy_cdeg;
+      uint16 hdop_centi;
+      uint16 vdop_centi;
+      uint16 ground_speed_cm_s;
+      uint16 course_over_ground_cdeg;
+      uint16 yaw_cdeg;
+      int16 velocity_up_cm_s;
+      uint8 flags;
+      uint8 fix_type;
+      uint8 satellites_used;
+      uint8 satellites_visible;
+      uint8 time_status;
+      uint8 id;
+    };
+  };
+};

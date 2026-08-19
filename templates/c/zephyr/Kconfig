@@ -4,3 +4,10 @@ config SYNAPSE_FBS_MCAP
 	help
 	  Build the allocation-free synapse/1 MCAP streaming writer. Applications
 	  still declare their own topics, queues, buffers, thread, and storage sink.
+
+config SYNAPSE_FBS_CDR
+	bool "Synapse CDRv1 projection support"
+	default n
+	help
+	  Build the allocation-free little-endian CDRv1 codecs and generated
+	  projection catalog. Applications select publishers and transport policy.

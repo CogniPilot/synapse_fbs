@@ -18,11 +18,15 @@ endif()
 if(NOT TARGET synapse_fbs::mcap)
   message(FATAL_ERROR "missing target: synapse_fbs::mcap")
 endif()
+if(NOT TARGET synapse_fbs::cdr)
+  message(FATAL_ERROR "missing target: synapse_fbs::cdr")
+endif()
 
 add_executable(smoke main.c)
 target_link_libraries(smoke PRIVATE
   synapse_fbs::c
   synapse_fbs::flatcc_runtime
   synapse_fbs::print
+  synapse_fbs::cdr
   synapse_fbs::mcap
 )

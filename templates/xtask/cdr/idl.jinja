@@ -1,0 +1,9 @@
+module synapse_msgs {
+  module msg {
+    struct {{ ros_message }} {
+{%- for field in fields %}
+      {{ field.idl_type }} {{ field.name }}{% if field.count > 1 %}[{{ field.count }}]{% endif %};
+{%- endfor %}
+    };
+  };
+};

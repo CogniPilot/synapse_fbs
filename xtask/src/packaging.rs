@@ -141,15 +141,18 @@ fn generate_bindings(
 
     let schema = load_compiled_schema(&bfbs_dir)?;
     validate_protocol(&schema)?;
+    validate_cdr_idl_sources(root, templates, &schema)?;
     let topics = topic_entries(&schema)?;
     let wire = build_wire_descriptors(&bfbs_dir)?;
     wire_check(root, &wire)?;
     write_rust_topic_catalog(templates, &packages.rust, &schema, &topics)?;
+    write_rust_cdr_catalog(templates, root, &schema, &packages.rust)?;
 
     // The Rust crate ships the wire contract itself: schema sources, compiled
     // binary schemas, and a generated debug decoder, so downstream tools do
     // not vendor schema copies that can drift from the pinned release.
     copy_dir_all(&root.join("fbs"), &packages.rust.join("fbs"))?;
+    copy_dir_all(&root.join("cdr"), &packages.rust.join("cdr"))?;
     copy_dir_all(
         &root.join("test-vectors"),
         &packages.rust.join("test-vectors"),
@@ -172,6 +175,38 @@ fn write_rust_topic_catalog(
         "xtask/topic_catalog/topic_catalog.rs.jinja",
         topic_catalog_context(schema, topics)?,
         &package_root.join("src/topic_catalog.rs"),
+    )
+}
+
+fn write_rust_cdr_catalog(
+    templates: &Templates,
+    root: &Path,
+    schema: &CompiledSchema,
+    package_root: &Path,
+) -> Result<()> {
+    templates.render_to_file(
+        "xtask/cdr/cdr_catalog.rs.jinja",
+        cdr_projection_context(root, schema)?,
+        &package_root.join("src/cdr_catalog.rs"),
+    )
+}
+
+fn write_c_cdr_catalog(
+    templates: &Templates,
+    root: &Path,
+    schema: &CompiledSchema,
+    package_root: &Path,
+) -> Result<()> {
+    let context = cdr_projection_context(root, schema)?;
+    templates.render_to_file(
+        "xtask/cdr/cdr_catalog.h.jinja",
+        context.clone(),
+        &package_root.join("include/synapse/cdr_catalog.h"),
+    )?;
+    templates.render_to_file(
+        "xtask/cdr/cdr_catalog.c.jinja",
+        context,
+        &package_root.join("src/cdr_catalog.c"),
     )
 }
 
@@ -467,6 +502,7 @@ fn build_archives(
     generate_reflection_schemas(root, &flatcc.binary, &model_bfbs)?;
     let schema = load_compiled_schema(&model_bfbs)?;
     validate_protocol(&schema)?;
+    validate_cdr_idl_sources(root, &templates, &schema)?;
     let topics = topic_entries(&schema)?;
 
     let c_root = workdir.join("synapse_fbs-c");
@@ -509,6 +545,7 @@ fn build_archives(
     )?;
     copy_common_archive_files(root, &c_root)?;
     write_c_topic_catalogs(&templates, &c_root, &schema, &topics)?;
+    write_c_cdr_catalog(&templates, root, &schema, &c_root)?;
     write_c_mcap_topics(&templates, &c_root, &schema, &topics)?;
     write_c_topic_print(
         &templates,
@@ -606,6 +643,7 @@ fn copy_common_archive_files(root: &Path, archive_root: &Path) -> Result<()> {
     fs::copy(root.join("LICENSE"), archive_root.join("LICENSE"))?;
     fs::copy(root.join(MCAP_PROFILE_PATH), archive_root.join("MCAP.md"))?;
     copy_dir_all(&root.join("fbs"), &archive_root.join("fbs"))?;
+    copy_dir_all(&root.join("cdr"), &archive_root.join("cdr"))?;
     copy_dir_all(
         &root.join("test-vectors"),
         &archive_root.join("test-vectors"),

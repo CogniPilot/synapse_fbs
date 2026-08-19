@@ -1,0 +1,15 @@
+module synapse_msgs {
+  module msg {
+    struct OpticalFlowVelocity {
+      uint64 timestamp_ns;
+      float velocity_flu_m_s[2];
+      float distance_m;
+      float roll_rad;
+      float pitch_rad;
+      uint8 quality;
+      uint8 flags;
+      uint8 time_status;
+      uint8 id;
+    };
+  };
+};

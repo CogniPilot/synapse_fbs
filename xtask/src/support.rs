@@ -306,6 +306,22 @@ fn smoke_c_archive(templates: &Templates, c_root: &Path) -> Result<()> {
     exercise_c_actuator_output_manifest(c_root, &actuator_contract_smoke)?;
     remove_file_if_exists(&actuator_contract_smoke)?;
 
+    let cdr_smoke = c_root.join("cdr_smoke");
+    run(Command::new(&cc)
+        .arg("-std=c11")
+        .arg("-Wall")
+        .arg("-Wextra")
+        .arg("-Werror")
+        .arg("-I")
+        .arg(c_root.join("include"))
+        .arg(c_root.join("tests/cdr.c"))
+        .arg(c_root.join("src/cdr.c"))
+        .arg(c_root.join("src/cdr_catalog.c"))
+        .arg("-o")
+        .arg(&cdr_smoke))?;
+    run(&mut Command::new(&cdr_smoke))?;
+    remove_file_if_exists(&cdr_smoke)?;
+
     let mcap_smoke = c_root.join("mcap_smoke");
     run(Command::new(&cc)
         .arg("-std=c11")

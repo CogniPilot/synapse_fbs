@@ -1,0 +1,62 @@
+#ifndef SYNAPSE_CDR_CATALOG_H
+#define SYNAPSE_CDR_CATALOG_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#include <synapse/cdr.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define SYNAPSE_CDR_PROJECTION_CATALOG_VERSION {{ version }}U
+#define SYNAPSE_CDR_PROJECTION_SET_IDENTITY {{ projection_set_identity|tojson }}
+#define SYNAPSE_CDR_ENCODING {{ encoding|tojson }}
+#define SYNAPSE_CDR_SCALAR_BYTE_ORDER {{ scalar_byte_order|tojson }}
+#define SYNAPSE_CDR_PROJECTION_COUNT {{ projections|length }}U
+
+typedef struct synapse_cdr_projection_info {
+    uint16_t topic_id;
+    const char *synapse_topic;
+    const char *synapse_schema_hash;
+    const char *ros_topic;
+    const char *ros_type;
+    const char *dds_type;
+    const char *rihs01;
+    const char *idl_path;
+    const char *idl_sha256;
+    size_t body_bytes;
+    size_t total_bytes;
+} synapse_cdr_projection_info_t;
+
+extern const synapse_cdr_projection_info_t
+    synapse_cdr_projections[SYNAPSE_CDR_PROJECTION_COUNT];
+
+const synapse_cdr_projection_info_t *synapse_cdr_projection_by_topic_id(
+    uint16_t topic_id);
+
+{%- for projection in projections %}
+
+#define SYNAPSE_CDR_{{ projection.symbol|upper }}_BODY_BYTES {{ projection.body_bytes }}U
+#define SYNAPSE_CDR_{{ projection.symbol|upper }}_TOTAL_BYTES {{ projection.total_bytes }}U
+
+typedef struct synapse_cdr_{{ projection.symbol }} {
+{%- for field in projection.fields %}
+    {{ field.c_type }} {{ field.name }}{% if field.count > 1 %}[{{ field.count }}]{% endif %};
+{%- endfor %}
+} synapse_cdr_{{ projection.symbol }}_t;
+
+synapse_cdr_result_t synapse_cdr_encode_{{ projection.symbol }}(
+    const synapse_cdr_{{ projection.symbol }}_t *value,
+    uint8_t *bytes, size_t capacity, size_t *written);
+synapse_cdr_result_t synapse_cdr_decode_{{ projection.symbol }}(
+    const uint8_t *bytes, size_t size,
+    synapse_cdr_{{ projection.symbol }}_t *value);
+{%- endfor %}
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif

@@ -163,9 +163,22 @@ rules are normative in the [`synapse/1` MCAP profile](MCAP.md).
 ## ROS integration
 
 ROS messages are edge integration types, not the Synapse wire format. Bridge
-nodes translate selected topics for visualization, autonomy, and simulation.
-Synapse stays compact and fixed-layout across vehicle networks, shared memory,
-radio links, and logs.
+nodes can publish selected topics as bounded CDRv1 mirrors for visualization,
+autonomy, and simulation. Synapse stays compact and fixed-layout across
+vehicle networks, shared memory, radio links, and logs.
 
-The generated topic catalog and BFBS reflection schemas make those bridges
-data-driven without embedding another `.fbs` compiler.
+Each materialized projection has canonical IDL, an exact ROS type and DDS type,
+a RIHS01 identity, a fixed serialized size, and allocation-free C and Rust
+codecs. Generation verifies the projection field list and exact transitive
+source identity against BFBS reflection, then gives the complete projection
+set its own identity. The CDR projection identity is separate from
+`SCHEMA_SET_IDENTITY` and
+`SCHEMA_PACKAGE_CONTRACT_IDENTITY`, so adding an optional mirror does not
+change the FlatBuffers compatibility contract.
+
+`GnssFix` and `OpticalFlowVelocity` are the initial materialized projections.
+Additional topics opt in through the same curated registry after their exact
+bounded ROS IDL and RIHS01 identity are established. ROS domain selection,
+QoS, Zenoh keys and attachments, publisher roles, endpoint enablement, and
+traffic limits remain deployment and transport policy rather than schema
+package inputs.

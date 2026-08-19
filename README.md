@@ -17,6 +17,13 @@ radio links, and MCAP logs. Runtime telemetry and control payloads favor
 fixed-layout FlatBuffers structs so the same little-endian bytes can move
 between processors and transports without re-serialization.
 
+Selected topics can also publish an exact bounded CDRv1 projection for ROS 2
+integration. Canonical IDL sources live under `cdr/`; the generator validates
+their fields against FlatBuffers reflection and emits allocation-free C and
+Rust codecs plus projection metadata. A projection is a separate edge
+representation and does not change the authoritative Synapse wire identity or
+select any deployment route.
+
 Raw sensor topics preserve source conventions. Estimates and commands use ENU
 world vectors, FLU body vectors, SI units, and Hamilton quaternions in `w x y
 z` order. Validity is explicit through schema-defined flags; sentinel values
@@ -42,6 +49,7 @@ profile](docs/MCAP.md) for the full contracts.
 ## Repository layout
 
 - `fbs/`: authoritative `.fbs` schemas.
+- `cdr/`: canonical IDL for materialized bounded CDRv1 projections.
 - `templates/`: Rust, C, and xtask MiniJinja inputs.
 - `xtask/`: FlatCC-reflection-driven generation and verification.
 - `docs/`: architecture, package, development, MCAP, and use-case details.

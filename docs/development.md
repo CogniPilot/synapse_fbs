@@ -92,6 +92,7 @@ without a release name use development version `0.0.0`.
 The source inputs are deliberately separated:
 
 - `fbs/` contains only the authoritative FlatBuffers schemas.
+- `cdr/` contains canonical IDL for materialized bounded CDRv1 projections.
 - `templates/{rust,c}` contains package skeletons.
 - `templates/xtask` contains MiniJinja templates for generated catalogs,
   checksums, BFBS source assets, and smoke programs.
@@ -107,7 +108,8 @@ The FlatCC source tree is used only when the portable C archive needs FlatCC
 runtime source files.
 
 The Rust orchestration is split by responsibility: `main.rs` contains the CLI
-flow, `protocol.rs` contains declarative routing policy, `schema.rs` adapts BFBS
+flow, `protocol.rs` contains declarative routing policy, `cdr.rs` contains the
+curated CDR projection registry and validation, `schema.rs` adapts BFBS
 reflection, `packaging.rs` builds packages, and `support.rs` contains shared
 I/O and process helpers.
 
@@ -151,11 +153,12 @@ The `ci` command:
 1. stages the Rust and C package inputs;
 2. renders generated text through MiniJinja;
 3. generates language bindings and BFBS assets;
-4. builds and tests the Rust crate;
-5. assembles the C archive with its required runtime;
-6. builds CMake `FetchContent` and `find_package` consumers;
-7. exercises the MCAP implementations;
-8. emits schema and BFBS checksum manifests.
+4. generates and tests the bounded CDRv1 projection catalogs and codecs;
+5. builds and tests the Rust crate;
+6. assembles the C archive with its required runtime;
+7. builds CMake `FetchContent` and `find_package` consumers;
+8. exercises the MCAP implementations;
+9. emits schema and BFBS checksum manifests.
 
 ## Release workflow
 

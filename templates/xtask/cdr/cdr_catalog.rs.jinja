@@ -1,0 +1,97 @@
+use crate::cdr::{CdrError, CdrReader, CdrWriter};
+
+pub const CDR_PROJECTION_CATALOG_VERSION: u8 = {{ version }};
+pub const CDR_PROJECTION_SET_IDENTITY: &str = {{ projection_set_identity|tojson }};
+pub const CDR_ENCODING: &str = {{ encoding|tojson }};
+pub const CDR_SCALAR_BYTE_ORDER: &str = {{ scalar_byte_order|tojson }};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CdrProjectionInfo {
+    pub topic_id: u16,
+    pub synapse_topic: &'static str,
+    pub synapse_schema_hash: &'static str,
+    pub ros_topic: &'static str,
+    pub ros_type: &'static str,
+    pub dds_type: &'static str,
+    pub rihs01: &'static str,
+    pub idl_path: &'static str,
+    pub idl: &'static str,
+    pub idl_sha256: &'static str,
+    pub body_bytes: usize,
+    pub total_bytes: usize,
+}
+
+pub const CDR_PROJECTIONS: &[CdrProjectionInfo] = &[
+{%- for projection in projections %}
+    CdrProjectionInfo {
+        topic_id: {{ projection.topic_id }},
+        synapse_topic: {{ projection.synapse_topic|tojson }},
+        synapse_schema_hash: {{ projection.synapse_schema_hash|tojson }},
+        ros_topic: {{ projection.ros_topic|tojson }},
+        ros_type: {{ projection.ros_type|tojson }},
+        dds_type: {{ projection.dds_type|tojson }},
+        rihs01: {{ projection.rihs01|tojson }},
+        idl_path: {{ projection.package_idl_path|tojson }},
+        idl: include_str!(concat!("../", {{ projection.package_idl_path|tojson }})),
+        idl_sha256: {{ projection.idl_sha256|tojson }},
+        body_bytes: {{ projection.body_bytes }},
+        total_bytes: {{ projection.total_bytes }},
+    },
+{%- endfor %}
+];
+
+pub fn cdr_projection_by_topic_id(topic_id: u16) -> Option<&'static CdrProjectionInfo> {
+    CDR_PROJECTIONS
+        .iter()
+        .find(|projection| projection.topic_id == topic_id)
+}
+
+{%- for projection in projections %}
+
+pub const {{ projection.symbol|upper }}_CDR_BODY_BYTES: usize = {{ projection.body_bytes }};
+pub const {{ projection.symbol|upper }}_CDR_TOTAL_BYTES: usize = {{ projection.total_bytes }};
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct {{ projection.ros_message }}Cdr {
+{%- for field in projection.fields %}
+    pub {{ field.name }}: {% if field.count > 1 %}[{{ field.rust_type }}; {{ field.count }}]{% else %}{{ field.rust_type }}{% endif %},
+{%- endfor %}
+}
+
+impl {{ projection.ros_message }}Cdr {
+    pub fn encode(&self, bytes: &mut [u8]) -> Result<usize, CdrError> {
+        let mut writer = CdrWriter::new_le(bytes)?;
+{%- for field in projection.fields %}
+{%- if field.count > 1 %}
+        for value in self.{{ field.name }} {
+            writer.write_{{ field.codec_suffix }}(value)?;
+        }
+{%- else %}
+        writer.write_{{ field.codec_suffix }}(self.{{ field.name }})?;
+{%- endif %}
+{%- endfor %}
+{%- for unused in range(projection.trailing_padding) %}
+        writer.write_u8(0)?;
+{%- endfor %}
+        writer.finish_exact({{ projection.symbol|upper }}_CDR_TOTAL_BYTES)
+    }
+
+    pub fn decode(bytes: &[u8]) -> Result<Self, CdrError> {
+        let mut reader = CdrReader::new_le(bytes)?;
+        let value = Self {
+{%- for field in projection.fields %}
+            {{ field.name }}: {% if field.count > 1 %}[
+{%- for unused in range(field.count) %}
+                reader.read_{{ field.codec_suffix }}()?,
+{%- endfor %}
+            ]{% else %}reader.read_{{ field.codec_suffix }}()?{% endif %},
+{%- endfor %}
+        };
+{%- for unused in range(projection.trailing_padding) %}
+        let _ = reader.read_u8()?;
+{%- endfor %}
+        reader.finish()?;
+        Ok(value)
+    }
+}
+{%- endfor %}

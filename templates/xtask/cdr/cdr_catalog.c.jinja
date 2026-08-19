@@ -1,0 +1,109 @@
+#include <synapse/cdr_catalog.h>
+
+const synapse_cdr_projection_info_t
+    synapse_cdr_projections[SYNAPSE_CDR_PROJECTION_COUNT] = {
+{%- for projection in projections %}
+    {
+        {{ projection.topic_id }}U,
+        {{ projection.synapse_topic|tojson }},
+        {{ projection.synapse_schema_hash|tojson }},
+        {{ projection.ros_topic|tojson }},
+        {{ projection.ros_type|tojson }},
+        {{ projection.dds_type|tojson }},
+        {{ projection.rihs01|tojson }},
+        {{ projection.package_idl_path|tojson }},
+        {{ projection.idl_sha256|tojson }},
+        {{ projection.body_bytes }}U,
+        {{ projection.total_bytes }}U,
+    },
+{%- endfor %}
+};
+
+const synapse_cdr_projection_info_t *synapse_cdr_projection_by_topic_id(
+    uint16_t topic_id) {
+    size_t index;
+    for (index = 0U; index < SYNAPSE_CDR_PROJECTION_COUNT; ++index) {
+        if (synapse_cdr_projections[index].topic_id == topic_id) {
+            return &synapse_cdr_projections[index];
+        }
+    }
+    return NULL;
+}
+
+{%- for projection in projections %}
+
+synapse_cdr_result_t synapse_cdr_encode_{{ projection.symbol }}(
+    const synapse_cdr_{{ projection.symbol }}_t *value,
+    uint8_t *bytes, size_t capacity, size_t *written) {
+    synapse_cdr_writer_t writer;
+{%- if projection.needs_index %}
+    size_t index;
+{%- endif %}
+    synapse_cdr_result_t result;
+
+    if (value == NULL) {
+        return SYNAPSE_CDR_NULL_ARGUMENT;
+    }
+    result = synapse_cdr_writer_init_le(&writer, bytes, capacity);
+    if (result != SYNAPSE_CDR_OK) {
+        return result;
+    }
+{%- for field in projection.fields %}
+{%- if field.count > 1 %}
+    for (index = 0U; index < {{ field.count }}U; ++index) {
+        (void)synapse_cdr_write_{{ field.codec_suffix }}(
+            &writer, value->{{ field.name }}[index]);
+    }
+{%- else %}
+    (void)synapse_cdr_write_{{ field.codec_suffix }}(
+        &writer, value->{{ field.name }});
+{%- endif %}
+{%- endfor %}
+{%- if projection.trailing_padding > 0 %}
+    for (index = 0U; index < {{ projection.trailing_padding }}U; ++index) {
+        (void)synapse_cdr_write_u8(&writer, 0U);
+    }
+{%- endif %}
+    return synapse_cdr_writer_finish_exact(
+        &writer, SYNAPSE_CDR_{{ projection.symbol|upper }}_TOTAL_BYTES,
+        written);
+}
+
+synapse_cdr_result_t synapse_cdr_decode_{{ projection.symbol }}(
+    const uint8_t *bytes, size_t size,
+    synapse_cdr_{{ projection.symbol }}_t *value) {
+    synapse_cdr_reader_t reader;
+{%- if projection.needs_index %}
+    size_t index;
+{%- endif %}
+{%- if projection.trailing_padding > 0 %}
+    uint8_t padding;
+{%- endif %}
+    synapse_cdr_result_t result;
+
+    if (value == NULL) {
+        return SYNAPSE_CDR_NULL_ARGUMENT;
+    }
+    result = synapse_cdr_reader_init_le(&reader, bytes, size);
+    if (result != SYNAPSE_CDR_OK) {
+        return result;
+    }
+{%- for field in projection.fields %}
+{%- if field.count > 1 %}
+    for (index = 0U; index < {{ field.count }}U; ++index) {
+        (void)synapse_cdr_read_{{ field.codec_suffix }}(
+            &reader, &value->{{ field.name }}[index]);
+    }
+{%- else %}
+    (void)synapse_cdr_read_{{ field.codec_suffix }}(
+        &reader, &value->{{ field.name }});
+{%- endif %}
+{%- endfor %}
+{%- if projection.trailing_padding > 0 %}
+    for (index = 0U; index < {{ projection.trailing_padding }}U; ++index) {
+        (void)synapse_cdr_read_u8(&reader, &padding);
+    }
+{%- endif %}
+    return synapse_cdr_reader_finish(&reader);
+}
+{%- endfor %}

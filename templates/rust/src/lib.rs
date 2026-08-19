@@ -23,6 +23,8 @@ pub mod cmd {
 }
 
 pub mod actuator_outputs_contract;
+pub mod cdr;
+pub mod cdr_catalog;
 pub mod schemas;
 pub mod topic_catalog;
 pub mod topic_decode;

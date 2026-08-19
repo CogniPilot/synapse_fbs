@@ -18,6 +18,7 @@ mod actuator_outputs_contract;
 
 include!("protocol.rs");
 include!("identity.rs");
+include!("cdr.rs");
 include!("actuator_vectors.rs");
 #[derive(Debug)]
 struct Tools {
@@ -87,6 +88,7 @@ fn check(root: &Path) -> Result<()> {
     wire_check(root, &wire)?;
 
     let templates = Templates::new(root)?;
+    validate_cdr_idl_sources(root, &templates, &schema)?;
     let context = topic_catalog_context(&schema, &topics)?;
     for (template, output) in [
         ("xtask/topic_catalog/topics.json.jinja", "topics.json"),
