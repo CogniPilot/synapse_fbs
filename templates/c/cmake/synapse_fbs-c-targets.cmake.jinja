@@ -55,6 +55,18 @@ add_library(synapse_fbs::mcap ALIAS synapse_fbs_mcap)
 
 target_link_libraries(synapse_fbs_mcap PUBLIC synapse_fbs_c)
 
+if(TARGET zephyr_interface)
+  foreach(_synapse_fbs_target IN ITEMS
+      synapse_fbs_flatcc_runtime
+      synapse_fbs_print
+      synapse_fbs_cdr
+      synapse_fbs_wire
+      synapse_fbs_mcap)
+    target_link_libraries(${_synapse_fbs_target} PRIVATE zephyr_interface)
+  endforeach()
+  unset(_synapse_fbs_target)
+endif()
+
 if(CONFIG_SYNAPSE_FBS_MCAP AND TARGET app)
   target_link_libraries(app PRIVATE synapse_fbs::mcap)
 endif()
