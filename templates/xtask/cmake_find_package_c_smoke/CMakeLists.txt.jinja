@@ -21,6 +21,9 @@ endif()
 if(NOT TARGET synapse_fbs::cdr)
   message(FATAL_ERROR "missing target: synapse_fbs::cdr")
 endif()
+if(NOT TARGET synapse_fbs::wire)
+  message(FATAL_ERROR "missing target: synapse_fbs::wire")
+endif()
 
 add_executable(smoke main.c)
 target_link_libraries(smoke PRIVATE
@@ -28,5 +31,6 @@ target_link_libraries(smoke PRIVATE
   synapse_fbs::flatcc_runtime
   synapse_fbs::print
   synapse_fbs::cdr
+  synapse_fbs::wire
   synapse_fbs::mcap
 )

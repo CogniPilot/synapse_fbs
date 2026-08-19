@@ -19,5 +19,6 @@ add_executable(smoke main.c)
 target_link_libraries(smoke PRIVATE
   synapse_fbs::c
   synapse_fbs::cdr
+  synapse_fbs::wire
   synapse_fbs::mcap
 )

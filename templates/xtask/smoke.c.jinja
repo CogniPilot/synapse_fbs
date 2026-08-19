@@ -1,4 +1,8 @@
 #include <synapse/transport_reader.h>
 #include <synapse/topic_catalog.h>
+#include <synapse/wire.h>
 
-int main(void) { return synapse_topic_by_id(1) == 0; }
+int main(void) {
+  return synapse_topic_by_id(1) == 0 ||
+         synapse_wire_rejection_name(SYNAPSE_WIRE_REJECTION_NONE) == 0;
+}
